@@ -2,6 +2,19 @@
 # aquí no hay valores secretos. Los puertos solo se publican en los archivos de entorno.
 name: lympha
 
+# Una sola imagen con cuatro comandos. En dev se construye; en staging/producción se toma de GHCR.
+x-servidor: &servidor
+  image: ${LYMPHA_IMAGE:-lympha-server:dev}
+  init: true
+
+x-proceso: &proceso
+  <<: *servidor
+  restart: unless-stopped
+  depends_on:
+    migrate: { condition: service_completed_successfully }
+    mqtt-bootstrap: { condition: service_completed_successfully }
+    valkey: { condition: service_healthy }
+
 services:
   postgres:
     image: timescale/timescaledb:2.26.0-pg16
@@ -30,7 +43,7 @@ services:
       - -c
       - max_worker_processes=16
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -63,6 +76,44 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
+
+  # Jobs de una sola ejecución (misma imagen que los procesos).
+  migrate:
+    <<: *servidor
+    command: ["src/cli/migrate.ts"]
+    restart: "no"
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  mqtt-bootstrap:
+    <<: *servidor
+    command: ["src/cli/mqtt-bootstrap.ts"]
+    restart: "no"
+    depends_on:
+      mosquitto: { condition: service_healthy }
+
+  # Los cuatro procesos.
+  api:
+    <<: *proceso
+    command: ["src/main/api.ts"]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 15s
+
+  ingest:
+    <<: *proceso
+    command: ["src/main/ingest.ts"]
+
+  worker:
+    <<: *proceso
+    command: ["src/main/worker.ts"]
+
+  notifier:
+    <<: *proceso
+    command: ["src/main/notifier.ts"]
 
 volumes:
   pgdata:

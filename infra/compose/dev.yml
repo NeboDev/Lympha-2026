@@ -1,6 +1,22 @@
 # Desarrollo local:
 #   docker compose -f infra/compose/base.yml -f infra/compose/dev.yml up
+# Con recarga al guardar (sincroniza src/ y reinicia el proceso):  ... up --watch
 # Todo escucha solo en 127.0.0.1. Las variables salen de dev.env (valores de desarrollo, no secretos).
+x-dev-servidor: &dev-servidor
+  image: lympha-server:dev
+  pull_policy: never
+  build:
+    context: ../..
+    dockerfile: apps/server/Dockerfile
+    target: dev
+  env_file: [dev.env]
+  develop:
+    watch:
+      - { path: ../../apps/server/src, target: /app/apps/server/src, action: sync+restart }
+      - { path: ../../apps/server/migrations, target: /app/apps/server/migrations, action: sync }
+      - { path: ../../packages/contracts/src, target: /app/packages/contracts/src, action: sync+restart }
+      - { path: ../../apps/server/package.json, action: rebuild }
+
 services:
   postgres:
     env_file: [dev.env]
@@ -27,3 +43,38 @@ services:
     ports:
       - "127.0.0.1:1883:1883"
       - "127.0.0.1:8883:8883"
+
+  migrate:
+    <<: *dev-servidor
+
+  mqtt-bootstrap:
+    <<: *dev-servidor
+
+  # Semillas de desarrollo (equivale a `pnpm db:seed`): usuario, espacio, nodo y su cliente MQTT.
+  seed:
+    <<: *dev-servidor
+    command: ["src/cli/seed.ts"]
+    restart: "no"
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      mqtt-bootstrap: { condition: service_completed_successfully }
+
+  # Cada proceso entra a Valkey con su propio usuario ACL.
+  api:
+    <<: *dev-servidor
+    environment:
+      VALKEY_URL: redis://api:dev-valkey-api@valkey:6379
+    ports: ["127.0.0.1:3000:3000"]
+
+  ingest:
+    <<: *dev-servidor
+    environment:
+      VALKEY_URL: redis://ingest:dev-valkey-ingest@valkey:6379
+
+  worker:
+    <<: *dev-servidor
+    environment:
+      VALKEY_URL: redis://worker:dev-valkey-worker@valkey:6379
+
+  notifier:
+    <<: *dev-servidor

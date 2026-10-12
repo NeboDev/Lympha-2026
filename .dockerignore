@@ -1,0 +1,13 @@
+**/node_modules
+**/dist
+.git
+.github
+.claude
+openspec
+infra/certs
+infra/secrets
+*.md
+!apps/**/README.md
+.env
+.env.*
+apps/web

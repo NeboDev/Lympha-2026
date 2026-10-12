@@ -2,6 +2,7 @@ import { topico } from "@lympha/contracts";
 import { Worker } from "bullmq";
 import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { iniciarNodo } from "../../../tools/simulator/src/nodo.ts";
 import { crearApi } from "../src/main/api.ts";
 import { iniciarIngest } from "../src/main/ingest.ts";
 import { iniciarNotifier } from "../src/main/notifier.ts";
@@ -302,6 +303,54 @@ describe("de la lectura MQTT a la API", () => {
       expect(libre.statusCode).toBe(404);
     } finally {
       await api.cerrar();
+    }
+  });
+});
+
+describe("simulador de nodos", () => {
+  const NODO_SIM = "0192f3a7-0000-7000-8000-00000000d0d1";
+
+  it("un nodo simulado publica por MQTT y sus lecturas quedan en ts.lecturas", async () => {
+    await owner.query(
+      `INSERT INTO app.nodos (id, lote_id, espacio_id, estado, claim_hash, reclamado_en)
+       VALUES ($1, $2, $3, 'reclamado', decode('00', 'hex'), now())`,
+      [NODO_SIM, ID.lote, ID.espacioAna],
+    );
+    const admin = crearClienteMqtt({
+      url: mq.url,
+      username: "lympha-admin",
+      password: MQTT_PW.admin,
+      clientId: "lympha-admin-prueba-sim",
+    });
+    await esperarConexion(admin);
+    await new ClienteDynsec(admin).asegurarNodo({
+      deviceId: NODO_SIM,
+      password: PW_NODO,
+      loteId: ID.lote,
+    });
+    await cerrarCliente(admin);
+
+    const worker = await iniciarWorker(cfgWorker(), log);
+    const ingest = await iniciarIngest(cfgIngest(), log);
+    try {
+      const nodo = await iniciarNodo({
+        deviceId: NODO_SIM,
+        password: PW_NODO,
+        url: mq.url,
+        intervaloS: 1,
+        maxLecturas: 3,
+      });
+      await nodo.terminado;
+      await nodo.detener();
+      await esperar(async () => (await contar(NODO_SIM)) === 3);
+      const r = await owner.query("SELECT seq, ph FROM ts.lecturas WHERE nodo_id=$1 ORDER BY seq", [
+        NODO_SIM,
+      ]);
+      expect(r.rows.map((f) => f.seq)).toEqual([0, 1, 2]);
+      expect(r.rows.every((f) => f.ph > 6 && f.ph < 8.5)).toBe(true);
+    } finally {
+      await ingest.detener();
+      await worker.detener();
     }
   });
 });

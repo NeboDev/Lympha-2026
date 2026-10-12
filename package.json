@@ -16,7 +16,8 @@
     "test": "vitest run --project unit --passWithNoTests",
     "test:int": "vitest run --project integration --passWithNoTests",
     "migrate": "pnpm --filter @lympha/server migrate",
-    "db:seed": "pnpm --filter @lympha/server db:seed"
+    "db:seed": "pnpm --filter @lympha/server db:seed",
+    "simulator": "node --env-file=infra/compose/dev.env tools/simulator/src/cli.ts --url mqtts://localhost:8883 --ca infra/certs/ca.crt"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.15",

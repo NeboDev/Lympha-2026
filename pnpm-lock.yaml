@@ -70,6 +70,15 @@ importers:
         specifier: ^3.25.76
         version: 3.25.76
 
+  tools/simulator:
+    dependencies:
+      '@lympha/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      mqtt:
+        specifier: ^5.16.0
+        version: 5.16.0
+
 packages:
 
   '@babel/runtime@7.29.10':

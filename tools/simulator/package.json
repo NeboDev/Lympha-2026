@@ -1,0 +1,14 @@
+{
+  "name": "@lympha/simulator",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "start": "node src/cli.ts"
+  },
+  "dependencies": {
+    "@lympha/contracts": "workspace:*",
+    "mqtt": "^5.16.0"
+  }
+}
