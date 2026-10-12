@@ -27,8 +27,6 @@ psql -v ON_ERROR_STOP=1 \
   -v pw_owner="$PW_OWNER" -v pw_app="$PW_APP" -v pw_system="$PW_SYSTEM" -v pw_backup="$PW_BACKUP" \
   <<'SQL'
 CREATE EXTENSION IF NOT EXISTS timescaledb;
-CREATE EXTENSION IF NOT EXISTS pgcrypto;   -- digest() para hashes
-CREATE EXTENSION IF NOT EXISTS citext;     -- correos sin distinguir mayúsculas
 
 -- Roles: se crean si faltan y siempre se actualiza la contraseña (rotación).
 SELECT format('CREATE ROLE %I LOGIN', r) FROM (VALUES ('lympha_owner'), ('lympha_app'),
@@ -55,7 +53,13 @@ SELECT format('REVOKE CONNECT, TEMPORARY ON DATABASE %I FROM PUBLIC', current_da
 CREATE SCHEMA IF NOT EXISTS app AUTHORIZATION lympha_owner;
 CREATE SCHEMA IF NOT EXISTS ts  AUTHORIZATION lympha_owner;
 
-ALTER ROLE lympha_owner  SET search_path = app, ts, pg_catalog;
+-- pgcrypto (digest) y citext viven en app: las funciones SECURITY DEFINER fijan search_path = app, pg_temp,
+-- y public queda cerrado para todos salvo para el dueño (TimescaleDB vive en public).
+CREATE EXTENSION IF NOT EXISTS pgcrypto SCHEMA app;
+CREATE EXTENSION IF NOT EXISTS citext   SCHEMA app;
+GRANT USAGE ON SCHEMA public TO lympha_owner;
+
+ALTER ROLE lympha_owner  SET search_path = app, ts, public, pg_catalog;
 ALTER ROLE lympha_app    SET search_path = app, pg_catalog;
 ALTER ROLE lympha_system SET search_path = app, ts, pg_catalog;
 ALTER ROLE lympha_app    SET statement_timeout = '5s';
