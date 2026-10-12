@@ -9,7 +9,7 @@
   },
   "scripts": {
     "prepare": "node scripts/setup-hooks.mjs",
-    "dev": "docker compose -f infra/compose/base.yml -f infra/compose/dev.yml up --build",
+    "dev": "docker compose -f infra/compose/base.yml -f infra/compose/dev.yml up --build --watch",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "typecheck": "pnpm -r typecheck",
@@ -17,7 +17,8 @@
     "test:int": "vitest run --project integration --passWithNoTests",
     "migrate": "pnpm --filter @lympha/server migrate",
     "db:seed": "pnpm --filter @lympha/server db:seed",
-    "simulator": "node --env-file=infra/compose/dev.env tools/simulator/src/cli.ts --url mqtts://localhost:8883 --ca infra/certs/ca.crt"
+    "simulator": "node --env-file=infra/compose/dev.env tools/simulator/src/cli.ts --url mqtts://localhost:8883 --ca infra/certs/ca.crt",
+    "test:infra": "bash infra/test/deploy.test.sh && bash infra/test/prod-compose.test.sh"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.15",
