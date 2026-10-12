@@ -1,0 +1,28 @@
+# Caddy termina TLS (certificados automáticos) para la API y obtiene el certificado de mqtt.<dominio>,
+# que infra/bootstrap/cert-sync.sh copia a Mosquitto. Variables: API_DOMAIN, MQTT_DOMAIN, ACME_EMAIL.
+{
+	email {$ACME_EMAIL}
+}
+
+{$API_DOMAIN} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		# La API solo responde JSON: ningún recurso embebido ni enmarcado.
+		Content-Security-Policy "default-src 'none'; frame-ancestors 'none'"
+		-Server
+	}
+
+	reverse_proxy api:3000 {
+		health_uri /health
+		health_interval 10s
+	}
+}
+
+# Solo para que Caddy emita y renueve el certificado del broker; no sirve nada.
+{$MQTT_DOMAIN} {
+	respond "no encontrado" 404
+}

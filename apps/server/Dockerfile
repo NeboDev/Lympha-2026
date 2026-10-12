@@ -31,11 +31,16 @@ WORKDIR /app/apps/server
 USER node
 ENTRYPOINT ["node"]
 
-# ---- producción: solo dependencias de producción, sin raíz de escritura ----
-FROM base AS runtime
+# ---- producción: solo dependencias de producción; sin npm/corepack/pnpm (no hacen falta para
+# ejecutar y traen sus propias dependencias con vulnerabilidades que Trivy reportaría) ----
+FROM ${NODE_IMAGE} AS runtime
 ARG APP_VERSION=dev
 ENV NODE_ENV=production \
     APP_VERSION=${APP_VERSION}
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack \
+           /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack \
+ && mkdir -p /app && chown node:node /app
+WORKDIR /app
 COPY --from=deps-prod /app /app
 COPY packages/contracts/ packages/contracts/
 COPY apps/server/src/ apps/server/src/

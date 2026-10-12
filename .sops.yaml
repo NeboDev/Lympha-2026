@@ -1,0 +1,7 @@
+# Reglas de cifrado de SOPS: una llave age por entorno.
+# REEMPLAZA los marcadores con la llave PÚBLICA (age1...) que imprime `age-keygen` (ver infra/secrets/README.md).
+creation_rules:
+  - path_regex: infra/secrets/staging\.enc\.env$
+    age: REEMPLAZAR_CON_LLAVE_PUBLICA_AGE_DE_STAGING
+  - path_regex: infra/secrets/production\.enc\.env$
+    age: REEMPLAZAR_CON_LLAVE_PUBLICA_AGE_DE_PRODUCCION

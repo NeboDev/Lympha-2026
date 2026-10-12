@@ -1,0 +1,172 @@
+# Staging y producción (mismos archivos; solo cambian las variables y el tamaño del servidor):
+#   LYMPHA_IMAGE=ghcr.io/<dueño>/lympha-server:<sha> docker compose -p lympha-<entorno> \
+#     -f infra/compose/base.yml -f infra/compose/prod.yml up -d
+# Lo normal es no ejecutarlo a mano: lo hace infra/deploy.sh.
+#
+# Los secretos NO se escriben a disco: deploy.sh descifra infra/secrets/<entorno>.enc.env con SOPS, los
+# exporta al entorno del proceso y Compose los interpola aquí. Cada servicio recibe solo los suyos.
+# Nada de Postgres, Valkey ni el 1883 se publica; solo 80/443 (Caddy) y 8883 (Mosquitto).
+
+x-endurecido: &endurecido
+  restart: unless-stopped
+  read_only: true
+  tmpfs: [/tmp]
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  logging:
+    driver: json-file
+    options: { max-size: "10m", max-file: "5" }
+
+x-servidor: &servidor
+  image: ${LYMPHA_IMAGE:?falta LYMPHA_IMAGE}
+  pull_policy: missing
+
+services:
+  postgres:
+    <<: *endurecido
+    read_only: false # la imagen escribe en /var/run/postgresql y en PGDATA
+    cap_drop: []
+    mem_limit: ${PG_MEM_LIMIT:-4g}
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+      POSTGRES_DB: ${POSTGRES_DB:-lympha}
+      PW_OWNER: ${PW_OWNER:?}
+      PW_APP: ${PW_APP:?}
+      PW_SYSTEM: ${PW_SYSTEM:?}
+      PW_BACKUP: ${PW_BACKUP:?}
+    volumes:
+      - ${LYMPHA_DATA:-/srv/lympha/data}/postgres:/var/lib/postgresql/data
+    command:
+      - postgres
+      - -c
+      - shared_buffers=${PG_SHARED_BUFFERS:-2GB}
+      - -c
+      - effective_cache_size=${PG_EFFECTIVE_CACHE_SIZE:-5GB}
+      - -c
+      - work_mem=16MB
+      - -c
+      - maintenance_work_mem=${PG_MAINTENANCE_WORK_MEM:-512MB}
+      - -c
+      - max_connections=100
+      - -c
+      - random_page_cost=1.1
+      - -c
+      - log_min_duration_statement=500ms
+      - -c
+      - timescaledb.max_background_workers=8
+      - -c
+      - max_worker_processes=16
+      # Archivado de WAL (pgBackRest) llega con los respaldos de H6; wal_level=replica ya lo permite.
+      - -c
+      - wal_level=replica
+
+  valkey:
+    <<: *endurecido
+    mem_limit: 1280m
+    environment:
+      VALKEY_PW_API: ${VALKEY_PW_API:?}
+      VALKEY_PW_INGEST: ${VALKEY_PW_INGEST:?}
+      VALKEY_PW_WORKER: ${VALKEY_PW_WORKER:?}
+
+  mosquitto:
+    <<: *endurecido
+    read_only: false # el entrypoint ajusta permisos de /mosquitto/data
+    cap_drop: [ALL]
+    cap_add: [CHOWN, SETUID, SETGID, DAC_OVERRIDE, FOWNER]
+    mem_limit: 512m
+    environment:
+      MQTT_ADMIN_USER: ${MQTT_ADMIN_USER:?}
+      MQTT_ADMIN_PASSWORD: ${MQTT_ADMIN_PASSWORD:?}
+    volumes:
+      - ${LYMPHA_DATA:-/srv/lympha/data}/mosquitto:/mosquitto/data
+      # Certificados de mqtt.<dominio>: los obtiene Caddy y infra/bootstrap/cert-sync.sh los copia aquí.
+      - ${LYMPHA_DATA:-/srv/lympha/data}/mosquitto-certs:/mosquitto/certs:ro
+    ports:
+      - "8883:8883" # único puerto MQTT expuesto a internet; el 1883 queda en la red de Docker
+
+  caddy:
+    <<: *endurecido
+    image: caddy:2-alpine
+    mem_limit: 256m
+    environment:
+      API_DOMAIN: ${API_DOMAIN:?}
+      MQTT_DOMAIN: ${MQTT_DOMAIN:?}
+      ACME_EMAIL: ${ACME_EMAIL:?}
+    volumes:
+      - ../caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ${LYMPHA_DATA:-/srv/lympha/data}/caddy:/data
+    ports:
+      - "80:80"
+      - "443:443"
+
+  migrate:
+    <<: [*servidor, *endurecido]
+    restart: "no"
+    environment:
+      APP_ENV: ${APP_ENV:?}
+      NODE_ENV: production
+      DATABASE_URL_MIGRATE: postgres://lympha_owner:${PW_OWNER:?}@postgres:5432/lympha
+
+  mqtt-bootstrap:
+    <<: [*servidor, *endurecido]
+    restart: "no"
+    environment:
+      APP_ENV: ${APP_ENV:?}
+      NODE_ENV: production
+      MQTT_URL: mqtt://mosquitto:1883
+      MQTT_ADMIN_USER: ${MQTT_ADMIN_USER:?}
+      MQTT_ADMIN_PASSWORD: ${MQTT_ADMIN_PASSWORD:?}
+      MQTT_INGEST_USER: ${MQTT_INGEST_USER:?}
+      MQTT_INGEST_PASSWORD: ${MQTT_INGEST_PASSWORD:?}
+      MQTT_CONTROL_USER: ${MQTT_CONTROL_USER:?}
+      MQTT_CONTROL_PASSWORD: ${MQTT_CONTROL_PASSWORD:?}
+
+  api:
+    <<: [*servidor, *endurecido]
+    mem_limit: 512m
+    environment:
+      APP_ENV: ${APP_ENV:?}
+      NODE_ENV: production
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      APP_VERSION: ${LYMPHA_VERSION:-desconocida}
+      DATABASE_URL_APP: postgres://lympha_app:${PW_APP:?}@postgres:5432/lympha
+      VALKEY_URL: redis://api:${VALKEY_PW_API:?}@valkey:6379
+      MQTT_URL: mqtt://mosquitto:1883
+      MQTT_CONTROL_USER: ${MQTT_CONTROL_USER:?}
+      MQTT_CONTROL_PASSWORD: ${MQTT_CONTROL_PASSWORD:?}
+      CLAIM_PEPPER: ${CLAIM_PEPPER:?}
+    ports:
+      - "127.0.0.1:3000:3000" # solo para las pruebas de humo; el público entra por Caddy
+
+  ingest:
+    <<: [*servidor, *endurecido]
+    mem_limit: 512m
+    environment:
+      APP_ENV: ${APP_ENV:?}
+      NODE_ENV: production
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      DATABASE_URL_SYSTEM: postgres://lympha_system:${PW_SYSTEM:?}@postgres:5432/lympha
+      VALKEY_URL: redis://ingest:${VALKEY_PW_INGEST:?}@valkey:6379
+      MQTT_URL: mqtt://mosquitto:1883
+      MQTT_INGEST_USER: ${MQTT_INGEST_USER:?}
+      MQTT_INGEST_PASSWORD: ${MQTT_INGEST_PASSWORD:?}
+
+  worker:
+    <<: [*servidor, *endurecido]
+    mem_limit: 512m
+    environment:
+      APP_ENV: ${APP_ENV:?}
+      NODE_ENV: production
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      DATABASE_URL_SYSTEM: postgres://lympha_system:${PW_SYSTEM:?}@postgres:5432/lympha
+      VALKEY_URL: redis://worker:${VALKEY_PW_WORKER:?}@valkey:6379
+
+  notifier:
+    <<: [*servidor, *endurecido]
+    mem_limit: 256m
+    environment:
+      APP_ENV: ${APP_ENV:?}
+      NODE_ENV: production
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      DATABASE_URL_SYSTEM: postgres://lympha_system:${PW_SYSTEM:?}@postgres:5432/lympha
