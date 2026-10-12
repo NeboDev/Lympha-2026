@@ -2,3 +2,11 @@ packages:
   - apps/*
   - packages/*
   - tools/*
+
+# pnpm 11 bloquea scripts de instalación salvo los aprobados aquí.
+allowBuilds:
+  esbuild: true
+  cpu-features: false # opcional (ssh2 de testcontainers); hay alternativa en JS
+  ssh2: false
+  msgpackr-extract: false # opcional (BullMQ); hay alternativa en JS
+  protobufjs: false

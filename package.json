@@ -1,6 +1,7 @@
 {
   "name": "lympha",
   "private": true,
+  "type": "module",
   "version": "0.0.0",
   "packageManager": "pnpm@11.21.0",
   "engines": {
