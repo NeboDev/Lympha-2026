@@ -1,0 +1,8 @@
+title = "Lympha"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Valores de desarrollo local, no son secretos reales"
+paths = ['''infra/compose/dev\.env$''', '''\.env\.example$''']

@@ -1,0 +1,29 @@
+# Desarrollo local:
+#   docker compose -f infra/compose/base.yml -f infra/compose/dev.yml up
+# Todo escucha solo en 127.0.0.1. Las variables salen de dev.env (valores de desarrollo, no secretos).
+services:
+  postgres:
+    env_file: [dev.env]
+    ports: ["127.0.0.1:5432:5432"]
+
+  valkey:
+    env_file: [dev.env]
+    ports: ["127.0.0.1:6379:6379"]
+
+  # Una sola vez: CA propia y certificado de servidor para el 8883. La CA pública queda en infra/certs.
+  certs:
+    image: alpine/openssl:latest
+    entrypoint: ["/bin/sh", "/gen-dev-certs.sh"]
+    volumes:
+      - ../mosquitto/gen-dev-certs.sh:/gen-dev-certs.sh:ro
+      - mosquittocerts:/out/server
+      - ../certs:/out/ca
+    restart: "no"
+
+  mosquitto:
+    env_file: [dev.env]
+    depends_on:
+      certs: { condition: service_completed_successfully }
+    ports:
+      - "127.0.0.1:1883:1883"
+      - "127.0.0.1:8883:8883"

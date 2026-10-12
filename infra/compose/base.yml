@@ -1,0 +1,71 @@
+# Base común a todos los entornos. Las variables y secretos entran por `env_file` en dev.yml / prod.yml;
+# aquí no hay valores secretos. Los puertos solo se publican en los archivos de entorno.
+name: lympha
+
+services:
+  postgres:
+    image: timescale/timescaledb:2.26.0-pg16
+    restart: unless-stopped
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ../postgres/init-roles.sh:/docker-entrypoint-initdb.d/10-init-roles.sh:ro
+    command:
+      - postgres
+      - -c
+      - shared_buffers=256MB
+      - -c
+      - effective_cache_size=768MB
+      - -c
+      - work_mem=16MB
+      - -c
+      - maintenance_work_mem=128MB
+      - -c
+      - max_connections=100
+      - -c
+      - random_page_cost=1.1
+      - -c
+      - log_min_duration_statement=500ms
+      - -c
+      - timescaledb.max_background_workers=8
+      - -c
+      - max_worker_processes=16
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  valkey:
+    image: valkey/valkey:8-alpine
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "/usr/local/bin/lympha-entrypoint.sh"]
+    volumes:
+      - valkeydata:/data
+      - ../valkey/entrypoint.sh:/usr/local/bin/lympha-entrypoint.sh:ro
+      - ../valkey/valkey.conf.tpl:/etc/valkey/valkey.conf.tpl:ro
+    healthcheck:
+      test: ["CMD-SHELL", "valkey-cli --user api --pass \"$$VALKEY_PW_API\" --no-auth-warning ping | grep -q PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  mosquitto:
+    image: eclipse-mosquitto:2.1.2-alpine
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "/usr/local/bin/lympha-entrypoint.sh"]
+    volumes:
+      - mosquittodata:/mosquitto/data
+      - mosquittocerts:/mosquitto/certs:ro
+      - ../mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ../mosquitto/entrypoint.sh:/usr/local/bin/lympha-entrypoint.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 1883"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  pgdata:
+  valkeydata:
+  mosquittodata:
+  mosquittocerts:
