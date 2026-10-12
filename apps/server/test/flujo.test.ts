@@ -7,7 +7,9 @@ import { crearApi } from "../src/main/api.ts";
 import { iniciarIngest } from "../src/main/ingest.ts";
 import { iniciarNotifier } from "../src/main/notifier.ts";
 import { iniciarWorker } from "../src/main/worker.ts";
+import { crearResolvedorNodo } from "../src/modules/dispositivos/index.ts";
 import { cargarConfig } from "../src/platform/config.ts";
+import { crearBdSistema } from "../src/platform/db.ts";
 import { ClienteDynsec } from "../src/platform/dynsec.ts";
 import { crearLogger } from "../src/platform/logger.ts";
 import {
@@ -17,7 +19,7 @@ import {
   type MqttClient,
 } from "../src/platform/mqtt.ts";
 import { COLA_LECTURAS, crearCola } from "../src/platform/queues.ts";
-import { crearConexionBullmq } from "../src/platform/valkey.ts";
+import { crearConexionBullmq, crearValkey } from "../src/platform/valkey.ts";
 import {
   iniciarMosquitto,
   iniciarPostgres,
@@ -199,6 +201,23 @@ describe("de la lectura MQTT a la API", () => {
       const r = await owner.query("SELECT estado FROM app.nodos WHERE id=$1", [ID.nodo]);
       return r.rows[0].estado === "activo";
     });
+
+    // ingest dejó en Valkey la caché del nodo (con TTL): la escribe en una transacción MULTI/EXEC,
+    // que la ACL del usuario debe permitir.
+    const valkey = crearValkey(vk.url("worker"), "prueba-cache");
+    try {
+      const meta = await valkey.hgetall(`nodo:${ID.nodo}:meta`);
+      expect(meta).toMatchObject({
+        espacio_id: ID.espacioAna,
+        perfil_id: "cisterna",
+        perfil_version: "1",
+      });
+      const ttl = await valkey.ttl(`nodo:${ID.nodo}:meta`);
+      expect(ttl).toBeGreaterThan(0);
+      expect(ttl).toBeLessThanOrEqual(600);
+    } finally {
+      valkey.disconnect();
+    }
     await cerrarCliente(nodo);
   });
 
@@ -303,6 +322,41 @@ describe("de la lectura MQTT a la API", () => {
       expect(libre.statusCode).toBe(404);
     } finally {
       await api.cerrar();
+    }
+  });
+});
+
+describe("resolvedor de nodos con la ACL real de Valkey", () => {
+  it("consulta la base, escribe la caché en MULTI/EXEC sin errores y la siguiente vez la lee de Valkey", async () => {
+    const bd = crearBdSistema(pgc.url("system"), "prueba-resolver", 2);
+    const valkey = crearValkey(vk.url("ingest"), "prueba-resolver");
+    try {
+      await valkey.del(`nodo:${ID.nodo}:meta`);
+      const resolver = crearResolvedorNodo(valkey, bd);
+
+      // Con la ACL sin +@transaction esto lanzaba "EXECABORT ... no permissions to run 'exec'".
+      const primera = await resolver.resolver(ID.nodo);
+      expect(primera).toMatchObject({ espacioId: ID.espacioAna, perfilId: "cisterna" });
+
+      // La segunda vez no debe tocar Postgres: se cierra el pool y aun así responde.
+      await bd.cerrar();
+      expect(await resolver.resolver(ID.nodo)).toEqual(primera);
+
+      // Un nodo inexistente se recuerda unos segundos (caché negativa) y se invalida bajo demanda.
+      const inexistente = "0192f3a7-0000-7000-8000-0000000000dd";
+      const bd2 = crearBdSistema(pgc.url("system"), "prueba-resolver-2", 2);
+      try {
+        const r2 = crearResolvedorNodo(valkey, bd2);
+        expect(await r2.resolver(inexistente)).toBeNull();
+        expect(await valkey.ttl(`nodo:${inexistente}:meta`)).toBeGreaterThan(0);
+        await r2.invalidar(inexistente);
+        expect(await valkey.exists(`nodo:${inexistente}:meta`)).toBe(0);
+      } finally {
+        await bd2.cerrar();
+      }
+    } finally {
+      valkey.disconnect();
+      await bd.cerrar().catch(() => undefined);
     }
   });
 });
