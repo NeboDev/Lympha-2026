@@ -1,0 +1,10 @@
+node_modules/
+dist/
+coverage/
+.env
+.env.*
+!.env.example
+infra/certs/
+*.log
+.claude/worktrees/
+.DS_Store
