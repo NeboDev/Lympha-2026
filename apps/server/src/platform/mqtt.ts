@@ -12,6 +12,11 @@ export interface OpcionesMqtt {
   caFile?: string | undefined;
   /** `false` = sesión persistente (el broker guarda los QoS 1 mientras el cliente está caído). */
   clean?: boolean;
+  /**
+   * Segundos que el broker conserva la sesión tras desconectar. En MQTT 5 es obligatorio para que
+   * `clean: false` funcione: con el valor por defecto (0) la sesión muere al desconectar.
+   */
+  sessionExpiryInterval?: number;
   will?: IClientOptions["will"];
   /** Si es `true`, el `PUBACK` lo envía la aplicación (`message.handled`/`done`) y no mqtt.js. */
   customHandleAcks?: IClientOptions["customHandleAcks"];
@@ -30,6 +35,9 @@ export function crearClienteMqtt(op: OpcionesMqtt): MqttClient {
     resubscribe: true,
   };
   if (op.caFile) opciones.ca = readFileSync(op.caFile);
+  if (op.sessionExpiryInterval !== undefined) {
+    opciones.properties = { sessionExpiryInterval: op.sessionExpiryInterval };
+  }
   if (op.will) opciones.will = op.will;
   if (op.customHandleAcks) opciones.customHandleAcks = op.customHandleAcks;
   return connect(op.url, opciones);

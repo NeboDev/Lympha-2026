@@ -162,7 +162,7 @@ export class ClienteDynsec {
   }
 
   /** Envía comandos en una sola petición y devuelve una respuesta por comando. Una a la vez. */
-  ejecutar(comandos: Comando[], ms = 10_000): Promise<RespuestaComando[]> {
+  ejecutar(comandos: Comando[], ms = 3_000): Promise<RespuestaComando[]> {
     const turno = this.#cola.then(async () => {
       await this.#asegurarSuscripcion();
       return new Promise<RespuestaComando[]>((resolve, reject) => {
@@ -197,22 +197,54 @@ export class ClienteDynsec {
     return respuesta;
   }
 
-  /** Crea el rol si falta y deja sus ACL exactamente como `rol.acls` (sin tocar a los clientes). */
+  /**
+   * Crea el rol si falta y deja sus ACL exactamente como `rol.acls` (sin tocar a los clientes).
+   *
+   * Al cambiar las ACL del rol `admin` (la primera vez, para quitarle el acceso comodín que trae
+   * `mosquitto_ctrl dynsec init`) el broker reevalúa o reinicia la sesión del propio administrador y
+   * se pierde la respuesta en curso. La conciliación es idempotente (compara y corrige), así que
+   * se reintenta tras esperar la reconexión.
+   */
   async asegurarRol(rol: DefinicionRol): Promise<void> {
+    for (let intento = 1; ; intento++) {
+      try {
+        await this.#conciliarRol(rol);
+        return;
+      } catch (error) {
+        const reintentable = error instanceof Error && /sin respuesta|no quedó/.test(error.message);
+        if (!reintentable || intento >= 4) throw error;
+        await this.#esperarConexion();
+      }
+    }
+  }
+
+  async #esperarConexion(ms = 15_000): Promise<void> {
+    const limite = Date.now() + ms;
+    while (!this.#mqtt.connected && Date.now() < limite) {
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    await new Promise((r) => setTimeout(r, 300)); // deja que mqtt.js reponga la suscripción
+  }
+
+  async #conciliarRol(rol: DefinicionRol): Promise<void> {
     await this.comando(
       { command: "createRole", rolename: rol.rolename, textname: rol.textname },
       /already exists/i,
     );
-    const actual = await this.comando({ command: "getRole", rolename: rol.rolename });
-    const roleData = actual.data?.role as { acls?: Acl[] } | undefined;
-    const { quitar, agregar } = diferenciarAcls(roleData?.acls ?? [], rol.acls);
+    const leerAcls = async (): Promise<Acl[]> => {
+      const actual = await this.comando({ command: "getRole", rolename: rol.rolename });
+      return ((actual.data?.role as { acls?: Acl[] } | undefined)?.acls ?? []) as Acl[];
+    };
+
+    const { quitar, agregar } = diferenciarAcls(await leerAcls(), rol.acls);
     for (const a of quitar) {
-      await this.comando({
+      const orden: Comando = {
         command: "removeRoleACL",
         rolename: rol.rolename,
         acltype: a.acltype,
         topic: a.topic,
-      });
+      };
+      await this.comando(orden);
     }
     for (const a of agregar) {
       await this.comando({
@@ -223,6 +255,11 @@ export class ClienteDynsec {
         allow: a.allow,
         priority: a.priority ?? 0,
       });
+    }
+
+    const pendiente = diferenciarAcls(await leerAcls(), rol.acls);
+    if (pendiente.quitar.length > 0 || pendiente.agregar.length > 0) {
+      throw new ErrorDynsec("asegurarRol", `el rol ${rol.rolename} no quedó como se esperaba`);
     }
   }
 
@@ -252,7 +289,7 @@ export class ClienteDynsec {
         command: "createClient",
         username: c.username,
         password: c.password,
-        clientid: c.clientid ?? c.username,
+        ...(c.clientid ? { clientid: c.clientid } : {}),
         roles: [{ rolename: c.rolename }],
         ...(c.grupo ? { groups: [{ groupname: c.grupo }] } : {}),
       },
@@ -295,8 +332,14 @@ export class ClienteDynsec {
     });
   }
 
-  /** Base del broker: ACL por defecto, roles y clientes internos. Idempotente. */
-  async aplicarBase(internos: { username: string; password: string; rolename: string }[]) {
+  /**
+   * Base del broker: ACL por defecto, roles y clientes internos. Idempotente.
+   * `clientid` fija el id de cliente permitido (ingest: una sola sesión persistente); sin él, el
+   * usuario puede conectarse con cualquier id (control: api y worker usan ids distintos).
+   */
+  async aplicarBase(
+    internos: { username: string; password: string; rolename: string; clientid?: string }[],
+  ) {
     await this.negarPorDefecto();
     for (const rol of ROLES) await this.asegurarRol(rol);
     for (const i of internos) await this.asegurarCliente(i);

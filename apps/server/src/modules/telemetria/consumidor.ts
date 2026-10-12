@@ -1,0 +1,124 @@
+import { type Job, UnrecoverableError, Worker } from "bullmq";
+import type { BdSistema } from "../../platform/db.ts";
+import type { Logger } from "../../platform/logger.ts";
+import { COLA_LECTURAS } from "../../platform/queues.ts";
+import type { Redis } from "../../platform/valkey.ts";
+import { guardarLecturas } from "./guardar.ts";
+import { type LecturaTrabajo, type TrabajoLecturas, trabajoLecturas } from "./schema.ts";
+
+/**
+ * Consumidor de la cola `lecturas` con agrupación manual (BullMQ sin Pro): toma trabajos hasta
+ * `maximo` lecturas o hasta que pasen `ventanaMs` desde el primero, los guarda en un solo INSERT
+ * ordenado por (nodo_id, ts) y recién entonces los completa. Concurrencia 1: un lote a la vez,
+ * para no romper la histéresis que H2 calcula sobre lecturas ordenadas.
+ *
+ * Si el proceso cae a mitad de un lote, los trabajos quedan activos sin completar; el chequeo de
+ * trabajos estancados de BullMQ los devuelve a la cola y la idempotencia de la base evita duplicados.
+ */
+
+export interface OpcionesConsumidor {
+  conexion: Redis;
+  bd: BdSistema;
+  log: Logger;
+  ventanaMs?: number;
+  maximo?: number;
+  /** Tiempo tras el cual un trabajo sin completar se considera estancado. */
+  lockDurationMs?: number;
+  stalledIntervalMs?: number;
+}
+
+export interface Consumidor {
+  detener(): Promise<void>;
+}
+
+const dormir = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+export async function iniciarConsumidor(op: OpcionesConsumidor): Promise<Consumidor> {
+  const ventanaMs = op.ventanaMs ?? 200;
+  const maximo = op.maximo ?? 500;
+  const token = `consumidor-${process.pid}-${Date.now()}`;
+
+  const worker = new Worker<TrabajoLecturas>(COLA_LECTURAS, null, {
+    connection: op.conexion,
+    autorun: false,
+    lockDuration: op.lockDurationMs ?? 30_000,
+    stalledInterval: op.stalledIntervalMs ?? 30_000,
+    maxStalledCount: 5,
+  });
+  worker.on("error", (e) => op.log.error({ err: e }, "error de BullMQ"));
+  await worker.startStalledCheckTimer();
+
+  let activo = true;
+
+  async function leerLote(): Promise<{
+    trabajos: Job<TrabajoLecturas>[];
+    filas: LecturaTrabajo[];
+  }> {
+    const trabajos: Job<TrabajoLecturas>[] = [];
+    const filas: LecturaTrabajo[] = [];
+
+    const aceptar = async (job: Job<TrabajoLecturas>): Promise<void> => {
+      const v = trabajoLecturas.safeParse(job.data);
+      if (!v.success) {
+        op.log.error({ jobId: job.id }, "trabajo de lecturas con formato inválido; se descarta");
+        await job.moveToFailed(new UnrecoverableError("formato inválido"), token, false);
+        return;
+      }
+      trabajos.push(job);
+      filas.push(...v.data.lecturas);
+    };
+
+    // El primero espera (bloqueando) a que haya trabajo; el resto, solo mientras dure la ventana.
+    const primero = await worker.getNextJob(token, { block: true });
+    if (!primero) return { trabajos, filas };
+    await aceptar(primero);
+
+    const limite = Date.now() + ventanaMs;
+    while (activo && filas.length < maximo && Date.now() < limite) {
+      const job = await worker.getNextJob(token, { block: false });
+      if (job) {
+        await aceptar(job);
+      } else {
+        await dormir(Math.min(15, Math.max(0, limite - Date.now())));
+      }
+    }
+    return { trabajos, filas };
+  }
+
+  const bucle = (async () => {
+    while (activo) {
+      let lote: Awaited<ReturnType<typeof leerLote>>;
+      try {
+        lote = await leerLote();
+      } catch (error) {
+        if (!activo) break;
+        op.log.error({ err: error }, "no se pudo leer la cola; se reintenta");
+        await dormir(1000);
+        continue;
+      }
+      if (lote.trabajos.length === 0) continue;
+
+      try {
+        const r = await guardarLecturas(op.bd, lote.filas);
+        op.log.debug({ ...r, trabajos: lote.trabajos.length }, "lote guardado");
+        for (const job of lote.trabajos) await job.moveToCompleted(r, token, false);
+      } catch (error) {
+        op.log.error({ err: error, trabajos: lote.trabajos.length }, "no se pudo guardar el lote");
+        for (const job of lote.trabajos) {
+          await job.moveToFailed(error as Error, token, false).catch((e: unknown) => {
+            op.log.error({ err: e }, "no se pudo marcar el trabajo como fallido");
+          });
+        }
+        await dormir(500);
+      }
+    }
+  })();
+
+  return {
+    async detener() {
+      activo = false;
+      await worker.close();
+      await bucle.catch(() => undefined);
+    },
+  };
+}

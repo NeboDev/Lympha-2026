@@ -24,6 +24,7 @@ try {
       username: config.MQTT_INGEST_USER,
       password: config.MQTT_INGEST_PASSWORD,
       rolename: "ingest",
+      clientid: config.MQTT_INGEST_USER,
     },
     {
       username: config.MQTT_CONTROL_USER,

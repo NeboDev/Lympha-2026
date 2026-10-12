@@ -8,7 +8,9 @@ import { z } from "zod";
 const comun = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("production"),
   APP_ENV: z.enum(["local", "staging", "production"]),
-  LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace"]).default("info"),
+  LOG_LEVEL: z.enum(["silent", "fatal", "error", "warn", "info", "debug", "trace"]).default("info"),
+  /** SHA del commit con el que se construyó la imagen (lo inyecta el despliegue). */
+  APP_VERSION: z.string().default("dev"),
 });
 
 const urlPostgres = z.string().regex(/^postgres(ql)?:\/\//, "debe ser una URL postgres://");
