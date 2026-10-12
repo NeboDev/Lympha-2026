@@ -1,0 +1,11 @@
+#!/bin/sh
+# Pre-commit: Biome sobre lo staged y gitleaks (si está instalado; CI lo exige siempre).
+set -e
+
+pnpm exec biome check --staged --no-errors-on-unmatched
+
+if command -v gitleaks >/dev/null 2>&1; then
+  gitleaks protect --staged --redact --no-banner
+else
+  echo "aviso: gitleaks no está instalado; el escaneo de secretos solo correrá en CI" >&2
+fi
