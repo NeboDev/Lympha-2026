@@ -139,7 +139,7 @@ Cambio de plan: no habrá VPS hasta el inicio de H5. Todo se desarrolla y prueba
 
 ## Pendiente al cerrar H3
 
-- **Probar con el bot real:** `pnpm dev` con `TELEGRAM_BOT_TOKEN` en `.env` (long polling): vincular con el enlace, forzar una alarma con el simulador (`pnpm simulator --historia turbidez_sube --intervalo 1`) y comprobar el mensaje. Después, el webhook con un túnel (`PUBLIC_API_URL` + `TELEGRAM_WEBHOOK_SECRET`).
+- **Webhook con el bot real:** el long polling y los avisos se probaron con `@lympha_dev_bot` (`pnpm dev:telegram`, 2026-10-13; confirmado por el dueño del proyecto); falta el modo webhook con un túnel (`PUBLIC_API_URL` + `TELEGRAM_WEBHOOK_SECRET`).
 - **Avisos acumulados por el horario silencioso:** de noche se pueden juntar `abierta`, `escalada` y `resuelta` de una misma alarma y llegar los tres a las 07:00. Habría que fusionarlos o descartar los obsoletos al salir.
 - **Alerta interna de avisos fallidos:** hoy es un `log.error` y el contador `lympha_avisos_fallidos_total`; el bot interno de alertas es de H6.
 - **Un nodo conectado pero mudo** (el broker lo ve vivo, pero no manda lecturas) no alarma: solo se detecta la desconexión. Sería otra regla sobre `ultima_lectura_en`.
