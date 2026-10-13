@@ -1,67 +1,64 @@
 import { createServer, type Server } from "node:http";
+import { Counter, collectDefaultMetrics, Gauge, Registry } from "prom-client";
 
 /**
- * Métricas en el formato de texto de Prometheus, sin dependencias: contadores con etiquetas y medidores.
- * Cada proceso (ingest, worker) las expone en su propio puerto interno (`METRICS_PORT`); ese puerto no se
- * publica fuera de la red de Docker. Las etiquetas son siempre valores acotados (motivos, tipos), nunca ids.
+ * Métricas con prom-client (formato Prometheus). Cada proceso (ingest, worker) tiene su propio registro, con las
+ * métricas por defecto del proceso (CPU, memoria, event loop, GC...) y las de dominio, y lo expone en su puerto
+ * interno (`METRICS_PORT`); ese puerto no se publica fuera de la red de Docker. Las etiquetas son siempre valores
+ * acotados (motivos, tipos), nunca ids.
  */
 
 type Etiquetas = Record<string, string>;
 
-const clave = (e: Etiquetas) =>
-  Object.keys(e)
-    .sort()
-    .map((k) => `${k}="${(e[k] as string).replace(/[\\"\n]/g, "_")}"`)
-    .join(",");
-
 export interface Contador {
   inc(etiquetas?: Etiquetas, n?: number): void;
-  valor(etiquetas?: Etiquetas): number;
 }
 
 export interface Registro {
-  contador(nombre: string, ayuda: string): Contador;
+  /** Declara las etiquetas de antemano: prom-client no admite etiquetas que no se hayan declarado. */
+  contador(nombre: string, ayuda: string, etiquetas?: readonly string[]): Contador;
   medidor(nombre: string, ayuda: string, leer: () => number | Promise<number>): void;
   texto(): Promise<string>;
+  contentType: string;
 }
 
-export function crearRegistro(): Registro {
-  const contadores: { nombre: string; ayuda: string; valores: Map<string, number> }[] = [];
-  const medidores: { nombre: string; ayuda: string; leer: () => number | Promise<number> }[] = [];
+export function crearRegistro(opciones: { porDefecto?: boolean } = {}): Registro {
+  const registro = new Registry();
+  if (opciones.porDefecto ?? true) collectDefaultMetrics({ register: registro });
 
   return {
-    contador(nombre, ayuda) {
-      const valores = new Map<string, number>();
-      contadores.push({ nombre, ayuda, valores });
+    contentType: registro.contentType,
+    contador(nombre, ayuda, etiquetas = []) {
+      const c = new Counter({
+        name: nombre,
+        help: ayuda,
+        labelNames: [...etiquetas],
+        registers: [registro],
+      });
+      // Sin etiquetas se materializa en 0 para que la serie exista desde el arranque.
+      if (etiquetas.length === 0) c.inc(0);
       return {
-        inc(etiquetas = {}, n = 1) {
-          const k = clave(etiquetas);
-          valores.set(k, (valores.get(k) ?? 0) + n);
+        inc(valores = {}, n = 1) {
+          if (etiquetas.length === 0) c.inc(n);
+          else c.inc(valores, n);
         },
-        valor: (etiquetas = {}) => valores.get(clave(etiquetas)) ?? 0,
       };
     },
     medidor(nombre, ayuda, leer) {
-      medidores.push({ nombre, ayuda, leer });
+      new Gauge({
+        name: nombre,
+        help: ayuda,
+        registers: [registro],
+        async collect() {
+          try {
+            this.set(await leer());
+          } catch {
+            // un medidor que falla no tumba la página
+          }
+        },
+      });
     },
-    async texto() {
-      const lineas: string[] = [];
-      for (const c of contadores) {
-        lineas.push(`# HELP ${c.nombre} ${c.ayuda}`, `# TYPE ${c.nombre} counter`);
-        if (c.valores.size === 0) lineas.push(`${c.nombre} 0`);
-        for (const [k, v] of c.valores)
-          lineas.push(k ? `${c.nombre}{${k}} ${v}` : `${c.nombre} ${v}`);
-      }
-      for (const m of medidores) {
-        lineas.push(`# HELP ${m.nombre} ${m.ayuda}`, `# TYPE ${m.nombre} gauge`);
-        try {
-          lineas.push(`${m.nombre} ${await m.leer()}`);
-        } catch {
-          // un medidor que falla no tumba la página
-        }
-      }
-      return `${lineas.join("\n")}\n`;
-    },
+    texto: () => registro.metrics(),
   };
 }
 
@@ -72,7 +69,7 @@ export function servirMetricas(registro: Registro, puerto: number): Promise<Serv
       registro
         .texto()
         .then((t) => {
-          res.writeHead(200, { "content-type": "text/plain; version=0.0.4; charset=utf-8" });
+          res.writeHead(200, { "content-type": registro.contentType });
           res.end(t);
         })
         .catch(() => {

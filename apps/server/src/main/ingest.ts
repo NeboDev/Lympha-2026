@@ -40,10 +40,12 @@ export async function iniciarIngest(
   const recibidas = registro.contador(
     "lympha_mensajes_recibidos_total",
     "Mensajes de nodos recibidos por tipo",
+    ["tipo"],
   );
   const rechazadas = registro.contador(
     "lympha_lecturas_rechazadas_total",
     "Mensajes de nodos rechazados, por motivo",
+    ["motivo"],
   );
   const huecos = registro.contador(
     "lympha_lecturas_huecos_total",

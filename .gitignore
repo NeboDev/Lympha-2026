@@ -10,3 +10,4 @@ infra/certs/
 .DS_Store
 infra/staging-local/.estado/
 tools/factory/lotes/
+infra/test/salida-carga/

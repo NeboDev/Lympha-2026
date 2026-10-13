@@ -4,6 +4,7 @@ import { rutasEspacios } from "../modules/espacios/index.ts";
 import {
   crearAutenticador,
   crearVerificadorFirebase,
+  prepararEntornoFirebase,
   rutasIdentidad,
   type VerificadorToken,
 } from "../modules/identidad/index.ts";
@@ -90,17 +91,21 @@ export async function crearApi(
   // No se bloquea el arranque si el broker aún no está: /health reportará "degradado".
   esperarConexion(mqtt).catch((e: unknown) => log.warn({ err: e }, "MQTT: aún sin conexión"));
 
-  if (config.FIREBASE_AUTH_EMULATOR_HOST) {
+  prepararEntornoFirebase(config);
+  if (config.FIREBASE_USE_EMULATOR) {
     log.warn(
       { emulador: config.FIREBASE_AUTH_EMULATOR_HOST },
       "Firebase Auth: EMULADOR (solo local)",
     );
+  } else {
+    log.info({ proyecto: config.FIREBASE_PROJECT_ID }, "Firebase Auth: proyecto real");
   }
   const verificador =
     ajustes.verificador ??
     crearVerificadorFirebase({
       projectId: config.FIREBASE_PROJECT_ID,
       exigirCorreoVerificado: config.APP_ENV !== "local",
+      cuentaServicio: config.FIREBASE_USE_EMULATOR ? undefined : config.FIREBASE_SERVICE_ACCOUNT,
     });
 
   const modo: ModoTelegram = modoTelegram({

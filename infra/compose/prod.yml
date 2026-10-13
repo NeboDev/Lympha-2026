@@ -137,6 +137,7 @@ services:
       MQTT_CONTROL_PASSWORD: ${MQTT_CONTROL_PASSWORD:?}
       CLAIM_PEPPER: ${CLAIM_PEPPER:?}
       FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:?}
+      FIREBASE_SERVICE_ACCOUNT: ${FIREBASE_SERVICE_ACCOUNT:-} # opcional (base64 del JSON)
     ports:
       - "127.0.0.1:3000:3000" # solo para las pruebas de humo; el público entra por Caddy
 

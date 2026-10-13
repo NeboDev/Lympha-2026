@@ -84,7 +84,10 @@ services:
       firebase-auth: { condition: service_healthy }
     environment:
       VALKEY_URL: redis://api:dev-valkey-api@valkey:6379
+      # FIREBASE_USE_EMULATOR=true (por defecto) usa el emulador; false verifica tokens del proyecto real lympha-dev.
+      FIREBASE_USE_EMULATOR: ${FIREBASE_USE_EMULATOR:-true}
       FIREBASE_AUTH_EMULATOR_HOST: firebase-auth:9099
+      FIREBASE_SERVICE_ACCOUNT: ${FIREBASE_SERVICE_ACCOUNT:-}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       PUBLIC_API_URL: ${PUBLIC_API_URL:-}
       TELEGRAM_WEBHOOK_SECRET: ${TELEGRAM_WEBHOOK_SECRET:-}

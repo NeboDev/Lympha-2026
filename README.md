@@ -36,7 +36,8 @@ pnpm simulator --identidades tools/factory/lotes/<loteId>/identidades.json --nod
 
 Los valores de desarrollo están en `infra/compose/dev.env` (no son secretos). **Tus** secretos (token del bot de
 Telegram `@lympha_dev_bot` y, si usas un túnel, `PUBLIC_API_URL` y `TELEGRAM_WEBHOOK_SECRET`) van en `.env`, que no se
-versiona; los nombres están en `.env.example`. Sin `PUBLIC_API_URL`, Telegram usa long polling.
+versiona; los nombres están en `.env.example`. Sin `PUBLIC_API_URL`, Telegram usa long polling. `FIREBASE_USE_EMULATOR=true` (por defecto) usa el emulador de Auth; con `false` la API
+verifica tokens del proyecto real `lympha-dev`.
 
 ### CA propia y nodos de prueba
 
@@ -77,6 +78,7 @@ Se despliega lo **commiteado** (la imagen usa el árbol de trabajo). Está escri
 | `pnpm factory lote --cantidad N` | Fábrica: lote, identidades y clientes MQTT (`revocar-nodo`, `revocar-lote`; `--dev` reclama) |
 | `pnpm dev:token correo` | ID token del emulador de Firebase Auth |
 | `pnpm certs` | Crea o renueva la CA propia y el certificado de Mosquitto (`CERT_SANS`) |
+| `bash infra/test/carga-local.sh --duracion 5m` | Carga con 100 nodos y reinicios forzados; informe en `infra/test/resultados/` |
 | `pnpm simulator` | Nodo o flota simulada, con escenarios (`--escenario`, `--identidades`, `--nodos`) |
 | `bash infra/test/deploy.test.sh` | Pruebas de `infra/deploy.sh` (rollback, orden, secretos) |
 

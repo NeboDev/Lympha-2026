@@ -1,9 +1,10 @@
 import { topico } from "@lympha/contracts";
+import { sql } from "drizzle-orm";
 import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { registrarRutas } from "../src/main/api.ts";
 import { fabricarLote, revocarLote, revocarNodo } from "../src/modules/fabrica/index.ts";
-import { crearBdApp } from "../src/platform/db.ts";
+import { conUsuario, crearBdApp } from "../src/platform/db.ts";
 import { ClienteDynsec } from "../src/platform/dynsec.ts";
 import { crearServidorHttp } from "../src/platform/http.ts";
 import { crearLogger } from "../src/platform/logger.ts";
@@ -214,18 +215,87 @@ describe("CLI de fábrica", () => {
     );
   });
 
-  it("revocar un lote niega a todos sus nodos y bloquea el reclamo", async () => {
+  it("un nodo de un lote revocado no puede conectar, ni publicar, ni ser reclamado", async () => {
     const deps = { db: owner, dynsec, claimPepper: PEPPER };
     const lote = await fabricarLote(deps, { cantidad: 3, versionHw: "v1" });
-    for (const n of lote.nodos) expect(await publica(n.deviceId, n.mqttPassword)).toBe(true);
+    const fuera = await fabricarLote(deps, { cantidad: 1, versionHw: "v1" });
+    // antes: conectan y publican
+    for (const n of lote.nodos) {
+      expect(await conecta(n.deviceId, n.mqttPassword)).toBe(true);
+      expect(await publica(n.deviceId, n.mqttPassword)).toBe(true);
+    }
+    // una sesión abierta antes de la revocación también se corta
+    const [primero] = lote.nodos;
+    if (!primero) throw new Error("faltan nodos");
+    const abierta = crearClienteMqtt({
+      url: mq.url,
+      username: primero.deviceId,
+      password: primero.mqttPassword,
+      clientId: primero.deviceId,
+      reconnectPeriod: 0,
+    });
+    await esperarConexion(abierta);
+
     expect(await revocarLote(deps, lote.loteId)).toBe(3);
-    for (const n of lote.nodos) expect(await publica(n.deviceId, n.mqttPassword)).toBe(false);
+
+    // después: ni conectan ni publican
+    for (const n of lote.nodos) {
+      expect(await conecta(n.deviceId, n.mqttPassword), "conectar").toBe(false);
+      expect(await publica(n.deviceId, n.mqttPassword), "publicar").toBe(false);
+    }
+    for (let i = 0; i < 50 && abierta.connected; i++) await new Promise((r) => setTimeout(r, 100));
+    expect(abierta.connected, "la sesión abierta se corta").toBe(false);
+    abierta.end(true);
+
+    // el grupo del lote se conserva como registro, con el rol de revocación
+    const grupo = await dynsec.comando({ command: "getGroup", groupname: `lote:${lote.loteId}` });
+    const g = grupo.data?.group as { roles?: { rolename: string }[]; clients?: unknown[] };
+    expect(g.roles?.map((r) => r.rolename)).toContain("revocado");
+    expect(g.clients).toHaveLength(3);
+
+    // en Postgres: revocados, sin espacio, y su código ya no sirve para reclamarlos
     const r = await owner.query(
-      "SELECT count(*) n FROM app.nodos WHERE lote_id = $1 AND estado = 'revocado'",
+      "SELECT count(*) n FROM app.nodos WHERE lote_id = $1 AND estado = 'revocado' AND espacio_id IS NULL",
       [lote.loteId],
     );
     expect(Number(r.rows[0].n)).toBe(3);
-    // revocar dos veces no falla
+    const bd = crearBdApp(pgc.url("app"), 2);
+    try {
+      const espacio = (
+        await owner.query(
+          "INSERT INTO app.espacios (nombre, tipo) VALUES ('X', 'hogar') RETURNING id",
+        )
+      ).rows[0].id;
+      const usuario = (
+        await owner.query(
+          "INSERT INTO app.usuarios (auth_uid, email) VALUES ('uid-rev', 'rev@example.com') RETURNING id",
+        )
+      ).rows[0].id;
+      await owner.query(
+        "INSERT INTO app.membresias (espacio_id, usuario_id, rol) VALUES ($1, $2, 'propietario')",
+        [espacio, usuario],
+      );
+      const reclamar = (nodo: string, codigo: string) =>
+        conUsuario(
+          bd,
+          usuario,
+          (tx) =>
+            tx.execute(
+              sql`SELECT app.reclamar_nodo(${nodo}::uuid, ${codigo.replaceAll("-", "")}, ${espacio}::uuid, 'cisterna')`,
+            ),
+          { claimPepper: PEPPER },
+        );
+      await expect(reclamar(primero.deviceId, primero.codigoReclamo)).rejects.toThrow();
+      // un lote vecino sin revocar sigue pudiendo reclamarse y conectar
+      const [vecino] = fuera.nodos;
+      if (!vecino) throw new Error("falta el vecino");
+      expect(await conecta(vecino.deviceId, vecino.mqttPassword)).toBe(true);
+      await reclamar(vecino.deviceId, vecino.codigoReclamo);
+    } finally {
+      await bd.cerrar();
+    }
+
+    // revocar dos veces no falla; un lote inexistente sí
     expect(await revocarLote(deps, lote.loteId)).toBe(0);
     await expect(revocarLote(deps, "0192f3a7-0000-7000-8000-0000000000ee")).rejects.toThrow();
   });

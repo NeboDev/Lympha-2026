@@ -5,5 +5,6 @@ export {
   CorreoNoVerificado,
   crearVerificadorFirebase,
   type IdentidadVerificada,
+  prepararEntornoFirebase,
   type VerificadorToken,
 } from "./verificador.ts";
