@@ -29,6 +29,10 @@ curl -X POST -H "Authorization: Bearer $TOKEN" -H 'content-type: application/jso
 # Un nodo simulado (el de `db:seed`) publica por TLS una lectura por minuto
 pnpm simulator --intervalo 5 --escenario acidificacion
 
+# Historias de agua con nivel esperado (H2): lista y reproduce una
+pnpm simulator --historias
+pnpm simulator --historia turbidez_sube --intervalo 1
+
 # Una flota: la fábrica crea 100 nodos ya reclamados (solo local) y el simulador los conecta
 pnpm factory lote --cantidad 100 --version-hw sim --dev
 pnpm simulator --identidades tools/factory/lotes/<loteId>/identidades.json --nodos 100 --intervalo 10
@@ -87,7 +91,7 @@ Se despliega lo **commiteado** (la imagen usa el árbol de trabajo). Está escri
 ```
 apps/server   un paquete, una imagen, cuatro procesos: api · ingest · worker · notifier
 apps/web      PWA (vacía hasta H4)
-packages/     contracts (Zod: MQTT y API) · wqi (H2)
+packages/     contracts (Zod: MQTT, API y eventos SSE) · wqi (motor WQI puro, H2)
 tools/        simulator · factory (lotes generados; el CLI está en apps/server)
 infra/        compose · caddy · mosquitto · postgres · valkey · bootstrap · secrets · deploy.sh
 ```

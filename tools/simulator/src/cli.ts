@@ -12,6 +12,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
 import { type Escenario, leerEscenario } from "./escenarios.ts";
+import { buscarHistoria, HISTORIAS } from "./historias.ts";
 import { iniciarNodo, type NodoSimulado } from "./nodo.ts";
 
 const { values } = parseArgs({
@@ -21,6 +22,9 @@ const { values } = parseArgs({
     identidades: { type: "string" },
     nodos: { type: "string" },
     escenario: { type: "string" },
+    historia: { type: "string" },
+    historias: { type: "boolean" },
+    semilla: { type: "string" },
     "escenario-nodos": { type: "string" },
     url: { type: "string", default: process.env.MQTT_URL ?? "mqtts://localhost:8883" },
     ca: { type: "string", default: process.env.MQTT_CA_FILE },
@@ -34,7 +38,19 @@ const { values } = parseArgs({
 if (values.ayuda) {
   console.log(`Uso: simulator [--device-id ID --password PW | --identidades archivo.json [--nodos N]]
                  [--url mqtts://host:8883] [--ca ca.crt] [--intervalo segundos=60] [--lecturas N]
-                 [--escenario nombre|ruta.json] [--escenario-nodos N] [--conexiones-por-segundo 25]`);
+                 [--escenario nombre|ruta.json] [--escenario-nodos N] [--conexiones-por-segundo 25]
+                 [--historia nombre] [--semilla N]
+       simulator --historias      (lista las historias de agua con su nivel esperado)`);
+  process.exit(0);
+}
+
+if (values.historias) {
+  for (const h of HISTORIAS) {
+    console.log(
+      `${h.nombre.padEnd(22)} ${h.lecturas} lecturas  →  ${h.esperado.transiciones.join(" → ")}`,
+    );
+    console.log(`${"".padEnd(22)} ${h.descripcion}`);
+  }
   process.exit(0);
 }
 
@@ -45,6 +61,11 @@ function cargarEscenario(ref: string): Escenario {
   return leerEscenario(JSON.parse(readFileSync(ruta, "utf8")));
 }
 const escenario = values.escenario ? cargarEscenario(values.escenario) : undefined;
+const historia = values.historia ? buscarHistoria(values.historia) : undefined;
+if (values.historia && !historia) {
+  console.error(`No existe la historia "${values.historia}". Usa --historias para verlas.`);
+  process.exit(1);
+}
 const escenarioNodos = values["escenario-nodos"]
   ? Number(values["escenario-nodos"])
   : Number.POSITIVE_INFINITY;
@@ -99,6 +120,8 @@ for (const [i, c] of credenciales.entries()) {
         intervaloS: Number(values.intervalo),
         ...(values.lecturas ? { maxLecturas: Number(values.lecturas) } : {}),
         ...(escenario && i < escenarioNodos ? { escenario } : {}),
+        ...(historia ? { historia } : {}),
+        ...(values.semilla ? { semilla: Number(values.semilla) } : {}),
         log: registrar(c.deviceId),
       }),
     );
@@ -128,7 +151,7 @@ const salir = async () => {
 };
 process.on("SIGINT", () => void salir());
 process.on("SIGTERM", () => void salir());
-if (values.lecturas) {
+if (values.lecturas || historia) {
   await Promise.all(nodos.map((n) => n.terminado));
   await salir();
 }

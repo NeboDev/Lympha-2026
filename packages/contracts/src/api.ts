@@ -108,6 +108,9 @@ export const estadoNodoApi = z.object({
   wqi: z.number().nullable(),
   parametro_limitante: z.string().nullable(),
   confianza: z.enum(["ok", "dudosa", "revisar"]),
+  /** Frase de causa y acción del estado (RF-20); nula hasta que el nodo tiene su primera evaluación. */
+  causa: z.string().nullable(),
+  accion: z.string().nullable(),
   ultimos_valores: z.record(z.string(), z.unknown()).nullable(),
 });
 

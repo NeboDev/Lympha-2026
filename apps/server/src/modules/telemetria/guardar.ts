@@ -20,8 +20,8 @@ export function ordenarLecturas(filas: LecturaTrabajo[]): LecturaTrabajo[] {
 }
 
 /**
- * Deja en `estado_nodo` la última lectura de cada nodo del lote (la API la muestra mientras H2 no calcula el
- * WQI). Solo avanza hacia lecturas más recientes y solo si el nodo sigue en el mismo espacio.
+ * Deja en `estado_nodo` la última lectura de cada nodo del lote (la API la muestra hasta que el evaluador de
+ * `calidad` calcula el WQI). Solo avanza hacia lecturas más recientes y solo si el nodo sigue en el mismo espacio.
  */
 async function actualizarUltimaLectura(tx: Tx, ordenadas: LecturaTrabajo[]): Promise<void> {
   const ultima = new Map<string, LecturaTrabajo>();

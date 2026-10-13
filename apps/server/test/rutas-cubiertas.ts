@@ -53,6 +53,9 @@ export const RUTAS_CUBIERTAS: Record<string, Cobertura> = {
   "POST /api/nodos/:nodoId/desvincular": ajeno(
     "un usuario ajeno recibe 404 en el nodo, sus lecturas y sus acciones",
   ),
+  "GET /api/espacios/:espacioId/eventos": ajeno(
+    "un usuario ajeno recibe 404 en el espacio, sus miembros y sus nodos",
+  ),
   "GET /api/nodos/:nodoId/lecturas": ajeno(
     "un usuario ajeno recibe 404 en el nodo, sus lecturas y sus acciones",
   ),

@@ -10,7 +10,9 @@ Documentos fuente (raíz del repo). Precedencia si se contradicen: **datos > pla
 ## Alcance y estado
 Solo backend e infraestructura. `apps/web` queda como carpeta vacía con README; no se toca el firmware (repo aparte `lympha-firmware`).
 
-**H0 y H1: terminados en local** (ver `docs/decisiones.md`: "Modo local", "H1" y "Pendiente al cerrar H1"). **No avanzar a H2 sin instrucción.** H1 dejó: identidad con Firebase (emulador en local), API de espacios/membresías/invitaciones/nodos/lecturas, migración `0010`, `ingest` con `status`/`attributes`/huecos, `/metrics` (prom-client) en `ingest` y `worker`, CLI de fábrica sin grabado (`pnpm factory`) y simulador de flotas con escenarios JSON. Verificado: 100 nodos, reinicios forzados, 0 lecturas perdidas.
+**H0, H1 y H2: terminados en local** (ver `docs/decisiones.md`: "Modo local", "H1", "Pendiente al cerrar H1" y "H2"). **No avanzar a H3 sin instrucción.** H1 dejó: identidad con Firebase (emulador en local), API de espacios/membresías/invitaciones/nodos/lecturas, migración `0010`, `ingest` con `status`/`attributes`/huecos, `/metrics` (prom-client) en `ingest` y `worker`, CLI de fábrica sin grabado (`pnpm factory`) y simulador de flotas con escenarios JSON. Verificado: 100 nodos, reinicios forzados, 0 lecturas perdidas.
+
+**H2 (Calidad y estado)** con curvas **PROVISIONALES `0.1-provisional`** (perfil cisterna, base NOM-127; sin validar por un especialista, ver `docs/decisiones.md`, sección H2). Paquete `@lympha/wqi` puro; ventana móvil + histéresis en el worker (`modules/calidad`, enganchado con `alEvaluar` del consumidor); `ts.evaluaciones` y `app.estado_nodo` (con `causa`/`accion`, migración `0011`); SSE por espacio en `GET /api/espacios/:espacioId/eventos` (Bearer); 12 historias de agua con nivel esperado en `tools/simulator/src/historias.ts`. Sin alarmas ni avisos todavía (H3).
 
 ## Modo de trabajo actual: sin VPS (hasta el inicio de H5)
 - Todo se desarrolla y prueba en local (Compose de desarrollo). Los criterios de salida que dicen "en staging" se cumplen en el Compose local o en la VM de Multipass (`infra/staging-local/vm.sh`), que se usa para ensayar el despliegue al cierre de cada hito.
@@ -38,8 +40,8 @@ Node 24 · TypeScript 5.9 `strict` · pnpm workspaces · Fastify 5 + `fastify-ty
 ```
 apps/server/{src/{modules,platform,main,cli},migrations,test,Dockerfile}
 apps/web/                 # vacío + README (fuera de alcance)
-packages/{contracts,wqi}  # wqi: pendiente (H2)
-tools/{simulator,factory} # factory: solo guarda los lotes generados; el CLI vive en apps/server/src/cli/fabrica.ts
+packages/{contracts,wqi}  # wqi: motor WQI puro; el perfil cisterna está en UN archivo (src/perfiles/cisterna.ts)
+tools/{simulator,factory} # simulator: escenarios JSON por tiempo (escenarios.ts) e historias con nivel esperado (historias.ts); factory: solo guarda los lotes generados; el CLI vive en apps/server/src/cli/fabrica.ts
 infra/{compose,caddy,mosquitto,postgres,valkey,firebase,bootstrap,staging-local,secrets,test}  + deploy.sh, smoke.sh
 .github/workflows/{ci,deploy-staging,deploy-prod}.yml
 docs/decisiones.md
@@ -50,6 +52,7 @@ docs/decisiones.md
 - `pnpm install` · `pnpm dev` (Compose de desarrollo con `--build --watch`) · `pnpm simulator`
 - `pnpm test` (unitarias) · `pnpm test:int` (integración, Testcontainers, necesita Docker) · `pnpm test:infra` (deploy.sh y prod.yml)
 - `pnpm lint` / `pnpm lint:fix` (Biome) · `pnpm typecheck`
+- `pnpm --filter @lympha/wqi fixtures` regenera `packages/wqi/fixtures/cisterna.json` (solo al subir la versión del perfil; revisar el diff) · `pnpm simulator --historias` lista las historias
 - `pnpm migrate` · `pnpm db:seed` · `pnpm factory lote --cantidad N [--dev]` · `pnpm dev:token correo` · `pnpm certs` (`CERT_SANS=IP:...`)
 - `bash infra/test/carga-local.sh --nodos 100 --duracion 5m` (prueba de carga con reinicios forzados; informe en `infra/test/resultados/`)
 - `infra/staging-local/vm.sh crear|desplegar|rollback|ssh|destruir` (VM de Multipass)
@@ -59,6 +62,7 @@ docs/decisiones.md
 - TypeScript estricto, sin `any` implícito.
 - Un módulo solo importa la interfaz pública de otro (`modules/<x>/index.ts`); `main/`, `cli/` y `platform/` solo `modules/<x>/index.ts`. Lo hace cumplir Biome (`noRestrictedImports`).
 - Toda consulta de la API pasa por `conUsuario()` (fija `app.usuario_id` con `set_config(..., true)` en la transacción). Procesos internos: `conSistema()`. Las series de tiempo se leen solo por `app.v_*`.
+- WQI (RNF-24): cambiar curvas, pesos, umbrales o histéresis exige subir `version` en `packages/wqi/src/perfiles/cisterna.ts` y regenerar los casos de referencia; la prueba falla si un resultado cambia sin ello. Nunca decir "potable" ni "seguro" en frases (RNF-32; lo verifica una prueba).
 - Toda ruta nueva se declara en `apps/server/test/rutas-cubiertas.ts` (pública o con una prueba de acceso cruzado de `test/api.test.ts` que exista de verdad: 404 al ajeno, 403 al miembro sin rol); si no, falla `src/main/rutas.test.ts`. Rutas de usuario bajo `/api`; sin `/dev` ni `/metrics` en la API.
 - Errores de dominio = clases tipadas traducidas por la capa HTTP; nunca exponer trazas.
 - Configuración validada con Zod al arrancar (`platform/config.ts`); si falta una variable el proceso no inicia. Ningún secreto en código ni en imágenes.

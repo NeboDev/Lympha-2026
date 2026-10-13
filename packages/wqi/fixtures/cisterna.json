@@ -1,0 +1,387 @@
+{
+  "perfil": "cisterna",
+  "version": "0.1-provisional",
+  "casos": [
+    {
+      "nombre": "agua ideal",
+      "mediciones": {
+        "ph": 7.2,
+        "temperatura": 22,
+        "conductividad": 450,
+        "turbidez": 0.6,
+        "tds": 290
+      },
+      "esperado": {
+        "wqi": 100,
+        "puntajeDecision": 100,
+        "nivel": "buena",
+        "subindices": {
+          "ph": 100,
+          "temperatura": 100,
+          "conductividad": 100,
+          "turbidez": 100,
+          "tds": 100
+        },
+        "limitante": null
+      }
+    },
+    {
+      "nombre": "pH justo en el límite inferior de la NOM-127 (6.5)",
+      "mediciones": {
+        "ph": 6.5,
+        "temperatura": 22,
+        "conductividad": 450,
+        "turbidez": 0.6,
+        "tds": 290
+      },
+      "esperado": {
+        "wqi": 94,
+        "puntajeDecision": 80,
+        "nivel": "buena",
+        "subindices": {
+          "ph": 80,
+          "temperatura": 100,
+          "conductividad": 100,
+          "turbidez": 100,
+          "tds": 100
+        },
+        "limitante": null
+      }
+    },
+    {
+      "nombre": "pH justo en el límite superior de la NOM-127 (8.5)",
+      "mediciones": {
+        "ph": 8.5,
+        "temperatura": 22,
+        "conductividad": 450,
+        "turbidez": 0.6,
+        "tds": 290
+      },
+      "esperado": {
+        "wqi": 94,
+        "puntajeDecision": 80,
+        "nivel": "buena",
+        "subindices": {
+          "ph": 80,
+          "temperatura": 100,
+          "conductividad": 100,
+          "turbidez": 100,
+          "tds": 100
+        },
+        "limitante": null
+      }
+    },
+    {
+      "nombre": "turbidez justo en el límite (4 NTU)",
+      "mediciones": {
+        "ph": 7.2,
+        "temperatura": 22,
+        "conductividad": 450,
+        "turbidez": 4,
+        "tds": 290
+      },
+      "esperado": {
+        "wqi": 94,
+        "puntajeDecision": 80,
+        "nivel": "buena",
+        "subindices": {
+          "ph": 100,
+          "temperatura": 100,
+          "conductividad": 100,
+          "turbidez": 80,
+          "tds": 100
+        },
+        "limitante": null
+      }
+    },
+    {
+      "nombre": "TDS justo en el límite (1000 mg/L)",
+      "mediciones": {
+        "ph": 7.2,
+        "temperatura": 22,
+        "conductividad": 450,
+        "turbidez": 0.6,
+        "tds": 1000
+      },
+      "esperado": {
+        "wqi": 97,
+        "puntajeDecision": 80,
+        "nivel": "buena",
+        "subindices": {
+          "ph": 100,
+          "temperatura": 100,
+          "conductividad": 100,
+          "turbidez": 100,
+          "tds": 80
+        },
+        "limitante": null
+      }
+    },
+    {
+      "nombre": "pH ácido (5.8) con todo lo demás ideal",
+      "mediciones": {
+        "ph": 5.8,
+        "temperatura": 22,
+        "conductividad": 450,
+        "turbidez": 0.6,
+        "tds": 290
+      },
+      "esperado": {
+        "wqi": 81.4,
+        "puntajeDecision": 38,
+        "nivel": "critica",
+        "subindices": {
+          "ph": 38,
+          "temperatura": 100,
+          "conductividad": 100,
+          "turbidez": 100,
+          "tds": 100
+        },
+        "limitante": {
+          "parametro": "ph",
+          "direccion": "bajo"
+        }
+      }
+    },
+    {
+      "nombre": "pH alcalino (9.3) con todo lo demás ideal",
+      "mediciones": {
+        "ph": 9.3,
+        "temperatura": 22,
+        "conductividad": 450,
+        "turbidez": 0.6,
+        "tds": 290
+      },
+      "esperado": {
+        "wqi": 79.6,
+        "puntajeDecision": 32,
+        "nivel": "critica",
+        "subindices": {
+          "ph": 32,
+          "temperatura": 100,
+          "conductividad": 100,
+          "turbidez": 100,
+          "tds": 100
+        },
+        "limitante": {
+          "parametro": "ph",
+          "direccion": "alto"
+        }
+      }
+    },
+    {
+      "nombre": "turbidez de 12 NTU con todo lo demás ideal: un parámetro crítico limita el nivel",
+      "mediciones": {
+        "ph": 7.2,
+        "temperatura": 22,
+        "conductividad": 450,
+        "turbidez": 12,
+        "tds": 290
+      },
+      "esperado": {
+        "wqi": 79.86,
+        "puntajeDecision": 32.86,
+        "nivel": "critica",
+        "subindices": {
+          "ph": 100,
+          "temperatura": 100,
+          "conductividad": 100,
+          "turbidez": 32.86,
+          "tds": 100
+        },
+        "limitante": {
+          "parametro": "turbidez",
+          "direccion": "alto"
+        }
+      }
+    },
+    {
+      "nombre": "turbidez de 6 NTU: regular aunque el promedio sea alto",
+      "mediciones": {
+        "ph": 7.2,
+        "temperatura": 22,
+        "conductividad": 450,
+        "turbidez": 6,
+        "tds": 290
+      },
+      "esperado": {
+        "wqi": 89.5,
+        "puntajeDecision": 65,
+        "nivel": "regular",
+        "subindices": {
+          "ph": 100,
+          "temperatura": 100,
+          "conductividad": 100,
+          "turbidez": 65,
+          "tds": 100
+        },
+        "limitante": {
+          "parametro": "turbidez",
+          "direccion": "alto"
+        }
+      }
+    },
+    {
+      "nombre": "turbidez de 8 NTU: mala",
+      "mediciones": {
+        "ph": 7.2,
+        "temperatura": 22,
+        "conductividad": 450,
+        "turbidez": 8,
+        "tds": 290
+      },
+      "esperado": {
+        "wqi": 85,
+        "puntajeDecision": 50,
+        "nivel": "mala",
+        "subindices": {
+          "ph": 100,
+          "temperatura": 100,
+          "conductividad": 100,
+          "turbidez": 50,
+          "tds": 100
+        },
+        "limitante": {
+          "parametro": "turbidez",
+          "direccion": "alto"
+        }
+      }
+    },
+    {
+      "nombre": "sales altas (TDS 1400, CE 2150)",
+      "mediciones": {
+        "ph": 7.2,
+        "temperatura": 22,
+        "conductividad": 2150,
+        "turbidez": 0.6,
+        "tds": 1400
+      },
+      "esperado": {
+        "wqi": 86.5,
+        "puntajeDecision": 54,
+        "nivel": "mala",
+        "subindices": {
+          "ph": 100,
+          "temperatura": 100,
+          "conductividad": 54,
+          "turbidez": 100,
+          "tds": 56
+        },
+        "limitante": {
+          "parametro": "conductividad",
+          "direccion": "alto"
+        }
+      }
+    },
+    {
+      "nombre": "agua caliente (40 °C) no limita por sí sola",
+      "mediciones": {
+        "ph": 7.2,
+        "temperatura": 40,
+        "conductividad": 450,
+        "turbidez": 0.6,
+        "tds": 290
+      },
+      "esperado": {
+        "wqi": 94,
+        "puntajeDecision": 94,
+        "nivel": "buena",
+        "subindices": {
+          "ph": 100,
+          "temperatura": 40,
+          "conductividad": 100,
+          "turbidez": 100,
+          "tds": 100
+        },
+        "limitante": {
+          "parametro": "temperatura",
+          "direccion": "alto"
+        }
+      }
+    },
+    {
+      "nombre": "todo en mal estado",
+      "mediciones": {
+        "ph": 5,
+        "temperatura": 50,
+        "conductividad": 4500,
+        "turbidez": 30,
+        "tds": 3000
+      },
+      "esperado": {
+        "wqi": 1.33,
+        "puntajeDecision": 0,
+        "nivel": "critica",
+        "subindices": {
+          "ph": 0,
+          "temperatura": 13.33,
+          "conductividad": 0,
+          "turbidez": 0,
+          "tds": 0
+        },
+        "limitante": {
+          "parametro": "ph",
+          "direccion": "bajo"
+        }
+      }
+    },
+    {
+      "nombre": "sin turbidez (sensor sin dato): se recalcula con el peso restante",
+      "mediciones": {
+        "ph": 7.2,
+        "temperatura": 22,
+        "conductividad": 450,
+        "turbidez": null,
+        "tds": 290
+      },
+      "esperado": {
+        "wqi": 100,
+        "puntajeDecision": 100,
+        "nivel": "buena",
+        "subindices": {
+          "ph": 100,
+          "temperatura": 100,
+          "conductividad": 100,
+          "tds": 100
+        },
+        "limitante": null
+      }
+    },
+    {
+      "nombre": "solo temperatura: no alcanza el peso mínimo",
+      "mediciones": {
+        "ph": null,
+        "temperatura": 22,
+        "conductividad": null,
+        "turbidez": null,
+        "tds": null
+      },
+      "esperado": {
+        "wqi": null,
+        "puntajeDecision": null,
+        "nivel": "sin_datos",
+        "subindices": {
+          "temperatura": 100
+        },
+        "limitante": null
+      }
+    },
+    {
+      "nombre": "sin ninguna medición",
+      "mediciones": {
+        "ph": null,
+        "temperatura": null,
+        "conductividad": null,
+        "turbidez": null,
+        "tds": null
+      },
+      "esperado": {
+        "wqi": null,
+        "puntajeDecision": null,
+        "nivel": "sin_datos",
+        "subindices": {},
+        "limitante": null
+      }
+    }
+  ]
+}

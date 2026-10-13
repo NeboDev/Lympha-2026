@@ -1,10 +1,12 @@
+import { crearEvaluador } from "../modules/calidad/index.ts";
+import { crearResolvedorNodo } from "../modules/dispositivos/index.ts";
 import { iniciarConsumidor } from "../modules/telemetria/index.ts";
 import { type ConfigDe, cargarConfigOSalir } from "../platform/config.ts";
 import { crearBdSistema } from "../platform/db.ts";
 import { crearLogger, type Logger } from "../platform/logger.ts";
 import { crearRegistro, servirMetricas } from "../platform/metricas.ts";
 import { alApagar } from "../platform/proceso.ts";
-import { crearConexionBullmq } from "../platform/valkey.ts";
+import { crearConexionBullmq, crearValkey } from "../platform/valkey.ts";
 
 export interface ProcesoWorker {
   detener(): Promise<void>;
@@ -18,6 +20,9 @@ export async function iniciarWorker(
 ): Promise<ProcesoWorker> {
   const bd = crearBdSistema(config.DATABASE_URL_SYSTEM, "worker", 10);
   const conexion = crearConexionBullmq(config.VALKEY_URL, "worker");
+  // Conexión de uso general: memoria del motor WQI, caché de nodos y publicación del estado.
+  const valkey = crearValkey(config.VALKEY_URL, "worker");
+  const evaluador = crearEvaluador({ bd, valkey, resolver: crearResolvedorNodo(valkey, bd), log });
 
   const registro = crearRegistro();
   const insertadas = registro.contador(
@@ -42,6 +47,7 @@ export async function iniciarWorker(
     conexion,
     bd,
     log,
+    alEvaluar: (filas) => evaluador.procesar(filas),
     alGuardar: (r, n) => {
       insertadas.inc({}, r.insertadas);
       duplicadas.inc({}, r.duplicadas);
@@ -58,6 +64,7 @@ export async function iniciarWorker(
       servidorMetricas?.close();
       await consumidor.detener();
       conexion.disconnect();
+      valkey.disconnect();
       await bd.cerrar();
     },
   };

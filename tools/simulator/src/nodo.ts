@@ -1,7 +1,9 @@
 import { readFileSync } from "node:fs";
 import { estadoConexion, type Telemetria, telemetria, topico } from "@lympha/contracts";
+import type { Mediciones } from "@lympha/wqi";
 import { connect, type IClientOptions, type MqttClient } from "mqtt";
 import { type Escenario, evaluarEscenario } from "./escenarios.ts";
+import { aTelemetria, type Historia, medicionesDeHistoria } from "./historias.ts";
 
 /**
  * Nodo simulado: se comporta como el firmware según el contrato v1 (identidad propia, TLS,
@@ -21,6 +23,10 @@ export interface OpcionesNodo {
   maxLecturas?: number;
   /** Guion de mediciones (valores, rampas, sensor caído, caídas sin despedirse). Sin él, agua estable. */
   escenario?: Escenario;
+  /** Historia de agua con nivel esperado (ver historias.ts): publica sus lecturas y termina sola. */
+  historia?: Historia;
+  /** Semilla del ruido de la historia. */
+  semilla?: number;
   /** Versión de firmware que dice tener. */
   firmware?: string;
   log?: (mensaje: string, extra?: Record<string, unknown>) => void;
@@ -70,6 +76,8 @@ export async function iniciarNodo(op: OpcionesNodo): Promise<NodoSimulado> {
   const ahora = op.ahora ?? Date.now;
   const intervaloMs = (op.intervaloS ?? 60) * 1000;
   const modelo = crearModeloAgua();
+  const guion = op.historia ? medicionesDeHistoria(op.historia, op.semilla) : undefined;
+  const maxLecturas = op.maxLecturas ?? op.historia?.lecturas;
   let seq = 0;
   let publicadas = 0;
   const inicio = ahora();
@@ -141,11 +149,15 @@ export async function iniciarNodo(op: OpcionesNodo): Promise<NodoSimulado> {
       cliente.reconnect();
       await new Promise<void>((resolver) => cliente.once("connect", () => resolver()));
     }
+    const numero = seq++;
+    const base = guion
+      ? aTelemetria(guion[numero] ?? (guion.at(-1) as Mediciones))
+      : modelo.siguiente();
     const payload = telemetria.parse({
       v: 1,
       ts: Math.floor(ahora() / 1000),
-      seq: seq++,
-      ...modelo.siguiente(),
+      seq: numero,
+      ...base,
       ...(muestra?.valores ?? {}),
     });
     try {
@@ -157,11 +169,11 @@ export async function iniciarNodo(op: OpcionesNodo): Promise<NodoSimulado> {
     } catch (error) {
       log("lectura no confirmada", { motivo: (error as Error).message });
     }
-    if (op.maxLecturas !== undefined && publicadas >= op.maxLecturas) alTerminar();
+    if (maxLecturas !== undefined && publicadas >= maxLecturas) alTerminar();
   }
 
   await publicarLectura();
-  if (op.maxLecturas === undefined || publicadas < op.maxLecturas) {
+  if (maxLecturas === undefined || publicadas < maxLecturas) {
     temporizador = setInterval(() => void publicarLectura(), intervaloMs);
   }
 

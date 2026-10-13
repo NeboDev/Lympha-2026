@@ -35,6 +35,11 @@ export interface OpcionesConsumidor {
   stalledIntervalMs?: number;
   /** Para métricas: se llama tras guardar cada lote. */
   alGuardar?: (resultado: ResultadoGuardado, eventos: number) => void;
+  /**
+   * Se ejecuta tras guardar cada lote (p. ej. la evaluación del WQI). Si lanza, el lote se reintenta:
+   * guardar es idempotente, así que quien se enganche aquí también debe serlo.
+   */
+  alEvaluar?: (filas: LecturaTrabajo[]) => Promise<void>;
 }
 
 export interface Consumidor {
@@ -124,6 +129,7 @@ export async function iniciarConsumidor(op: OpcionesConsumidor): Promise<Consumi
       try {
         const r = await guardarLecturas(op.bd, lote.filas);
         for (const evento of lote.eventos) await aplicarEvento(op.bd, evento);
+        await op.alEvaluar?.(lote.filas);
         op.alGuardar?.(r, lote.eventos.length);
         op.log.debug(
           { ...r, eventos: lote.eventos.length, trabajos: lote.trabajos.length },

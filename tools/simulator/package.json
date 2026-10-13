@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@lympha/contracts": "workspace:*",
+    "@lympha/wqi": "workspace:*",
     "mqtt": "^5.16.0",
     "zod": "^3.25.76"
   }

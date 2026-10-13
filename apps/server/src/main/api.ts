@@ -1,4 +1,5 @@
 import type { FastifyInstance } from "fastify";
+import { rutasCalidad } from "../modules/calidad/index.ts";
 import { rutasDispositivos } from "../modules/dispositivos/index.ts";
 import { rutasEspacios } from "../modules/espacios/index.ts";
 import {
@@ -67,6 +68,7 @@ export async function registrarRutas(app: FastifyInstance, deps: DepsRutas, _log
     claimPepper: deps.claimPepper,
   });
   await app.register(rutasTelemetria, { bd: deps.bd, autenticar });
+  await app.register(rutasCalidad, { bd: deps.bd, valkey: deps.valkey, autenticar });
   if (deps.telegram) await app.register(rutaWebhookTelegram, deps.telegram);
 }
 

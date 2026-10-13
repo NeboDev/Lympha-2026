@@ -26,6 +26,9 @@ importers:
       '@lympha/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@lympha/wqi':
+        specifier: workspace:*
+        version: link:../../packages/wqi
       bullmq:
         specifier: ~5.81.5
         version: 5.81.5
@@ -76,11 +79,16 @@ importers:
         specifier: ^3.25.76
         version: 3.25.76
 
+  packages/wqi: {}
+
   tools/simulator:
     dependencies:
       '@lympha/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@lympha/wqi':
+        specifier: workspace:*
+        version: link:../../packages/wqi
       mqtt:
         specifier: ^5.16.0
         version: 5.16.0

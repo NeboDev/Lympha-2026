@@ -16,6 +16,8 @@ type FilaNodo = {
   nivel: NonNullable<NodoApi["estado_actual"]>["nivel"] | null;
   wqi: string | null;
   parametro_limitante: string | null;
+  causa: string | null;
+  accion: string | null;
   confianza: NonNullable<NodoApi["estado_actual"]>["confianza"] | null;
   ultimos_valores: Record<string, unknown> | null;
 };
@@ -30,7 +32,7 @@ export async function consultarNodos(tx: Tx, donde: SQL): Promise<NodoApi[]> {
   const r = await tx.execute<FilaNodo>(sql`
     SELECT n.id, n.espacio_id, n.nombre, n.perfil_id, n.estado, n.version_fw, n.reclamado_en,
            e.conectado, e.cambio_conexion_en, e.ultima_lectura_en, e.nivel, e.wqi,
-           e.parametro_limitante, e.confianza, e.ultimos_valores
+           e.parametro_limitante, e.confianza, e.causa, e.accion, e.ultimos_valores
     FROM app.nodos n
     LEFT JOIN app.estado_nodo e ON e.nodo_id = n.id
     WHERE ${donde}
@@ -54,6 +56,8 @@ export async function consultarNodos(tx: Tx, donde: SQL): Promise<NodoApi[]> {
             wqi: f.wqi === null ? null : Number(f.wqi),
             parametro_limitante: f.parametro_limitante,
             confianza: f.confianza,
+            causa: f.causa,
+            accion: f.accion,
             ultimos_valores: f.ultimos_valores,
           },
   }));

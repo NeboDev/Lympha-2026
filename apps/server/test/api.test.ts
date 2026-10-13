@@ -228,6 +228,17 @@ describe("API de H1", () => {
     expect(JSON.stringify(ajeno.cuerpo)).not.toContain(nodo);
     // un miembro sí lo ve
     expect((await llamar(usuarios.carla, "GET", `/api/espacios/${espacio}`)).status).toBe(200);
+
+    // el stream SSE del espacio (H2) responde igual: 404 al ajeno, indistinguible de un espacio inexistente
+    const sseAjeno = await llamar(usuarios.beto, "GET", `/api/espacios/${espacio}/eventos`);
+    const sseInexistente = await llamar(
+      usuarios.beto,
+      "GET",
+      `/api/espacios/${INEXISTENTE}/eventos`,
+    );
+    expect(sseAjeno.status).toBe(404);
+    expect(sseAjeno.cuerpo).toEqual(sseInexistente.cuerpo);
+    expect((await llamar(null, "GET", `/api/espacios/${espacio}/eventos`)).status).toBe(401);
   });
 
   it("un usuario ajeno recibe 404 al editar y un miembro recibe 403", async () => {
