@@ -144,6 +144,8 @@ Cambio de plan: no habrá VPS hasta el inicio de H5. Todo se desarrolla y prueba
 - **Alerta interna de avisos fallidos:** hoy es un `log.error` y el contador `lympha_avisos_fallidos_total`; el bot interno de alertas es de H6.
 - **Un nodo conectado pero mudo** (el broker lo ve vivo, pero no manda lecturas) no alarma: solo se detecta la desconexión. Sería otra regla sobre `ultima_lectura_en`.
 - **Tiempo sin conexión de los perfiles `beber`, `alberca` y `riego`:** usan el valor por defecto (10 min) hasta que existan sus reglas.
+- **Nodos caídos de larga data:** el barrido no pone tope a la antigüedad de la desconexión. Al arrancar H3 sobre una base con nodos desconectados desde hace horas o días (en desarrollo, los de `carga-local.sh`: 400 alarmas de golpe en la primera prueba) se abren sus alarmas `sin_conexion` y, con Telegram vinculado, llegan recordatorios de todas. Es correcto para un nodo real desenchufado, pero conviene decidir si se descarta (o agrupa) lo muy antiguo antes de producción.
+- **Clientes HTTP (H4):** un `POST` sin cuerpo no debe enviar `content-type: application/json`; Fastify responde 400 «invalido». Lo detectó `pnpm dev:telegram`.
 - **Silencio y alarmas críticas:** hoy el horario silencioso difiere también lo crítico (ver arriba); decidir con el dueño del producto si debe romperse para `crítica`.
 - **`desvincular_nodo` y `eliminar_mi_cuenta`** cierran las alarmas sin avisar (es lo esperado: la persona lo hizo ella misma).
 - **Retención:** `app.alarmas` no tiene limpieza; el mantenimiento nocturno solo borra avisos de más de 90 días.
