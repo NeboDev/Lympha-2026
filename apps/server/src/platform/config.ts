@@ -147,6 +147,9 @@ const esquemas = {
   notifier: comun.extend({
     DATABASE_URL_SYSTEM: urlPostgres,
     NOTIFIER_POLL_MS: z.coerce.number().int().min(100).default(2000),
+    /** Sin token el notifier no envía (y no reclama avisos, para no gastar sus intentos). */
+    TELEGRAM_BOT_TOKEN: opcional(secreto),
+    METRICS_PORT: puertoMetricas,
   }),
   migrate: comun.extend({
     DATABASE_URL_MIGRATE: urlPostgres,

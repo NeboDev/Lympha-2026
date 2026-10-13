@@ -14,27 +14,109 @@ export type FilaSalida = {
   evento: string;
   clave_idempotencia: string;
   payload: unknown;
+  /** Intentos contando este (se incrementa al reclamar). */
   intentos: number;
+  /** Chat de Telegram del usuario ahora mismo; `null` si ya no tiene vínculo. `bigint` llega como texto. */
+  chat_id: string | null;
+  /** Cuándo debía salir según el horario silencioso (antes de que el reclamo la mueva). */
+  programada: Date;
 };
 
+/** Mientras un notifier envía una fila, nadie más la reclama este tiempo; si muere, la fila reaparece sola. */
+export const ARRENDAMIENTO_S = 60;
+
 /**
- * Reclama hasta `limite` avisos pendientes y vencidos. `FOR UPDATE SKIP LOCKED` permite varias
- * instancias de notifier sin enviar dos veces; el contador de intentos sube al reclamar.
+ * Reclama hasta `limite` avisos pendientes y vencidos y los arrienda por `arrendamientoS`:
+ * `FOR UPDATE SKIP LOCKED` permite varias instancias de notifier sin enviar dos veces, y el arrendamiento
+ * (`enviar_despues_de = now() + lease`) hace que, si el proceso muere a mitad de un envío, la fila vuelva a
+ * estar disponible sin que nadie la deje trabada. No se mantiene una transacción abierta durante el HTTP.
+ * El contador de intentos sube al reclamar.
  */
-export async function reclamarPendientes(tx: Tx, limite = 50): Promise<FilaSalida[]> {
+export async function reclamarPendientes(
+  tx: Tx,
+  limite = 50,
+  arrendamientoS = ARRENDAMIENTO_S,
+): Promise<FilaSalida[]> {
   const r = await tx.execute<FilaSalida>(sql`
     UPDATE app.notificaciones_salida s
-    SET    intentos = intentos + 1
-    WHERE  s.id IN (
-      SELECT id FROM app.notificaciones_salida
+    SET    intentos = s.intentos + 1,
+           enviar_despues_de = now() + make_interval(secs => ${arrendamientoS})
+    FROM (
+      SELECT id, enviar_despues_de AS programada FROM app.notificaciones_salida
       WHERE  estado = 'pendiente' AND enviar_despues_de <= now()
       ORDER  BY enviar_despues_de
       LIMIT  ${limite}
       FOR UPDATE SKIP LOCKED
-    )
+    ) c
+    WHERE  s.id = c.id
     RETURNING s.id, s.espacio_id, s.alarma_id, s.usuario_id, s.canal, s.evento,
-              s.clave_idempotencia, s.payload, s.intentos`);
+              s.clave_idempotencia, s.payload, s.intentos, c.programada,
+              (SELECT v.chat_id::text FROM app.vinculos_telegram v WHERE v.usuario_id = s.usuario_id) AS chat_id`);
   return r.rows;
+}
+
+/** Cada cambio de estado de una fila exige que siga `pendiente`: dos notifiers no se pisan. */
+export async function marcarEnviada(bd: BdSistema, id: string): Promise<boolean> {
+  const r = await conSistema(bd, (tx) =>
+    tx.execute(sql`
+      UPDATE app.notificaciones_salida
+      SET estado = 'enviada', enviada_en = now(), error = NULL
+      WHERE id = ${id}::uuid AND estado = 'pendiente'`),
+  );
+  return (r.rowCount ?? 0) > 0;
+}
+
+/** Deja la fila pendiente para dentro de `esperaS` segundos (reintento con espera creciente). */
+export async function reprogramar(
+  bd: BdSistema,
+  id: string,
+  esperaS: number,
+  error: string,
+): Promise<void> {
+  await conSistema(bd, (tx) =>
+    tx.execute(sql`
+      UPDATE app.notificaciones_salida
+      SET enviar_despues_de = now() + make_interval(secs => ${esperaS}), error = ${error}
+      WHERE id = ${id}::uuid AND estado = 'pendiente'`),
+  );
+}
+
+/** `fallida` (se agotaron los intentos o el error no tiene remedio) o `descartada` (el usuario ya no recibe avisos). */
+export async function cerrarSinEnviar(
+  bd: BdSistema,
+  id: string,
+  estado: "fallida" | "descartada",
+  error: string,
+): Promise<void> {
+  await conSistema(bd, (tx) =>
+    tx.execute(sql`
+      UPDATE app.notificaciones_salida
+      SET estado = ${estado}, error = ${error}
+      WHERE id = ${id}::uuid AND estado = 'pendiente'`),
+  );
+}
+
+/** El usuario bloqueó el bot o borró el chat: se elimina el vínculo y sus avisos pendientes se descartan. */
+export async function olvidarVinculo(bd: BdSistema, usuarioId: string): Promise<void> {
+  await conSistema(bd, async (tx) => {
+    await tx.execute(sql`DELETE FROM app.vinculos_telegram WHERE usuario_id = ${usuarioId}::uuid`);
+    await tx.execute(sql`
+      UPDATE app.notificaciones_salida
+      SET estado = 'descartada', error = 'sin_vinculo'
+      WHERE usuario_id = ${usuarioId}::uuid AND estado = 'pendiente' AND canal = 'telegram'`);
+  });
+}
+
+/** Lecturas para las métricas del notifier. */
+export async function contarAlarmasAbiertas(bd: BdSistema): Promise<Record<string, number>> {
+  const r = await conSistema(bd, (tx) =>
+    tx.execute<{ tipo: string; n: string }>(sql`
+      SELECT tipo::text AS tipo, count(*)::text AS n FROM app.alarmas
+      WHERE estado <> 'resuelta' GROUP BY tipo`),
+  );
+  const salida: Record<string, number> = { nivel: 0, sin_conexion: 0, sensor: 0 };
+  for (const f of r.rows) salida[f.tipo] = Number(f.n);
+  return salida;
 }
 
 export async function contarPendientes(bd: BdSistema): Promise<number> {

@@ -1,5 +1,5 @@
 import { createServer, type Server } from "node:http";
-import { Counter, collectDefaultMetrics, Gauge, Registry } from "prom-client";
+import { Counter, collectDefaultMetrics, Gauge, Histogram, Registry } from "prom-client";
 
 /**
  * Métricas con prom-client (formato Prometheus). Cada proceso (ingest, worker) tiene su propio registro, con las
@@ -14,10 +14,22 @@ export interface Contador {
   inc(etiquetas?: Etiquetas, n?: number): void;
 }
 
+export interface Histograma {
+  observar(valor: number): void;
+}
+
 export interface Registro {
   /** Declara las etiquetas de antemano: prom-client no admite etiquetas que no se hayan declarado. */
   contador(nombre: string, ayuda: string, etiquetas?: readonly string[]): Contador;
   medidor(nombre: string, ayuda: string, leer: () => number | Promise<number>): void;
+  /** Un valor por cada valor de `etiqueta` (p. ej. alarmas abiertas por tipo). Se relee en cada scrape. */
+  medidorEtiquetado(
+    nombre: string,
+    ayuda: string,
+    etiqueta: string,
+    leer: () => Record<string, number> | Promise<Record<string, number>>,
+  ): void;
+  histograma(nombre: string, ayuda: string, cubetas: readonly number[]): Histograma;
   texto(): Promise<string>;
   contentType: string;
 }
@@ -57,6 +69,33 @@ export function crearRegistro(opciones: { porDefecto?: boolean } = {}): Registro
           }
         },
       });
+    },
+    medidorEtiquetado(nombre, ayuda, etiqueta, leer) {
+      new Gauge({
+        name: nombre,
+        help: ayuda,
+        labelNames: [etiqueta],
+        registers: [registro],
+        async collect() {
+          try {
+            const valores = await leer();
+            this.reset();
+            for (const [clave, valor] of Object.entries(valores))
+              this.set({ [etiqueta]: clave }, valor);
+          } catch {
+            // un medidor que falla no tumba la página
+          }
+        },
+      });
+    },
+    histograma(nombre, ayuda, cubetas) {
+      const h = new Histogram({
+        name: nombre,
+        help: ayuda,
+        buckets: [...cubetas],
+        registers: [registro],
+      });
+      return { observar: (valor) => h.observe(valor) };
     },
     texto: () => registro.metrics(),
   };

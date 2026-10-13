@@ -22,13 +22,23 @@ export const actualizacionTelegram = z
 export type ActualizacionTelegram = z.infer<typeof actualizacionTelegram>;
 
 export class ErrorTelegram extends Error {
+  /** Código HTTP/Bot API; `undefined` = no hubo respuesta (red caída o tiempo agotado). */
   readonly codigo: number | undefined;
-  constructor(metodo: string, descripcion: string, codigo?: number) {
+  /** Segundos que pide esperar Telegram (429). */
+  readonly reintentarEnS: number | undefined;
+  /** Descripción de Telegram, sin la URL ni el token. */
+  readonly descripcion: string;
+  constructor(metodo: string, descripcion: string, codigo?: number, reintentarEnS?: number) {
     super(`Telegram ${metodo}: ${descripcion}`);
     this.name = "ErrorTelegram";
     this.codigo = codigo;
+    this.reintentarEnS = reintentarEnS;
+    this.descripcion = descripcion;
   }
 }
+
+/** Tiempo máximo de espera de una llamada normal (las de long polling traen su propia señal). */
+const ESPERA_MAXIMA_MS = 15_000;
 
 export interface ClienteTelegram {
   /** Long polling: espera hasta `esperaS` segundos por actualizaciones con `update_id >= offset`. */
@@ -56,7 +66,7 @@ export function crearClienteTelegram(token: string, fetchImpl: Fetch = fetch): C
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(cuerpo),
-        ...(senal ? { signal: senal } : {}),
+        signal: senal ?? AbortSignal.timeout(ESPERA_MAXIMA_MS),
       });
     } catch (error) {
       if (senal?.aborted) throw error;
@@ -68,12 +78,14 @@ export function crearClienteTelegram(token: string, fetchImpl: Fetch = fetch): C
       result?: T;
       description?: string;
       error_code?: number;
+      parameters?: { retry_after?: number };
     } | null;
     if (!json?.ok) {
       throw new ErrorTelegram(
         metodo,
         json?.description ?? `HTTP ${respuesta.status}`,
         json?.error_code ?? respuesta.status,
+        json?.parameters?.retry_after,
       );
     }
     return json.result as T;

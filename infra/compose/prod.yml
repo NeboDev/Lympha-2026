@@ -138,6 +138,10 @@ services:
       CLAIM_PEPPER: ${CLAIM_PEPPER:?}
       FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:?}
       FIREBASE_SERVICE_ACCOUNT: ${FIREBASE_SERVICE_ACCOUNT:-} # opcional (base64 del JSON)
+      # Telegram por webhook (fuera de local es obligatorio si hay token; lo valida platform/config.ts).
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      PUBLIC_API_URL: ${PUBLIC_API_URL:-}
+      TELEGRAM_WEBHOOK_SECRET: ${TELEGRAM_WEBHOOK_SECRET:-}
     ports:
       - "127.0.0.1:3000:3000" # solo para las pruebas de humo; el público entra por Caddy
 
@@ -174,3 +178,5 @@ services:
       NODE_ENV: production
       LOG_LEVEL: ${LOG_LEVEL:-info}
       DATABASE_URL_SYSTEM: postgres://lympha_system:${PW_SYSTEM:?}@postgres:5432/lympha
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      METRICS_PORT: 9100

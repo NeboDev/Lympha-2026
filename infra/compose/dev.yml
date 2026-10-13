@@ -104,5 +104,8 @@ services:
     environment:
       VALKEY_URL: redis://worker:dev-valkey-worker@valkey:6379
 
+  # Envía los avisos del outbox. Sin TELEGRAM_BOT_TOKEN en tu .env no envía y los avisos esperan en la bandeja.
   notifier:
     <<: *dev-servidor
+    environment:
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
