@@ -1,4 +1,13 @@
 export { aplicarCiclo, type EstadoConfirmado, type ResultadoCiclo } from "./ciclo.ts";
+export {
+  barrer,
+  iniciarMantenimiento,
+  type Mantenimiento,
+  type OpcionesBarrido,
+  type OpcionesMantenimiento,
+  type ResultadoBarrido,
+  resolverSinConexion,
+} from "./mantenimiento.ts";
 export { type DatosAviso, duracion, nombreNodo, textoAviso } from "./plantillas.ts";
 export {
   type AccionNivel,

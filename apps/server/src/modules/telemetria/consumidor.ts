@@ -40,6 +40,11 @@ export interface OpcionesConsumidor {
    * guardar es idempotente, así que quien se enganche aquí también debe serlo.
    */
   alEvaluar?: (filas: LecturaTrabajo[]) => Promise<void>;
+  /**
+   * Un nodo pasó de desconectado a conectado (cambio real, no un evento repetido). Va después de aplicar el
+   * evento y NO debe lanzar: si falla, el barrido de mantenimiento cierra la alarma de desconexión de todos modos.
+   */
+  alReconectar?: (nodoId: string) => Promise<void>;
 }
 
 export interface Consumidor {
@@ -128,7 +133,12 @@ export async function iniciarConsumidor(op: OpcionesConsumidor): Promise<Consumi
 
       try {
         const r = await guardarLecturas(op.bd, lote.filas);
-        for (const evento of lote.eventos) await aplicarEvento(op.bd, evento);
+        const reconectados: string[] = [];
+        for (const evento of lote.eventos) {
+          const cambio = await aplicarEvento(op.bd, evento);
+          if (cambio === "conectado") reconectados.push(evento.nodoId);
+        }
+        for (const nodoId of reconectados) await op.alReconectar?.(nodoId);
         await op.alEvaluar?.(lote.filas);
         op.alGuardar?.(r, lote.eventos.length);
         op.log.debug(

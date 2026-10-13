@@ -143,6 +143,13 @@ const esquemas = {
     VALKEY_URL: urlValkey,
     WORKER_CONCURRENCY: z.coerce.number().int().min(1).max(1).default(1),
     METRICS_PORT: puertoMetricas,
+    /** Cada cuánto corre el barrido de alarmas (desconexión, reconexión y recordatorios). */
+    BARRIDO_MS: z.coerce.number().int().min(100).default(15_000),
+    /**
+     * Sustituye el tiempo sin conexión de los perfiles (`perfiles_uso.reglas_alarma`, 10 min por defecto en
+     * `cisterna`). Para pruebas y demostraciones; en producción se deja sin definir.
+     */
+    ALARMA_SIN_CONEXION_S: opcional(z.coerce.number().int().min(1)),
   }),
   notifier: comun.extend({
     DATABASE_URL_SYSTEM: urlPostgres,

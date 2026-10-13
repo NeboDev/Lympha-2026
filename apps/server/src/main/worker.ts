@@ -1,4 +1,9 @@
-import { aplicarCiclo } from "../modules/alarmas/index.ts";
+import { canalEspacio } from "@lympha/contracts";
+import {
+  aplicarCiclo,
+  iniciarMantenimiento,
+  resolverSinConexion,
+} from "../modules/alarmas/index.ts";
 import { crearEvaluador } from "../modules/calidad/index.ts";
 import { crearResolvedorNodo } from "../modules/dispositivos/index.ts";
 import { iniciarConsumidor } from "../modules/telemetria/index.ts";
@@ -71,6 +76,23 @@ export async function iniciarWorker(
     bd,
     log,
     alEvaluar: (filas) => evaluador.procesar(filas),
+    // Un nodo que vuelve cierra su alarma de desconexión al instante; si esto falla, el barrido la cierra.
+    alReconectar: async (nodoId) => {
+      try {
+        const r = await resolverSinConexion(bd, nodoId);
+        if (!r) return;
+        avisosEncolados.inc({}, r.avisos);
+        cambiosAlarma.inc({ tipo: r.evento.tipo, cambio: r.evento.cambio });
+        await valkey
+          .publish(canalEspacio(r.evento.espacio_id), JSON.stringify(r.evento))
+          .catch(() => undefined);
+      } catch (error) {
+        log.warn(
+          { err: error, nodoId },
+          "no se pudo cerrar la alarma de desconexión; lo hará el barrido",
+        );
+      }
+    },
     alGuardar: (r, n) => {
       insertadas.inc({}, r.insertadas);
       duplicadas.inc({}, r.duplicadas);
@@ -80,11 +102,26 @@ export async function iniciarWorker(
     ...ajustes,
   });
 
+  // Desconexión sostenida, reconexiones perdidas y recordatorios (H3), en la cola `mantenimiento`.
+  const mantenimiento = await iniciarMantenimiento({
+    conexion,
+    valkey,
+    bd,
+    log,
+    cadaMs: config.BARRIDO_MS,
+    sinConexionS: config.ALARMA_SIN_CONEXION_S,
+    alBarrer: (r) => {
+      avisosEncolados.inc({}, r.avisos);
+      for (const e of r.eventos) cambiosAlarma.inc({ tipo: e.tipo, cambio: e.cambio });
+    },
+  });
+
   log.info("worker iniciado");
   return {
     metricas: () => registro.texto(),
     async detener() {
       servidorMetricas?.close();
+      await mantenimiento.detener();
       await consumidor.detener();
       conexion.disconnect();
       valkey.disconnect();

@@ -1,4 +1,9 @@
-export { type AvisoPorEncolar, encolarAvisos, type PayloadAviso } from "./encolar.ts";
+export {
+  type AvisoPorEncolar,
+  encolarAvisoAUsuario,
+  encolarAvisos,
+  type PayloadAviso,
+} from "./encolar.ts";
 export {
   type CanalTelegram,
   crearEnviador,

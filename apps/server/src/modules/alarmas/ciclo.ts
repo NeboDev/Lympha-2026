@@ -117,7 +117,7 @@ export async function aplicarCiclo(
       severidad?: SeveridadAlarma;
       anterior?: SeveridadAlarma;
       niveles: readonly SeveridadAlarma[] | null;
-      incluirPrevios: boolean;
+      destinatarios: "preferencias" | "ya_avisados";
     }) => {
       // Un lote recuperado de hace horas actualiza el estado pero no avisa de algo que ya pasó.
       if (!esAvisable(e.ts, ahoraMs)) return;
@@ -129,7 +129,8 @@ export async function aplicarCiclo(
         evento: a.evento,
         clave: e.ts,
         niveles: a.niveles,
-        incluirPrevios: a.incluirPrevios,
+        destinatarios: a.destinatarios,
+        ahoraMs,
         payload: {
           texto: textoAviso({
             evento: a.evento,
@@ -183,7 +184,7 @@ export async function aplicarCiclo(
           evento: "abierta",
           severidad: accion.severidad,
           niveles: [accion.severidad],
-          incluirPrevios: false,
+          destinatarios: "preferencias",
         });
       }
     } else if (deNivel && (accion.tipo === "escalar" || accion.tipo === "mejorar")) {
@@ -225,7 +226,7 @@ export async function aplicarCiclo(
         anterior: accion.anterior,
         niveles: escalar ? [accion.severidad] : [accion.severidad, accion.anterior],
         // Una mejora intermedia solo interesa a quien sigue los niveles implicados; el cierre, a todo el que ya fue avisado.
-        incluirPrevios: false,
+        destinatarios: "preferencias",
       });
     } else if (deNivel && accion.tipo === "resolver") {
       await tx.execute(sql`
@@ -244,7 +245,7 @@ export async function aplicarCiclo(
         evento: "resuelta",
         anterior: accion.anterior,
         niveles: [accion.anterior],
-        incluirPrevios: true,
+        destinatarios: "ya_avisados",
       });
     }
 
@@ -271,7 +272,7 @@ export async function aplicarCiclo(
           evento: "abierta",
           severidad: "regular",
           niveles: null,
-          incluirPrevios: false,
+          destinatarios: "preferencias",
         });
       }
     } else if (deSensor && accionSensor === "resolver") {
@@ -291,7 +292,7 @@ export async function aplicarCiclo(
         evento: "resuelta",
         severidad: "regular",
         niveles: null,
-        incluirPrevios: false,
+        destinatarios: "ya_avisados",
       });
     }
   }
