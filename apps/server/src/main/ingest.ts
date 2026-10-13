@@ -1,10 +1,17 @@
 import { topico } from "@lympha/contracts";
 import { CANAL_INVALIDAR_NODO, crearResolvedorNodo } from "../modules/dispositivos/index.ts";
-import type { TrabajoLecturas } from "../modules/telemetria/index.ts";
-import { crearIngesta } from "../modules/telemetria/index.ts";
+import {
+  crearIngesta,
+  crearSeguimientoSeq,
+  type EventoNodo,
+  TRABAJO_EVENTO,
+  TRABAJO_LECTURAS,
+  type TrabajoLecturas,
+} from "../modules/telemetria/index.ts";
 import { type ConfigDe, cargarConfigOSalir } from "../platform/config.ts";
 import { crearBdSistema } from "../platform/db.ts";
 import { crearLogger, type Logger } from "../platform/logger.ts";
+import { crearRegistro, servirMetricas } from "../platform/metricas.ts";
 import { cerrarCliente, crearClienteMqtt } from "../platform/mqtt.ts";
 import { alApagar } from "../platform/proceso.ts";
 import { COLA_LECTURAS, crearCola } from "../platform/queues.ts";
@@ -12,6 +19,8 @@ import { crearConexionBullmq, crearValkey } from "../platform/valkey.ts";
 
 export interface ProcesoIngest {
   detener(): Promise<void>;
+  /** Texto de las métricas (Prometheus); también se sirve en METRICS_PORT si está definido. */
+  metricas(): Promise<string>;
 }
 
 const dormir = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -24,13 +33,43 @@ export async function iniciarIngest(
   const valkey = crearValkey(config.VALKEY_URL, "ingest");
   const suscriptor = crearValkey(config.VALKEY_URL, "ingest-invalidar");
   const conexionCola = crearConexionBullmq(config.VALKEY_URL, "ingest");
-  const cola = crearCola<TrabajoLecturas>(COLA_LECTURAS, conexionCola);
+  const cola = crearCola<TrabajoLecturas | EventoNodo>(COLA_LECTURAS, conexionCola);
   const resolver = crearResolvedorNodo(valkey, bd);
+
+  const registro = crearRegistro();
+  const recibidas = registro.contador(
+    "lympha_mensajes_recibidos_total",
+    "Mensajes de nodos recibidos por tipo",
+  );
+  const rechazadas = registro.contador(
+    "lympha_lecturas_rechazadas_total",
+    "Mensajes de nodos rechazados, por motivo",
+  );
+  const huecos = registro.contador(
+    "lympha_lecturas_huecos_total",
+    "Lecturas perdidas según el seq de los nodos",
+  );
+  const reintentos = registro.contador(
+    "lympha_ingest_reintentos_total",
+    "Reintentos por fallos de infraestructura (Valkey, Postgres o cola)",
+  );
+  const servidorMetricas = config.METRICS_PORT
+    ? await servirMetricas(registro, config.METRICS_PORT)
+    : null;
 
   const ingesta = crearIngesta({
     resolver,
     encolar: async (trabajo) => {
-      await cola.add("lote", trabajo);
+      await cola.add(TRABAJO_LECTURAS, trabajo);
+    },
+    encolarEvento: async (evento) => {
+      await cola.add(TRABAJO_EVENTO, evento);
+    },
+    seguirSeq: crearSeguimientoSeq(valkey),
+    metricas: {
+      recibida: (tipo) => recibidas.inc({ tipo }),
+      rechazada: (motivo) => rechazadas.inc({ motivo }),
+      huecos: (n) => huecos.inc({}, n),
     },
     log,
   });
@@ -49,6 +88,7 @@ export async function iniciarIngest(
         return await ingesta.manejar(topicoRecibido, carga);
       } catch (error) {
         log.error({ err: error }, "fallo de infraestructura; se reintenta sin confirmar");
+        reintentos.inc();
         await dormir(espera);
         espera = Math.min(espera * 2, 5000);
       }
@@ -75,9 +115,11 @@ export async function iniciarIngest(
   mqtt.on("reconnect", () => log.warn("MQTT: reconectando"));
   mqtt.on("connect", () => {
     log.info("MQTT conectado");
-    mqtt.subscribe(topico("+", "telemetry"), { qos: 1 }, (error, granted) => {
+    // `status` es retenido: al suscribirse llega el último estado de cada nodo (concilia online/offline).
+    const filtros = (["telemetry", "status", "attributes"] as const).map((t) => topico("+", t));
+    mqtt.subscribe(filtros, { qos: 1 }, (error, granted) => {
       if (error || granted?.some((g) => g.qos >= 128)) {
-        log.error({ err: error }, "suscripción a telemetría denegada");
+        log.error({ err: error }, "suscripción a los tópicos de los nodos denegada");
       }
     });
   });
@@ -89,8 +131,10 @@ export async function iniciarIngest(
 
   log.info("ingest iniciado");
   return {
+    metricas: () => registro.texto(),
     async detener() {
       cerrando = true;
+      servidorMetricas?.close();
       await cerrarCliente(mqtt).catch(() => mqtt.end(true));
       await cola.close();
       suscriptor.disconnect();

@@ -3,8 +3,16 @@ import type { BdSistema } from "../../platform/db.ts";
 import type { Logger } from "../../platform/logger.ts";
 import { COLA_LECTURAS } from "../../platform/queues.ts";
 import type { Redis } from "../../platform/valkey.ts";
-import { guardarLecturas } from "./guardar.ts";
-import { type LecturaTrabajo, type TrabajoLecturas, trabajoLecturas } from "./schema.ts";
+import { aplicarEvento } from "./eventos.ts";
+import { guardarLecturas, type ResultadoGuardado } from "./guardar.ts";
+import {
+  type EventoNodo,
+  eventoNodo,
+  type LecturaTrabajo,
+  TRABAJO_EVENTO,
+  type TrabajoLecturas,
+  trabajoLecturas,
+} from "./schema.ts";
 
 /**
  * Consumidor de la cola `lecturas` con agrupación manual (BullMQ sin Pro): toma trabajos hasta
@@ -25,6 +33,8 @@ export interface OpcionesConsumidor {
   /** Tiempo tras el cual un trabajo sin completar se considera estancado. */
   lockDurationMs?: number;
   stalledIntervalMs?: number;
+  /** Para métricas: se llama tras guardar cada lote. */
+  alGuardar?: (resultado: ResultadoGuardado, eventos: number) => void;
 }
 
 export interface Consumidor {
@@ -53,11 +63,24 @@ export async function iniciarConsumidor(op: OpcionesConsumidor): Promise<Consumi
   async function leerLote(): Promise<{
     trabajos: Job<TrabajoLecturas>[];
     filas: LecturaTrabajo[];
+    eventos: EventoNodo[];
   }> {
     const trabajos: Job<TrabajoLecturas>[] = [];
     const filas: LecturaTrabajo[] = [];
+    const eventos: EventoNodo[] = [];
 
     const aceptar = async (job: Job<TrabajoLecturas>): Promise<void> => {
+      if (job.name === TRABAJO_EVENTO) {
+        const e = eventoNodo.safeParse(job.data);
+        if (!e.success) {
+          op.log.error({ jobId: job.id }, "evento de nodo con formato inválido; se descarta");
+          await job.moveToFailed(new UnrecoverableError("formato inválido"), token, false);
+          return;
+        }
+        trabajos.push(job);
+        eventos.push(e.data);
+        return;
+      }
       const v = trabajoLecturas.safeParse(job.data);
       if (!v.success) {
         op.log.error({ jobId: job.id }, "trabajo de lecturas con formato inválido; se descarta");
@@ -70,11 +93,11 @@ export async function iniciarConsumidor(op: OpcionesConsumidor): Promise<Consumi
 
     // El primero espera (bloqueando) a que haya trabajo; el resto, solo mientras dure la ventana.
     const primero = await worker.getNextJob(token, { block: true });
-    if (!primero) return { trabajos, filas };
+    if (!primero) return { trabajos, filas, eventos };
     await aceptar(primero);
 
     const limite = Date.now() + ventanaMs;
-    while (activo && filas.length < maximo && Date.now() < limite) {
+    while (activo && filas.length + eventos.length < maximo && Date.now() < limite) {
       const job = await worker.getNextJob(token, { block: false });
       if (job) {
         await aceptar(job);
@@ -82,7 +105,7 @@ export async function iniciarConsumidor(op: OpcionesConsumidor): Promise<Consumi
         await dormir(Math.min(15, Math.max(0, limite - Date.now())));
       }
     }
-    return { trabajos, filas };
+    return { trabajos, filas, eventos };
   }
 
   const bucle = (async () => {
@@ -100,7 +123,12 @@ export async function iniciarConsumidor(op: OpcionesConsumidor): Promise<Consumi
 
       try {
         const r = await guardarLecturas(op.bd, lote.filas);
-        op.log.debug({ ...r, trabajos: lote.trabajos.length }, "lote guardado");
+        for (const evento of lote.eventos) await aplicarEvento(op.bd, evento);
+        op.alGuardar?.(r, lote.eventos.length);
+        op.log.debug(
+          { ...r, eventos: lote.eventos.length, trabajos: lote.trabajos.length },
+          "lote guardado",
+        );
         for (const job of lote.trabajos) await job.moveToCompleted(r, token, false);
       } catch (error) {
         op.log.error({ err: error, trabajos: lote.trabajos.length }, "no se pudo guardar el lote");

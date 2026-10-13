@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { crearLogger } from "../../platform/logger.ts";
 import type { MetaNodo, ResolvedorNodo } from "../dispositivos/index.ts";
 import { CODIGO_PUBACK, crearIngesta } from "./ingesta.ts";
-import type { TrabajoLecturas } from "./schema.ts";
+import type { EventoNodo, TrabajoLecturas } from "./schema.ts";
 
 const NODO = "0192f3a7-5d1c-7a2b-8c3d-0123456789ab";
 const ESPACIO = "0192f3a7-5d1c-7a2b-8c3d-0123456789ac";
@@ -18,18 +18,35 @@ const meta = (extra: Partial<MetaNodo> = {}): MetaNodo => ({
   ...extra,
 });
 
-function preparar(m: MetaNodo | null) {
+function preparar(
+  m: MetaNodo | null,
+  extra: { seguirSeq?: (n: string, s: number) => Promise<number> } = {},
+) {
   const encolados: TrabajoLecturas[] = [];
+  const eventos: EventoNodo[] = [];
+  const rechazos: string[] = [];
+  let huecos = 0;
   const resolver: ResolvedorNodo = { resolver: async () => m, invalidar: async () => undefined };
   const ingesta = crearIngesta({
     resolver,
     encolar: async (t) => {
       encolados.push(t);
     },
+    encolarEvento: async (e) => {
+      eventos.push(e);
+    },
+    metricas: {
+      recibida: () => undefined,
+      rechazada: (motivo) => rechazos.push(motivo),
+      huecos: (n) => {
+        huecos += n;
+      },
+    },
+    ...extra,
     log: crearLogger("prueba", "silent"),
     ahora: () => AHORA,
   });
-  return { ingesta, encolados };
+  return { ingesta, encolados, eventos, rechazos, huecos: () => huecos };
 }
 
 const msg = (o: Record<string, unknown> = {}) =>
@@ -90,18 +107,86 @@ describe("crearIngesta", () => {
     expect(encolados).toHaveLength(0);
   });
 
-  it("rechaza tópicos que no son de telemetría", async () => {
-    const { ingesta } = preparar(meta());
-    expect(await ingesta.manejar(topico(NODO, "attributes"), msg())).toBe(
-      CODIGO_PUBACK.topicoInvalido,
-    );
+  it("rechaza tópicos que el ingest no atiende", async () => {
+    const { ingesta, rechazos } = preparar(meta());
+    expect(await ingesta.manejar(topico(NODO, "config"), msg())).toBe(CODIGO_PUBACK.topicoInvalido);
     expect(await ingesta.manejar("otro/topico", msg())).toBe(CODIGO_PUBACK.topicoInvalido);
+    expect(rechazos).toEqual(["topico_invalido", "topico_invalido"]);
+  });
+
+  it("cuenta cada rechazo por motivo", async () => {
+    const { ingesta, rechazos } = preparar(meta());
+    await ingesta.manejar(topico(NODO, "telemetry"), Buffer.from("x"));
+    await ingesta.manejar(topico(NODO, "telemetry"), msg({ extra: 1 }));
+    await ingesta.manejar(topico(NODO, "telemetry"), msg({ ts: TS + 3600 }));
+    expect(rechazos).toEqual(["json_ilegible", "payload_invalido", "reloj_fuera_de_rango"]);
+    const sin = preparar(null);
+    await sin.ingesta.manejar(topico(NODO, "telemetry"), msg());
+    expect(sin.rechazos).toEqual(["nodo_no_autorizado"]);
+  });
+
+  it("cuenta las lecturas perdidas que reporta el seguimiento de seq", async () => {
+    const { ingesta, huecos } = preparar(meta(), { seguirSeq: async () => 3 });
+    await ingesta.manejar(topico(NODO, "telemetry"), msg());
+    expect(huecos()).toBe(3);
+  });
+
+  it("un fallo del seguimiento de seq no pierde la lectura", async () => {
+    const { ingesta, encolados } = preparar(meta(), {
+      seguirSeq: async () => {
+        throw new Error("valkey");
+      },
+    });
+    expect(await ingesta.manejar(topico(NODO, "telemetry"), msg())).toBe(CODIGO_PUBACK.ok);
+    expect(encolados).toHaveLength(1);
+  });
+
+  describe("status (Last Will) y attributes", () => {
+    it.each(["online", "offline"] as const)(
+      "encola el estado %s con el espacio del nodo",
+      async (estado) => {
+        const { ingesta, eventos } = preparar(meta());
+        expect(await ingesta.manejar(topico(NODO, "status"), Buffer.from(estado))).toBe(
+          CODIGO_PUBACK.ok,
+        );
+        expect(eventos).toEqual([
+          { tipo: "estado", nodoId: NODO, espacioId: ESPACIO, estado, recibidoEn: AHORA },
+        ]);
+      },
+    );
+
+    it("rechaza un estado desconocido y los de nodos sin espacio", async () => {
+      const { ingesta, eventos } = preparar(meta());
+      expect(await ingesta.manejar(topico(NODO, "status"), Buffer.from("dormido"))).toBe(
+        CODIGO_PUBACK.payloadInvalido,
+      );
+      const libre = preparar(meta({ espacioId: null, estado: "desvinculado" }));
+      expect(await libre.ingesta.manejar(topico(NODO, "status"), Buffer.from("online"))).toBe(
+        CODIGO_PUBACK.nodoNoAutorizado,
+      );
+      expect(eventos).toHaveLength(0);
+      expect(libre.eventos).toHaveLength(0);
+    });
+
+    it("encola los atributos (versión de firmware) y rechaza los inválidos", async () => {
+      const { ingesta, eventos } = preparar(meta());
+      const ok = Buffer.from(JSON.stringify({ v: 1, fw: "1.2.3", rssi: -60 }));
+      expect(await ingesta.manejar(topico(NODO, "attributes"), ok)).toBe(CODIGO_PUBACK.ok);
+      expect(eventos).toEqual([
+        { tipo: "atributos", nodoId: NODO, espacioId: ESPACIO, fw: "1.2.3", recibidoEn: AHORA },
+      ]);
+      const malo = Buffer.from(JSON.stringify({ v: 1, fw: "1", extra: true }));
+      expect(await ingesta.manejar(topico(NODO, "attributes"), malo)).toBe(
+        CODIGO_PUBACK.payloadInvalido,
+      );
+    });
   });
 
   it("propaga los fallos de la cola para que ingest reintente sin confirmar", async () => {
     const ingesta = crearIngesta({
       resolver: { resolver: async () => meta(), invalidar: async () => undefined },
       encolar: vi.fn().mockRejectedValue(new Error("valkey caído")),
+      encolarEvento: vi.fn().mockRejectedValue(new Error("valkey caído")),
       log: crearLogger("prueba", "silent"),
       ahora: () => AHORA,
     });

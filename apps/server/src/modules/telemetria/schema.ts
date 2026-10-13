@@ -22,3 +22,30 @@ export const trabajoLecturas = z.object({
   lecturas: z.array(lecturaTrabajo).min(1).max(500),
 });
 export type TrabajoLecturas = z.infer<typeof trabajoLecturas>;
+
+/**
+ * Hechos del nodo que no son lecturas y viajan por la misma cola (`lecturas`), en el orden en que llegaron:
+ * un cambio de conexión (Last Will `offline` incluido) o los atributos que el nodo publica al conectar.
+ */
+export const eventoNodo = z.discriminatedUnion("tipo", [
+  z.object({
+    tipo: z.literal("estado"),
+    nodoId: z.string().uuid(),
+    espacioId: z.string().uuid(),
+    estado: z.enum(["online", "offline"]),
+    /** Hora en que `ingest` recibió el mensaje, en milisegundos Unix. */
+    recibidoEn: z.number().int().positive(),
+  }),
+  z.object({
+    tipo: z.literal("atributos"),
+    nodoId: z.string().uuid(),
+    espacioId: z.string().uuid(),
+    fw: z.string().max(32),
+    recibidoEn: z.number().int().positive(),
+  }),
+]);
+export type EventoNodo = z.infer<typeof eventoNodo>;
+
+/** Nombres de trabajo en la cola `lecturas`. */
+export const TRABAJO_LECTURAS = "lote";
+export const TRABAJO_EVENTO = "evento";

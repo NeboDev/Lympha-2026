@@ -1,0 +1,9 @@
+{
+  "nombre": "desconexion",
+  "descripcion": "El nodo cae sin despedirse 10 minutos (Last Will 'offline') y vuelve: debe abrir y cerrar la alarma de desconexión.",
+  "pasos": [
+    { "duracionS": 300, "ph": 7.2 },
+    { "duracionS": 600, "desconectado": true },
+    { "duracionS": 300, "ph": 7.2 }
+  ]
+}

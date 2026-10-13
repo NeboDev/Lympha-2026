@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { estadoConexion, type Telemetria, telemetria, topico } from "@lympha/contracts";
 import { connect, type IClientOptions, type MqttClient } from "mqtt";
+import { type Escenario, evaluarEscenario } from "./escenarios.ts";
 
 /**
  * Nodo simulado: se comporta como el firmware según el contrato v1 (identidad propia, TLS,
@@ -18,6 +19,8 @@ export interface OpcionesNodo {
   intervaloS?: number;
   /** Detenerse tras N lecturas (útil en pruebas). Sin valor, corre hasta cerrar. */
   maxLecturas?: number;
+  /** Guion de mediciones (valores, rampas, sensor caído, caídas sin despedirse). Sin él, agua estable. */
+  escenario?: Escenario;
   /** Versión de firmware que dice tener. */
   firmware?: string;
   log?: (mensaje: string, extra?: Record<string, unknown>) => void;
@@ -69,8 +72,11 @@ export async function iniciarNodo(op: OpcionesNodo): Promise<NodoSimulado> {
   const modelo = crearModeloAgua();
   let seq = 0;
   let publicadas = 0;
+  const inicio = ahora();
   let temporizador: NodeJS.Timeout | undefined;
   let cerrado = false;
+  /** El escenario lo tiene "caído": sin conexión y sin publicar. */
+  let caido = false;
 
   const opciones: IClientOptions = {
     username: op.deviceId,
@@ -91,7 +97,9 @@ export async function iniciarNodo(op: OpcionesNodo): Promise<NodoSimulado> {
 
   const cliente = connect(op.url, opciones);
   cliente.on("error", (e) => log("error MQTT", { motivo: e.message }));
-  cliente.on("reconnect", () => log("reconectando"));
+  cliente.on("reconnect", () => {
+    if (!caido) log("reconectando");
+  });
 
   await new Promise<void>((resolve, reject) => {
     cliente.once("connect", () => resolve());
@@ -99,12 +107,18 @@ export async function iniciarNodo(op: OpcionesNodo): Promise<NodoSimulado> {
   });
   log("conectado", { url: op.url, tls: op.url.startsWith("mqtts") });
 
-  await cliente.publishAsync(topico(op.deviceId, "status"), "online", { qos: 1, retain: true });
-  await cliente.publishAsync(
-    topico(op.deviceId, "attributes"),
-    JSON.stringify({ v: 1, fw: op.firmware ?? "sim-0.1.0", rssi: -58, buffered: 0 }),
-    { qos: 1 },
-  );
+  /** Lo que hace el firmware en cada conexión: anunciarse y publicar sus atributos. */
+  async function anunciarse(): Promise<void> {
+    await cliente.publishAsync(topico(op.deviceId, "status"), "online", { qos: 1, retain: true });
+    await cliente.publishAsync(
+      topico(op.deviceId, "attributes"),
+      JSON.stringify({ v: 1, fw: op.firmware ?? "sim-0.1.0", rssi: -58, buffered: 0 }),
+      { qos: 1 },
+    );
+  }
+  await anunciarse();
+  // Tras una caída (del escenario o de la red) el nodo vuelve a anunciarse.
+  cliente.on("connect", () => void anunciarse().catch(() => undefined));
 
   let alTerminar!: () => void;
   const terminado = new Promise<void>((r) => {
@@ -112,11 +126,27 @@ export async function iniciarNodo(op: OpcionesNodo): Promise<NodoSimulado> {
   });
 
   async function publicarLectura(): Promise<void> {
+    const muestra = op.escenario ? evaluarEscenario(op.escenario, (ahora() - inicio) / 1000) : null;
+    if (muestra?.desconectado) {
+      if (!caido) {
+        caido = true;
+        log("caída sin despedirse (escenario)");
+        cliente.end(true); // sin DISCONNECT: el broker publica el Last Will
+      }
+      return;
+    }
+    if (caido) {
+      caido = false;
+      log("vuelve a conectarse (escenario)");
+      cliente.reconnect();
+      await new Promise<void>((resolver) => cliente.once("connect", () => resolver()));
+    }
     const payload = telemetria.parse({
       v: 1,
       ts: Math.floor(ahora() / 1000),
       seq: seq++,
       ...modelo.siguiente(),
+      ...(muestra?.valores ?? {}),
     });
     try {
       await cliente.publishAsync(topico(op.deviceId, "telemetry"), JSON.stringify(payload), {

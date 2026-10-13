@@ -8,3 +8,5 @@ infra/certs/
 *.log
 .claude/worktrees/
 .DS_Store
+infra/staging-local/.estado/
+tools/factory/lotes/

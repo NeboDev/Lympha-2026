@@ -26,10 +26,13 @@ services:
     env_file: [dev.env]
     ports: ["127.0.0.1:6379:6379"]
 
-  # Una sola vez: CA propia y certificado de servidor para el 8883. La CA pública queda en infra/certs.
+  # CA propia (infra/certs/ca.crt + ca.key, que persiste) y certificado de servidor para el 8883. `pnpm certs` lo renueva
+  # o agrega nombres con CERT_SANS (p. ej. la IP de tu equipo para un nodo de prueba).
   certs:
     image: alpine/openssl:latest
     entrypoint: ["/bin/sh", "/gen-dev-certs.sh"]
+    environment:
+      CERT_SANS: ${CERT_SANS:-}
     volumes:
       - ../mosquitto/gen-dev-certs.sh:/gen-dev-certs.sh:ro
       - mosquittocerts:/out/server
@@ -43,6 +46,19 @@ services:
     ports:
       - "127.0.0.1:1883:1883"
       - "127.0.0.1:8883:8883"
+
+  # Emulador de Firebase Auth (solo local): la API acepta sus tokens sin firma. Proyecto: lympha-dev.
+  firebase-auth:
+    build:
+      context: ../firebase
+    image: lympha-firebase-auth:dev
+    pull_policy: never
+    ports: ["127.0.0.1:9099:9099"]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:9099/').then(()=>process.exit(0)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
 
   migrate:
     <<: *dev-servidor
@@ -60,10 +76,18 @@ services:
       mqtt-bootstrap: { condition: service_completed_successfully }
 
   # Cada proceso entra a Valkey con su propio usuario ACL.
+  # TELEGRAM_BOT_TOKEN (y, si usas un túnel, PUBLIC_API_URL y TELEGRAM_WEBHOOK_SECRET) salen de tu .env, que no se
+  # versiona (ver .env.example). Sin PUBLIC_API_URL el bot usa long polling.
   api:
     <<: *dev-servidor
+    depends_on:
+      firebase-auth: { condition: service_healthy }
     environment:
       VALKEY_URL: redis://api:dev-valkey-api@valkey:6379
+      FIREBASE_AUTH_EMULATOR_HOST: firebase-auth:9099
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      PUBLIC_API_URL: ${PUBLIC_API_URL:-}
+      TELEGRAM_WEBHOOK_SECRET: ${TELEGRAM_WEBHOOK_SECRET:-}
     ports: ["127.0.0.1:3000:3000"]
 
   ingest:

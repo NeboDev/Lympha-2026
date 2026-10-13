@@ -5,7 +5,7 @@ import {
   serializerCompiler,
   validatorCompiler,
 } from "fastify-type-provider-zod";
-import { esErrorDominio } from "./errors.ts";
+import { esErrorDominio, traducirErrorPg } from "./errors.ts";
 import type { Logger } from "./logger.ts";
 
 /**
@@ -35,6 +35,11 @@ export function crearServidorHttp(log: Logger): FastifyInstance {
     if (esErrorDominio(error)) {
       return reply.code(error.status).send({ codigo: error.codigo, mensaje: error.message });
     }
+    const deLaBase = traducirErrorPg(error);
+    if (deLaBase)
+      return reply
+        .code(deLaBase.status)
+        .send({ codigo: deLaBase.codigo, mensaje: deLaBase.message });
     if (hasZodFastifySchemaValidationErrors(error)) {
       return reply.code(400).send({ codigo: "invalido", mensaje: "Solicitud inválida" });
     }

@@ -1,3 +1,6 @@
+# ESTADO: escrito y documentado, NO probado contra un servidor real (por ahora no hay VPS; ver docs/decisiones.md,
+# "Modo local"). Lo que sí está probado: infra/deploy.sh con simulacros (pnpm test:infra) y, para el ensayo
+# completo, la VM de Multipass (infra/staging-local). Se prueba contra un VPS al inicio de H5.
 # Una etiqueta vAAAA.MM.N publica la imagen y la despliega a prod-1 tras una aprobación manual
 # (configura "Required reviewers" en el entorno "production" de GitHub). deploy.sh respalda Postgres antes
 # de migrar y, si fallan las pruebas de humo, regresa solo a la versión anterior.

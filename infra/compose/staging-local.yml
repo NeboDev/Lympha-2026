@@ -1,0 +1,8 @@
+# Staging local en una VM de Multipass (infra/staging-local/vm.sh). Se suma a base.yml y prod.yml:
+#   deploy.sh lo agrega solo cuando deploy.conf trae COMPOSE_EXTRA=infra/compose/staging-local.yml.
+# Diferencias con un servidor real: Caddy usa su CA interna (no hay dominio) y los certificados de MQTT salen
+# de la CA propia de Lympha (los copia vm.sh a /srv/lympha/data/mosquitto-certs).
+services:
+  caddy:
+    volumes:
+      - ../caddy/Caddyfile.local:/etc/caddy/Caddyfile:ro

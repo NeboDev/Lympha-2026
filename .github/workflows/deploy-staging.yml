@@ -1,3 +1,6 @@
+# ESTADO: escrito y documentado, NO probado contra un servidor real (por ahora no hay VPS; ver docs/decisiones.md,
+# "Modo local"). Lo que sí está probado: infra/deploy.sh con simulacros (pnpm test:infra) y, para el ensayo
+# completo, la VM de Multipass (infra/staging-local). Se prueba contra un VPS al inicio de H5.
 # Cada merge a main (con el CI en verde) publica la imagen y la despliega a staging-1 por SSH.
 # Secretos del entorno "staging" en GitHub: STAGING_HOST, STAGING_SSH_KEY (llave privada del usuario deploy)
 # y STAGING_SSH_KNOWN_HOSTS (salida de `ssh-keyscan` verificada a mano; evita confiar en la primera conexión).

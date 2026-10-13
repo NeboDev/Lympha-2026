@@ -1,0 +1,23 @@
+# Variante para la VM de staging local (infra/staging-local): sin dominio público ni Let's Encrypt.
+# `local_certs` emite todo con la CA interna de Caddy; la API_DOMAIN suele ser la IP de la VM.
+# El certificado de MQTT lo trae la CA propia de Lympha (infra/certs), no Caddy.
+{
+	local_certs
+	skip_install_trust
+}
+
+{$API_DOMAIN} {
+	encode zstd gzip
+
+	header {
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		Content-Security-Policy "default-src 'none'; frame-ancestors 'none'"
+		-Server
+	}
+
+	reverse_proxy api:3000 {
+		health_uri /health
+		health_interval 10s
+	}
+}
