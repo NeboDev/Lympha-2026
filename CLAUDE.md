@@ -22,6 +22,13 @@ Solo backend e infraestructura. `apps/web` queda como carpeta vacía con README;
 - Mosquitto local usa una CA propia (`infra/certs/ca.crt` + `ca.key`, ignoradas por git; `pnpm certs`), reutilizable para los nodos de prueba de H5.
 - Secretos: nunca leer ni pedir valores. Las variables se documentan por nombre en `.env.example` y el usuario llena `.env` (no versionado). Antes de cada paso, listar los archivos que se van a crear o modificar.
 
+## Flujo de ramas (política)
+- **Todo el trabajo de cada hito Hx se hace sobre `dev`** (o en una rama corta `claude/...` que sale de `dev` y vuelve a `dev`). Nunca se abre una rama de hito desde `main` ni desde el commit de otro hito: así H3 parte de lo que H2 dejó y no hay rebases entre hitos (el choque de H1 y H2 —migración `0010` duplicada, escenarios del simulador, `/dev/*`— nació de trabajarlos en paralelo desde `main`).
+- Antes de empezar un paso y antes de integrar: `git fetch` (si hay remoto) y comprobar que la rama parte de la punta actual de `dev`. Una rama corta se rebasea sobre `dev` y se integra con `git merge --ff-only`; no se hacen merges de integración con commit.
+- **Un solo hito activo a la vez.** Las migraciones se numeran siguiendo la última de `dev`; las rutas, contratos y nombres exportados se revisan contra `dev` antes de crearlos.
+- `main` solo recibe `dev` cuando un hito cierra con lint, typecheck, `pnpm test`, `pnpm test:int` y `pnpm test:infra` en verde, y siempre por avance rápido (`--ff-only`). `main` es lo desplegable (`deploy-staging.yml` sale de `main`); `dev` es la integración y también corre el CI.
+- Los commits `wip` no se integran: se reescriben antes de entrar a `dev`.
+
 ## Decisiones finales (anulan a cualquier documento)
 - Valkey 8, no Redis.
 - Mosquitto 2.1 con Dynamic Security (necesita sustitución `%u`/`%c` en ACL). Imagen: `eclipse-mosquitto:2.1.2-alpine`.
@@ -72,7 +79,7 @@ docs/decisiones.md
 - Todo en UTC (`timestamptz`); `America/Mexico_City` solo al agregar por día y mostrar. IDs UUIDv7.
 - Ingesta idempotente: `ON CONFLICT (nodo_id, ts) DO NOTHING`; `PUBACK` solo tras encolar. Los jobs de BullMQ no llevan `jobId` (BullMQ rechaza `:`).
 - Sin datos personales en logs ni Sentry (ids, no correos). pino con `redact`.
-- Commits Conventional Commits; trunk-based; cada paso termina con tests, lint y typecheck limpios.
+- Commits Conventional Commits; trunk-based sobre `dev` (ver "Flujo de ramas"); cada paso termina con tests, lint y typecheck limpios.
 - No agregar dependencias fuera del stack sin preguntar.
 - Archivos largos con heredoc en Bash fallan en este entorno: usar la herramienta Write.
 

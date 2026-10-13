@@ -107,6 +107,12 @@ Cambio de plan: no habrá VPS hasta el inicio de H5. Todo se desarrolla y prueba
 
 - **Integración de H2 sobre H1 (rebase):** H2 se escribió antes de que H1 existiera. Al rebasear: la migración de H2 pasó de `0010` a `0011` (`0010` es `operaciones_h1`); la ruta SSE pasó de `/dev/...` con `x-dev-usuario-id` a `/api/...` con Bearer y `autenticar` (H1 eliminó `/dev/*`); el enganche del worker usa `alEvaluar` para no chocar con las métricas de H1; la **última lectura** de `estado_nodo` que H1 escribía en `guardar.ts` sigue ahí y el evaluador la sobrescribe con el estado completo.
 
+## Flujo de ramas: todo sobre `dev`
+
+- **Qué pasó:** H1 y H2 se desarrollaron en ramas paralelas que salían de `main` (H0). Al integrarlas hubo conflictos de contenido en 12 archivos, una migración `0010` duplicada, dos sistemas de escenarios del simulador y rutas `/dev/*` que H1 ya había prohibido. Se rebaseó H2 sobre H1 (ver "Integración de H2 sobre H1" en la sección H2).
+- **Política:** el trabajo de cada hito se hace sobre `dev` (o ramas cortas que salen de `dev` y regresan por avance rápido). `main` recibe `dev` solo al cerrar un hito con todas las pruebas en verde, también por avance rápido. Un solo hito activo a la vez; migraciones, rutas y contratos se numeran/nombran contra la punta de `dev`. El detalle está en `CLAUDE.md`, "Flujo de ramas".
+- `ci.yml` corre también en `push` a `dev`; `deploy-staging.yml` sigue saliendo solo de `main`.
+
 ## Pendiente al cerrar H0 (histórico; lo de H1 y del modo local está arriba)
 
 - Crear los servidores, el dominio, los proyectos de Firebase y los bots de Telegram; configurar los entornos `staging`/`production` y sus secretos en GitHub; generar las llaves age y reemplazar los marcadores de `.sops.yaml`; ejecutar `infra/bootstrap/setup.sh` en un VPS desechable antes de usarlo en serio.

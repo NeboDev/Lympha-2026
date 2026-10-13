@@ -1,11 +1,11 @@
-# Validación de cada pull request (y de main, para que el despliegue a staging dependa de un CI en verde).
+# Validación de cada pull request (y de dev y main, para que el despliegue a staging dependa de un CI en verde).
 # Objetivo del plan: menos de 10 minutos. Las acciones están fijadas por SHA de commit.
 name: CI
 
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, dev]
 
 permissions:
   contents: read
