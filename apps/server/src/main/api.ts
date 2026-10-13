@@ -1,4 +1,5 @@
 import type { FastifyInstance } from "fastify";
+import { rutasAlarmas } from "../modules/alarmas/index.ts";
 import { rutasCalidad } from "../modules/calidad/index.ts";
 import { rutasDispositivos } from "../modules/dispositivos/index.ts";
 import { rutasEspacios } from "../modules/espacios/index.ts";
@@ -9,6 +10,7 @@ import {
   rutasIdentidad,
   type VerificadorToken,
 } from "../modules/identidad/index.ts";
+import { crearManejadorTelegram, rutasNotificaciones } from "../modules/notificaciones/index.ts";
 import { rutasSalud } from "../modules/salud/index.ts";
 import {
   crearClienteTelegram,
@@ -48,6 +50,8 @@ export interface DepsRutas {
   claimPepper: string;
   /** Webhook de Telegram: solo existe si Telegram está en modo webhook. */
   telegram?: { secreto: string; manejar: ManejadorActualizacion };
+  /** Nombre de usuario del bot para armar el enlace de vinculación; ausente si no hay bot configurado. */
+  nombreBot?: () => Promise<string>;
 }
 
 /** Único lugar donde se registran rutas: lo usa la API real y la prueba de cobertura de aislamiento. */
@@ -69,6 +73,13 @@ export async function registrarRutas(app: FastifyInstance, deps: DepsRutas, _log
   });
   await app.register(rutasTelemetria, { bd: deps.bd, autenticar });
   await app.register(rutasCalidad, { bd: deps.bd, valkey: deps.valkey, autenticar });
+  await app.register(rutasAlarmas, { bd: deps.bd, valkey: deps.valkey, autenticar });
+  await app.register(rutasNotificaciones, {
+    bd: deps.bd,
+    valkey: deps.valkey,
+    autenticar,
+    ...(deps.nombreBot ? { nombreBot: deps.nombreBot } : {}),
+  });
   if (deps.telegram) await app.register(rutaWebhookTelegram, deps.telegram);
 }
 
@@ -115,7 +126,24 @@ export async function crearApi(
     token: config.TELEGRAM_BOT_TOKEN,
     publicApiUrl: config.PUBLIC_API_URL,
   });
-  const manejar = manejadorBasico(log);
+  const clienteTelegram = config.TELEGRAM_BOT_TOKEN
+    ? crearClienteTelegram(config.TELEGRAM_BOT_TOKEN, ajustes.fetchTelegram)
+    : null;
+  // El nombre del bot no cambia: se pregunta una vez (un fallo no se guarda y se reintenta en la siguiente solicitud).
+  let nombreBot: Promise<string> | undefined;
+  const obtenerNombreBot = clienteTelegram
+    ? () => {
+        nombreBot ??= clienteTelegram.obtenerNombreBot().catch((e: unknown) => {
+          nombreBot = undefined;
+          throw e;
+        });
+        return nombreBot;
+      }
+    : undefined;
+  // Con bot: vinculación por deep link y `/desvincular` (H3). Sin bot, nada que atender.
+  const manejar = clienteTelegram
+    ? crearManejadorTelegram({ bd, valkey, cliente: clienteTelegram, log })
+    : manejadorBasico(log);
 
   const app = crearServidorHttp(log);
   await registrarRutas(
@@ -128,6 +156,7 @@ export async function crearApi(
       appEnv: config.APP_ENV,
       verificador,
       claimPepper: config.CLAIM_PEPPER,
+      ...(obtenerNombreBot ? { nombreBot: obtenerNombreBot } : {}),
       ...(modo === "webhook" && config.TELEGRAM_WEBHOOK_SECRET
         ? { telegram: { secreto: config.TELEGRAM_WEBHOOK_SECRET, manejar } }
         : {}),
@@ -136,11 +165,11 @@ export async function crearApi(
   );
 
   let telegram: Awaited<ReturnType<typeof iniciarTelegram>> | null = null;
-  if (config.TELEGRAM_BOT_TOKEN && modo !== "desactivado") {
+  if (clienteTelegram && modo !== "desactivado") {
     // Un fallo de Telegram no debe impedir que la API arranque: se registra y se sigue sin el bot.
     telegram = await iniciarTelegram({
       modo,
-      cliente: crearClienteTelegram(config.TELEGRAM_BOT_TOKEN, ajustes.fetchTelegram),
+      cliente: clienteTelegram,
       manejar,
       log,
       publicApiUrl: config.PUBLIC_API_URL,

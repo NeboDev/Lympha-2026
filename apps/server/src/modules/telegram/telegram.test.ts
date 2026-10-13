@@ -70,6 +70,7 @@ function clienteFalso(): ClienteTelegram & {
       llamadas.push("deleteWebhook");
     },
     enviarMensaje: async () => undefined,
+    obtenerNombreBot: async () => "lympha_prueba_bot",
   };
 }
 

@@ -59,4 +59,26 @@ export const RUTAS_CUBIERTAS: Record<string, Cobertura> = {
   "GET /api/nodos/:nodoId/lecturas": ajeno(
     "un usuario ajeno recibe 404 en el nodo, sus lecturas y sus acciones",
   ),
+
+  // H3: el vínculo de Telegram y las preferencias de aviso son del usuario en sesión (la RLS lo exige).
+  "POST /api/yo/telegram/vinculo": ajeno(
+    "telegram: el vínculo y las preferencias son de cada usuario",
+  ),
+  "GET /api/yo/telegram": ajeno("telegram: el vínculo y las preferencias son de cada usuario"),
+  "DELETE /api/yo/telegram": ajeno("telegram: el vínculo y las preferencias son de cada usuario"),
+  "GET /api/yo/notificaciones": ajeno(
+    "telegram: el vínculo y las preferencias son de cada usuario",
+  ),
+  "PUT /api/yo/notificaciones": ajeno(
+    "telegram: el vínculo y las preferencias son de cada usuario",
+  ),
+  "DELETE /api/yo/notificaciones/:nodoId": ajeno(
+    "telegram: el vínculo y las preferencias son de cada usuario",
+  ),
+  "GET /api/espacios/:espacioId/alarmas": ajeno(
+    "alarmas: un ajeno recibe 404 al listar y al atender",
+  ),
+  "POST /api/alarmas/:alarmaId/atender": ajeno(
+    "alarmas: un ajeno recibe 404 al listar y al atender",
+  ),
 };

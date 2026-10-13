@@ -50,6 +50,8 @@ export interface ClienteTelegram {
   fijarWebhook(url: string, secreto: string): Promise<void>;
   borrarWebhook(): Promise<void>;
   enviarMensaje(chatId: number, texto: string): Promise<void>;
+  /** Nombre de usuario del bot (sin @), para armar el enlace `https://t.me/<bot>?start=<token>`. */
+  obtenerNombreBot(): Promise<string>;
 }
 
 type Fetch = typeof fetch;
@@ -117,6 +119,11 @@ export function crearClienteTelegram(token: string, fetchImpl: Fetch = fetch): C
     },
     async enviarMensaje(chatId, texto) {
       await llamar("sendMessage", { chat_id: chatId, text: texto });
+    },
+    async obtenerNombreBot() {
+      const bot = await llamar<{ username?: string }>("getMe", {});
+      if (!bot.username) throw new ErrorTelegram("getMe", "el bot no tiene nombre de usuario");
+      return bot.username;
     },
   };
 }

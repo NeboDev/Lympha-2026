@@ -4,7 +4,8 @@ import type { FastifyInstance } from "fastify";
 import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { registrarRutas } from "../src/main/api.ts";
-import { crearBdApp } from "../src/platform/db.ts";
+import { crearManejadorTelegram } from "../src/modules/notificaciones/index.ts";
+import { type BdApp, crearBdApp } from "../src/platform/db.ts";
 import { crearServidorHttp } from "../src/platform/http.ts";
 import { crearLogger } from "../src/platform/logger.ts";
 import { migrar } from "../src/platform/migrar.ts";
@@ -35,6 +36,7 @@ let vk: ValkeyDePrueba;
 let owner: pg.Client;
 let app: FastifyInstance;
 let valkeyApi: Redis;
+let bdApp: BdApp;
 let bdCerrar: () => Promise<void>;
 
 const usuarios = {
@@ -46,7 +48,7 @@ const usuarios = {
 
 async function llamar(
   token: string | null,
-  method: "GET" | "POST" | "PATCH" | "DELETE",
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE",
   url: string,
   body?: unknown,
 ) {
@@ -99,6 +101,7 @@ beforeAll(async () => {
   ]);
 
   const bd = crearBdApp(pgc.url("app"), 5);
+  bdApp = bd;
   valkeyApi = crearValkey(vk.url("api"), "prueba-api");
   const log = crearLogger("prueba", "silent");
   app = crearServidorHttp(log);
@@ -112,6 +115,7 @@ beforeAll(async () => {
       appEnv: "local",
       verificador: verificadorDePrueba,
       claimPepper: PEPPER,
+      nombreBot: async () => "lympha_prueba_bot",
     },
     log,
   );
@@ -663,6 +667,282 @@ describe("API de H1", () => {
     expect((await llamar(usuarios.ana, "GET", `/api/nodos/${nodoAna}`)).status).toBe(200);
     // el mismo token vuelve a crear un perfil nuevo y vacío
     expect((await llamar(zoe, "GET", "/api/espacios")).cuerpo.espacios).toEqual([]);
+  });
+
+  it("telegram: el vínculo y las preferencias son de cada usuario", async () => {
+    const mensajes: { chat: number; texto: string }[] = [];
+    const manejar = crearManejadorTelegram({
+      bd: bdApp,
+      valkey: valkeyApi,
+      log: crearLogger("prueba", "silent"),
+      cliente: {
+        enviarMensaje: async (chat, texto) => {
+          mensajes.push({ chat, texto });
+        },
+      },
+    });
+    let idUpdate = 0;
+    const escribir = (chat: number, texto: string, tipo = "private") =>
+      manejar({ update_id: ++idUpdate, message: { chat: { id: chat, type: tipo }, text: texto } });
+    const ultimo = () => mensajes.at(-1)?.texto ?? "";
+    const tokenDe_ = (enlace: string) => new URL(enlace).searchParams.get("start") as string;
+    const vinculado = async (token: string) =>
+      (await llamar(token, "GET", "/api/yo/telegram")).cuerpo.vinculado as boolean;
+    const enlace = async (token: string) => {
+      const r = await llamar(token, "POST", "/api/yo/telegram/vinculo");
+      expect(r.status).toBe(201);
+      return tokenDe_(r.cuerpo.enlace as string);
+    };
+
+    // ── vinculación por deep link ──
+    expect((await llamar(null, "POST", "/api/yo/telegram/vinculo")).status).toBe(401);
+    const respuesta = await llamar(usuarios.ana, "POST", "/api/yo/telegram/vinculo");
+    expect(respuesta.cuerpo.enlace).toMatch(
+      /^https:\/\/t\.me\/lympha_prueba_bot\?start=[A-Za-z0-9_-]{43}$/,
+    );
+    const tokenAna = tokenDe_(respuesta.cuerpo.enlace as string);
+    const ttl = await valkeyApi.ttl(`tg:vincular:${tokenAna}`);
+    expect(ttl).toBeGreaterThan(590);
+    expect(ttl).toBeLessThanOrEqual(600);
+    expect(await vinculado(usuarios.ana)).toBe(false);
+
+    await escribir(5001, `/start ${tokenAna}`);
+    expect(ultimo()).toMatch(/quedó vinculado/);
+    expect(await vinculado(usuarios.ana)).toBe(true);
+    expect(await vinculado(usuarios.beto)).toBe(false);
+    expect(
+      (await owner.query("SELECT usuario_id FROM app.vinculos_telegram WHERE chat_id = 5001"))
+        .rows[0].usuario_id,
+    ).toBe(await usuarioId(usuarios.ana));
+
+    // el enlace es de un solo uso
+    await escribir(5002, `/start ${tokenAna}`);
+    expect(ultimo()).toMatch(/venció o ya se usó/);
+    expect(
+      (await owner.query("SELECT 1 FROM app.vinculos_telegram WHERE chat_id = 5002")).rowCount,
+    ).toBe(0);
+    await escribir(5002, "/start token-inventado-que-no-existe");
+    expect(ultimo()).toMatch(/venció o ya se usó/);
+
+    // un chat que ya es de Ana no se le puede quitar a Ana con otro enlace
+    const tokenBeto = await enlace(usuarios.beto);
+    await escribir(5001, `/start ${tokenBeto}`);
+    expect(ultimo()).toMatch(/ya está vinculado a otra cuenta/);
+    expect(await vinculado(usuarios.beto)).toBe(false);
+    expect(await vinculado(usuarios.ana)).toBe(true);
+
+    // desde un grupo no se vincula, y el enlace no se gasta
+    const tokenGrupo = await enlace(usuarios.beto);
+    await escribir(5003, `/start ${tokenGrupo}`, "group");
+    expect(ultimo()).toMatch(/conversación privada/);
+    await escribir(5003, `/start ${tokenGrupo}`);
+    expect(await vinculado(usuarios.beto)).toBe(true);
+
+    // quitar el vínculo de uno no toca el del otro
+    expect((await llamar(usuarios.beto, "DELETE", "/api/yo/telegram")).status).toBe(204);
+    expect(await vinculado(usuarios.beto)).toBe(false);
+    expect(await vinculado(usuarios.ana)).toBe(true);
+    expect((await llamar(usuarios.ana, "GET", "/api/yo/telegram")).cuerpo.vinculado_en).toMatch(
+      /^\d{4}-\d{2}-\d{2}T/,
+    );
+
+    // /desvincular desde el chat de Ana quita el vínculo de Ana y de nadie más
+    await escribir(5001, "/desvincular");
+    expect(ultimo()).toMatch(/ya no te enviaré avisos/);
+    expect(await vinculado(usuarios.ana)).toBe(false);
+    await escribir(5001, "/desvincular");
+    expect(ultimo()).toMatch(/no estaba vinculado/);
+    await escribir(5001, "hola");
+    expect(ultimo()).toMatch(/Ajustes → Telegram/);
+
+    // pedir enlaces tiene límite por usuario
+    for (let i = 0; i < 10; i++) await enlace(usuarios.dani);
+    expect((await llamar(usuarios.dani, "POST", "/api/yo/telegram/vinculo")).status).toBe(429);
+    expect((await llamar(usuarios.carla, "POST", "/api/yo/telegram/vinculo")).status).toBe(201);
+
+    // ── preferencias ──
+    const espacio = await crearEspacio(usuarios.ana, "Con preferencias");
+    const nodo = await fabricarNodo(40);
+    await llamar(usuarios.ana, "POST", "/api/nodos/reclamar", {
+      nodoId: nodo,
+      codigo: codigoN(40),
+      espacioId: espacio,
+    });
+    const pref = {
+      nodo_id: null,
+      niveles: ["regular", "mala", "critica"],
+      silencio_inicio: "22:00",
+      silencio_fin: "07:00",
+      zona_horaria: "America/Mexico_City",
+      recordatorio_h: 3,
+    };
+    const guardada = await llamar(usuarios.ana, "PUT", "/api/yo/notificaciones", pref);
+    expect(guardada.status).toBe(200);
+    expect(guardada.cuerpo.defecto).toEqual(pref);
+    // otra vez lo mismo: actualiza, no duplica
+    await llamar(usuarios.ana, "PUT", "/api/yo/notificaciones", { ...pref, recordatorio_h: 5 });
+    expect((await llamar(usuarios.ana, "GET", "/api/yo/notificaciones")).cuerpo.defecto).toEqual({
+      ...pref,
+      recordatorio_h: 5,
+    });
+
+    // Beto no ve nada de Ana: recibe los valores por defecto
+    expect((await llamar(usuarios.beto, "GET", "/api/yo/notificaciones")).cuerpo).toEqual({
+      defecto: {
+        nodo_id: null,
+        niveles: ["mala", "critica"],
+        silencio_inicio: null,
+        silencio_fin: null,
+        zona_horaria: "America/Mexico_City",
+        recordatorio_h: 6,
+      },
+      nodos: [],
+    });
+
+    // un nodo ajeno e uno inexistente responden igual (404), y no se escribe nada
+    const ajeno = await llamar(usuarios.beto, "PUT", "/api/yo/notificaciones", {
+      ...pref,
+      nodo_id: nodo,
+    });
+    const inexistente = await llamar(usuarios.beto, "PUT", "/api/yo/notificaciones", {
+      ...pref,
+      nodo_id: INEXISTENTE,
+    });
+    expect(ajeno.status).toBe(404);
+    expect(ajeno.cuerpo).toEqual(inexistente.cuerpo);
+    expect((await llamar(usuarios.beto, "DELETE", `/api/yo/notificaciones/${nodo}`)).status).toBe(
+      404,
+    );
+    expect(
+      (await owner.query("SELECT 1 FROM app.preferencias_notificacion WHERE nodo_id = $1", [nodo]))
+        .rowCount,
+    ).toBe(0);
+
+    // Ana sí: preferencia de un nodo y su borrado
+    const deNodo = await llamar(usuarios.ana, "PUT", "/api/yo/notificaciones", {
+      ...pref,
+      nodo_id: nodo,
+      niveles: ["critica"],
+      silencio_inicio: null,
+      silencio_fin: null,
+    });
+    expect(deNodo.cuerpo.nodos).toHaveLength(1);
+    expect(deNodo.cuerpo.nodos[0]).toMatchObject({ nodo_id: nodo, niveles: ["critica"] });
+    expect((await llamar(usuarios.ana, "DELETE", `/api/yo/notificaciones/${nodo}`)).status).toBe(
+      204,
+    );
+    expect((await llamar(usuarios.ana, "GET", "/api/yo/notificaciones")).cuerpo.nodos).toEqual([]);
+
+    // entradas inválidas: 400
+    const malas: Record<string, unknown>[] = [
+      { ...pref, silencio_fin: null }, // horario a medias
+      { ...pref, zona_horaria: "Marte/Olympus" },
+      { ...pref, niveles: ["mala", "mala"] },
+      { ...pref, niveles: ["buena"] },
+      { ...pref, silencio_inicio: "25:00" },
+      { ...pref, recordatorio_h: 0 },
+      { ...pref, recordatorio_h: 73 },
+      { ...pref, extra: true },
+    ];
+    for (const mala of malas) {
+      expect((await llamar(usuarios.ana, "PUT", "/api/yo/notificaciones", mala)).status).toBe(400);
+    }
+    expect((await llamar(null, "GET", "/api/yo/notificaciones")).status).toBe(401);
+  });
+
+  it("alarmas: un ajeno recibe 404 al listar y al atender", async () => {
+    // Ana ya llegó al máximo de espacios en las pruebas anteriores: esta propietaria es nueva.
+    const elena = tokenDe("uid-elena", "elena@example.com", "Elena");
+    const espacio = await crearEspacio(elena, "Con alarmas");
+    await invitar(elena, espacio, usuarios.carla);
+    const nodo = await fabricarNodo(41);
+    await llamar(elena, "POST", "/api/nodos/reclamar", {
+      nodoId: nodo,
+      codigo: codigoN(41),
+      espacioId: espacio,
+    });
+    const activa = (
+      await owner.query(
+        `INSERT INTO app.alarmas (nodo_id, espacio_id, tipo, severidad, causa)
+         VALUES ($1, $2, 'nivel', 'mala', 'La turbidez está alta.') RETURNING id`,
+        [nodo, espacio],
+      )
+    ).rows[0].id as string;
+    const resuelta = (
+      await owner.query(
+        `INSERT INTO app.alarmas (nodo_id, espacio_id, tipo, severidad, estado, resuelta_en)
+         VALUES ($1, $2, 'sensor', 'regular', 'resuelta', now()) RETURNING id`,
+        [nodo, espacio],
+      )
+    ).rows[0].id as string;
+
+    // un usuario ajeno no distingue un espacio o una alarma ajenos de uno inexistente
+    const ajenoLista = await llamar(usuarios.beto, "GET", `/api/espacios/${espacio}/alarmas`);
+    const vacioLista = await llamar(usuarios.beto, "GET", `/api/espacios/${INEXISTENTE}/alarmas`);
+    expect(ajenoLista.status).toBe(404);
+    expect(ajenoLista.cuerpo).toEqual(vacioLista.cuerpo);
+    const ajenoAtender = await llamar(usuarios.beto, "POST", `/api/alarmas/${activa}/atender`);
+    const vacioAtender = await llamar(usuarios.beto, "POST", `/api/alarmas/${INEXISTENTE}/atender`);
+    expect(ajenoAtender.status).toBe(404);
+    expect(ajenoAtender.cuerpo).toEqual(vacioAtender.cuerpo);
+    expect(
+      (await owner.query("SELECT estado FROM app.alarmas WHERE id = $1", [activa])).rows[0].estado,
+    ).toBe("activa");
+    expect((await llamar(null, "GET", `/api/espacios/${espacio}/alarmas`)).status).toBe(401);
+    expect((await llamar(null, "POST", `/api/alarmas/${activa}/atender`)).status).toBe(401);
+
+    // los miembros ven el historial, con estado y sin correos
+    const lista = await llamar(usuarios.carla, "GET", `/api/espacios/${espacio}/alarmas`);
+    expect(lista.status).toBe(200);
+    expect(lista.cuerpo.alarmas.map((a: { id: string }) => a.id).sort()).toEqual(
+      [activa, resuelta].sort(),
+    );
+    expect(JSON.stringify(lista.cuerpo)).not.toContain("@");
+    const abiertas = await llamar(
+      usuarios.carla,
+      "GET",
+      `/api/espacios/${espacio}/alarmas?estado=abiertas`,
+    );
+    expect(abiertas.cuerpo.alarmas.map((a: { id: string }) => a.id)).toEqual([activa]);
+    expect(
+      (await llamar(usuarios.carla, "GET", `/api/espacios/${espacio}/alarmas?estado=inventado`))
+        .status,
+    ).toBe(400);
+
+    // atender: el cambio llega por el canal del espacio y queda registrado quién fue
+    const suscriptor = valkeyApi.duplicate();
+    suscriptor.on("error", () => undefined);
+    const eventos: string[] = [];
+    suscriptor.on("message", (_canal: string, mensaje: string) => eventos.push(mensaje));
+    await suscriptor.subscribe(`espacio:${espacio}`);
+    try {
+      const atendida = await llamar(usuarios.carla, "POST", `/api/alarmas/${activa}/atender`);
+      expect(atendida.status).toBe(200);
+      expect(atendida.cuerpo).toMatchObject({
+        id: activa,
+        estado: "atendida",
+        atendida_por: { id: await usuarioId(usuarios.carla), nombre: "Carla" },
+      });
+      for (let i = 0; i < 50 && eventos.length === 0; i++)
+        await new Promise((r) => setTimeout(r, 20));
+      expect(JSON.parse(eventos[0] ?? "{}")).toMatchObject({
+        alarma_id: activa,
+        cambio: "atendida",
+        estado: "atendida",
+      });
+    } finally {
+      suscriptor.disconnect();
+    }
+
+    // solo se atiende una alarma activa: otra atención o una alarma resuelta es un conflicto
+    const otra = await llamar(elena, "POST", `/api/alarmas/${activa}/atender`);
+    expect(otra.status).toBe(409);
+    expect(otra.cuerpo.codigo).toBe("alarma_no_activa");
+    expect((await llamar(elena, "POST", `/api/alarmas/${resuelta}/atender`)).status).toBe(409);
+    expect(
+      (await llamar(elena, "GET", `/api/espacios/${espacio}/alarmas?estado=atendida`)).cuerpo
+        .alarmas[0].atendida_por.nombre,
+    ).toBe("Carla");
   });
 
   it("toda prueba de acceso cruzado citada en rutas-cubiertas.ts existe en este archivo", () => {

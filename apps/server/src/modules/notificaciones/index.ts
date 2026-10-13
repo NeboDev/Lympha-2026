@@ -17,3 +17,5 @@ export {
   reclamarPendientes,
 } from "./outbox.ts";
 export { type Decision, decidirTrasError, ESPERAS_S, INTENTOS_MAXIMOS } from "./reintentos.ts";
+export { type DepsNotificaciones, rutasNotificaciones } from "./rutas.ts";
+export { crearManejadorTelegram, type DepsManejador } from "./vinculo.ts";

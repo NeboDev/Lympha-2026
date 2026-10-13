@@ -12,3 +12,4 @@ export {
   RANGO_SEVERIDAD,
   SIN_CONEXION_MIN_DEFECTO,
 } from "./reglas.ts";
+export { type DepsAlarmas, rutasAlarmas } from "./rutas.ts";

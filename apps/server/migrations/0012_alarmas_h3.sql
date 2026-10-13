@@ -62,6 +62,22 @@ REVOKE ALL ON FUNCTION app.quiere_aviso(uuid, uuid, app.nivel[]), app.siguiente_
 GRANT EXECUTE ON FUNCTION app.quiere_aviso(uuid, uuid, app.nivel[]), app.siguiente_envio(uuid, uuid, timestamptz)
   TO lympha_system;
 
+-- "/desvincular" llega desde el chat de Telegram, sin sesión de usuario: la API no sabe de quién es ese chat y
+-- `vinculos_telegram` solo es visible para su dueño. Esta función borra el vínculo de ese chat (y descarta sus
+-- avisos pendientes) sin exponer a quién pertenecía. Devuelve si había algo que desvincular.
+CREATE FUNCTION app.desvincular_chat(p_chat bigint)
+RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER SET search_path = app, pg_temp AS $$
+DECLARE u uuid;
+BEGIN
+  DELETE FROM app.vinculos_telegram WHERE chat_id = p_chat RETURNING usuario_id INTO u;
+  IF u IS NULL THEN RETURN false; END IF;
+  UPDATE app.notificaciones_salida SET estado = 'descartada', error = 'sin_vinculo'
+   WHERE usuario_id = u AND estado = 'pendiente' AND canal = 'telegram';
+  RETURN true;
+END $$;
+REVOKE ALL ON FUNCTION app.desvincular_chat(bigint) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION app.desvincular_chat(bigint) TO lympha_app;
+
 -- Los avisos nombran el espacio ("Casa"); el worker solo necesita id y nombre.
 GRANT SELECT (id, nombre) ON app.espacios TO lympha_system;
 
