@@ -1,4 +1,5 @@
-import { type BdSistema, conSistema } from "../../platform/db.ts";
+import { sql } from "drizzle-orm";
+import { type BdSistema, conSistema, type Tx } from "../../platform/db.ts";
 import { activarNodosConLectura } from "../dispositivos/index.ts";
 import type { LecturaTrabajo } from "./schema.ts";
 import { lecturas } from "./tablas.ts";
@@ -16,6 +17,28 @@ export function ordenarLecturas(filas: LecturaTrabajo[]): LecturaTrabajo[] {
   return [...filas].sort((a, b) =>
     a.nodoId === b.nodoId ? a.ts - b.ts || a.seq - b.seq : a.nodoId < b.nodoId ? -1 : 1,
   );
+}
+
+/**
+ * Deja en `estado_nodo` la última lectura de cada nodo del lote (la API la muestra mientras H2 no calcula el
+ * WQI). Solo avanza hacia lecturas más recientes y solo si el nodo sigue en el mismo espacio.
+ */
+async function actualizarUltimaLectura(tx: Tx, ordenadas: LecturaTrabajo[]): Promise<void> {
+  const ultima = new Map<string, LecturaTrabajo>();
+  for (const l of ordenadas) ultima.set(l.nodoId, l); // ordenadas por (nodo, ts): la última gana
+  if (ultima.size === 0) return;
+  const filas = [...ultima.values()].map(
+    (
+      l,
+    ) => sql`(${l.nodoId}::uuid, ${l.espacioId}::uuid, ${new Date(l.ts).toISOString()}::timestamptz,
+      ${JSON.stringify({ ph: l.ph, temperatura: l.temperatura, conductividad: l.conductividad, turbidez: l.turbidez, tds: l.tds })}::jsonb)`,
+  );
+  await tx.execute(sql`
+    UPDATE app.estado_nodo e
+    SET ultima_lectura_en = v.ts, ultimos_valores = v.valores, actualizado_en = now()
+    FROM (VALUES ${sql.join(filas, sql`, `)}) AS v(nodo_id, espacio_id, ts, valores)
+    WHERE e.nodo_id = v.nodo_id AND e.espacio_id = v.espacio_id
+      AND (e.ultima_lectura_en IS NULL OR e.ultima_lectura_en < v.ts)`);
 }
 
 /**
@@ -48,6 +71,7 @@ export async function guardarLecturas(
         .onConflictDoNothing({ target: [lecturas.nodoId, lecturas.ts] });
       insertadas += r.rowCount ?? 0;
     }
+    await actualizarUltimaLectura(tx, ordenadas);
   });
   await activarNodosConLectura(bd, [...new Set(ordenadas.map((l) => l.nodoId))]);
   return { recibidas: ordenadas.length, insertadas, duplicadas: ordenadas.length - insertadas };

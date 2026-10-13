@@ -116,6 +116,21 @@ afirma "levanta la imagen anterior" grep -q "IMAGE=ghcr.io/prueba/lympha-server:
 limpiar_estado
 correr staging rollback; afirma "sin historial, el rollback se niega" test $? -ne 0
 
+echo "VM de staging local: imagen ya cargada y archivo Compose adicional"
+limpiar_estado
+printf 'IMAGE_PULL=0
+COMPOSE_EXTRA=infra/compose/staging-local.yml
+' >> "$TMP/raiz/deploy.conf"
+correr staging "$A"; afirma "despliega bien" test $? -eq 0
+afirma "no descarga de ningún registro" bash -c "! grep -q 'docker pull' '$LOG'"
+afirma "comprueba que la imagen exista localmente" grep -q "docker image inspect ghcr.io/prueba/lympha-server:$A" "$LOG"
+afirma "agrega el archivo Compose adicional" grep -q "staging-local.yml" "$LOG"
+echo "IMAGE_REPO=ghcr.io/prueba/lympha-server" > "$TMP/raiz/deploy.conf"
+limpiar_estado
+correr staging "$A"
+afirma "sin esas opciones sigue usando docker pull" grep -q "docker pull" "$LOG"
+afirma "sin esas opciones no agrega archivos Compose" bash -c "! grep -q 'staging-local.yml' '$LOG'"
+
 echo "validaciones"
 correr staging; afirma "sin argumentos falla" test $? -ne 0
 correr desarrollo "$A"; afirma "entorno desconocido falla" test $? -ne 0

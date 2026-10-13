@@ -1,0 +1,6 @@
+{
+  "nombre": "estable",
+  "descripcion": "Agua estable: pH 7.2, 22 °C. Debe mantenerse en nivel buena sin parpadeo.",
+  "repetir": true,
+  "pasos": [{ "duracionS": 3600, "ph": 7.2 }]
+}

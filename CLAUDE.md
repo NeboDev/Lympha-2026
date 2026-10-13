@@ -10,7 +10,15 @@ Documentos fuente (raíz del repo). Precedencia si se contradicen: **datos > pla
 ## Alcance y estado
 Solo backend e infraestructura. `apps/web` queda como carpeta vacía con README; no se toca el firmware (repo aparte `lympha-firmware`).
 
-**H0 (Esqueleto): terminado** (criterio de salida cumplido en local; ver `docs/decisiones.md`, sección "Pendiente al cerrar H0"). **No avanzar a H1 sin instrucción.** Lo que H0 deja funcionando: Compose de desarrollo con Postgres+Timescale, Valkey 8, Mosquitto 2.1 con Dynamic Security y TLS, y los cuatro procesos; migraciones `0000`–`0009`; `conUsuario()`/`conSistema()`; flujo MQTT → cola → worker → `ts.lecturas`; simulador con TLS; CI y deploy a staging/producción escritos (sin servidor todavía).
+**H0 y H1: terminados en local** (ver `docs/decisiones.md`: "Modo local", "H1" y "Pendiente al cerrar H1"). **No avanzar a H2 sin instrucción.** H1 dejó: identidad con Firebase (emulador en local), API de espacios/membresías/invitaciones/nodos/lecturas, migración `0010`, `ingest` con `status`/`attributes`/huecos, `/metrics` (prom-client) en `ingest` y `worker`, CLI de fábrica sin grabado (`pnpm factory`) y simulador de flotas con escenarios JSON. Verificado: 100 nodos, reinicios forzados, 0 lecturas perdidas.
+
+## Modo de trabajo actual: sin VPS (hasta el inicio de H5)
+- Todo se desarrolla y prueba en local (Compose de desarrollo). Los criterios de salida que dicen "en staging" se cumplen en el Compose local o en la VM de Multipass (`infra/staging-local/vm.sh`), que se usa para ensayar el despliegue al cierre de cada hito.
+- `deploy-staging.yml`, `deploy-prod.yml`, `deploy.sh`, `setup.sh` y `cert-sync.sh` están **escritos pero no probados contra un servidor real**; no afirmar lo contrario. `vm.sh` tampoco se ha ejecutado aún. Se prueban contra un VPS al inicio de H5.
+- Telegram: con `APP_ENV=local` y sin `PUBLIC_API_URL` usa long polling; el webhook solo se activa con `PUBLIC_API_URL` (https) definido. Bot de desarrollo `@lympha_dev_bot`.
+- Firebase: proyecto `lympha-dev`. `FIREBASE_USE_EMULATOR=true` usa el emulador de Auth (prohibido fuera de `APP_ENV=local`); `false` verifica tokens del proyecto real. `FIREBASE_SERVICE_ACCOUNT` es opcional. Token de prueba: `pnpm dev:token correo`.
+- Mosquitto local usa una CA propia (`infra/certs/ca.crt` + `ca.key`, ignoradas por git; `pnpm certs`), reutilizable para los nodos de prueba de H5.
+- Secretos: nunca leer ni pedir valores. Las variables se documentan por nombre en `.env.example` y el usuario llena `.env` (no versionado). Antes de cada paso, listar los archivos que se van a crear o modificar.
 
 ## Decisiones finales (anulan a cualquier documento)
 - Valkey 8, no Redis.
@@ -31,25 +39,27 @@ Node 24 · TypeScript 5.9 `strict` · pnpm workspaces · Fastify 5 + `fastify-ty
 apps/server/{src/{modules,platform,main,cli},migrations,test,Dockerfile}
 apps/web/                 # vacío + README (fuera de alcance)
 packages/{contracts,wqi}  # wqi: pendiente (H2)
-tools/{simulator,factory} # factory: pendiente (H1)
-infra/{compose,caddy,mosquitto,postgres,valkey,bootstrap,secrets,test}  + deploy.sh, smoke.sh
+tools/{simulator,factory} # factory: solo guarda los lotes generados; el CLI vive en apps/server/src/cli/fabrica.ts
+infra/{compose,caddy,mosquitto,postgres,valkey,firebase,bootstrap,staging-local,secrets,test}  + deploy.sh, smoke.sh
 .github/workflows/{ci,deploy-staging,deploy-prod}.yml
 docs/decisiones.md
 ```
-`main/` tiene cuatro entrypoints (`api`, `ingest`, `worker`, `notifier`); **una sola imagen, cuatro comandos** (`node src/main/<proceso>.ts`). `cli/` tiene los jobs: `migrate`, `mqtt-bootstrap`, `seed`.
+`main/` tiene cuatro entrypoints (`api`, `ingest`, `worker`, `notifier`); **una sola imagen, cuatro comandos** (`node src/main/<proceso>.ts`). `cli/` tiene los jobs: `migrate`, `mqtt-bootstrap`, `seed`, `fabrica`, `dev-token`.
 
 ## Comandos
 - `pnpm install` · `pnpm dev` (Compose de desarrollo con `--build --watch`) · `pnpm simulator`
 - `pnpm test` (unitarias) · `pnpm test:int` (integración, Testcontainers, necesita Docker) · `pnpm test:infra` (deploy.sh y prod.yml)
 - `pnpm lint` / `pnpm lint:fix` (Biome) · `pnpm typecheck`
-- `pnpm migrate` · `pnpm db:seed`
-- Desde el host contra el stack de desarrollo: `MQTT_URL=mqtt://127.0.0.1:1883 node --env-file=infra/compose/dev.env apps/server/src/cli/<job>.ts`
+- `pnpm migrate` · `pnpm db:seed` · `pnpm factory lote --cantidad N [--dev]` · `pnpm dev:token correo` · `pnpm certs` (`CERT_SANS=IP:...`)
+- `bash infra/test/carga-local.sh --nodos 100 --duracion 5m` (prueba de carga con reinicios forzados; informe en `infra/test/resultados/`)
+- `infra/staging-local/vm.sh crear|desplegar|rollback|ssh|destruir` (VM de Multipass)
+- Desde el host contra el stack de desarrollo: `node --env-file=infra/compose/dev.env --env-file=infra/compose/host.env apps/server/src/cli/<job>.ts` (`host.env` cambia los nombres internos por 127.0.0.1)
 
 ## Reglas del código (no negociables)
 - TypeScript estricto, sin `any` implícito.
 - Un módulo solo importa la interfaz pública de otro (`modules/<x>/index.ts`); `main/`, `cli/` y `platform/` solo `modules/<x>/index.ts`. Lo hace cumplir Biome (`noRestrictedImports`).
 - Toda consulta de la API pasa por `conUsuario()` (fija `app.usuario_id` con `set_config(..., true)` en la transacción). Procesos internos: `conSistema()`. Las series de tiempo se leen solo por `app.v_*`.
-- Toda ruta nueva se declara en `apps/server/test/rutas-cubiertas.ts` (pública o con su prueba de acceso cruzado → 404); si no, falla `src/main/rutas.test.ts`.
+- Toda ruta nueva se declara en `apps/server/test/rutas-cubiertas.ts` (pública o con una prueba de acceso cruzado de `test/api.test.ts` que exista de verdad: 404 al ajeno, 403 al miembro sin rol); si no, falla `src/main/rutas.test.ts`. Rutas de usuario bajo `/api`; sin `/dev` ni `/metrics` en la API.
 - Errores de dominio = clases tipadas traducidas por la capa HTTP; nunca exponer trazas.
 - Configuración validada con Zod al arrancar (`platform/config.ts`); si falta una variable el proceso no inicia. Ningún secreto en código ni en imágenes.
 - Validar con Zod todo cuerpo, parámetro y payload MQTT; rechazar lo desconocido (`.strict()`).
@@ -63,7 +73,7 @@ docs/decisiones.md
 - Archivos largos con heredoc en Bash fallan en este entorno: usar la herramienta Write.
 
 ## Contrato MQTT
-`lympha/v1/d/{deviceId}/{telemetry|attributes|status|config|cmd|cmd/ack}`; payload con `v`; `telemetry` = `{"v":1,"ts":<epoch s>,"seq":n,"ph","t","ec","turb","tds"}`; `status` es LWT retenido `online|offline`. Usuario = client id = `deviceId` (Dynamic Security lo exige); `lympha-ingest` fijo a su client id; `lympha-control` sin client id fijo (`-api`, `-worker`).
+`lympha/v1/d/{deviceId}/{telemetry|attributes|status|config|cmd|cmd/ack}`; payload con `v`; `telemetry` = `{"v":1,"ts":<epoch s>,"seq":n,"ph","t","ec","turb","tds"}`; `status` es LWT retenido `online|offline`; `ingest` atiende `telemetry`, `status` y `attributes`. Usuario = client id = `deviceId` (Dynamic Security lo exige); `lympha-ingest` fijo a su client id; `lympha-control` sin client id fijo (`-api`, `-worker`).
 
 ## Cuándo preguntar
 Si un documento tiene contradicción o hueco que cambia el diseño: detenerse y preguntar. Si es menor: decidir, anotar en `docs/decisiones.md` y seguir.

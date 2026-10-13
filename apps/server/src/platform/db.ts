@@ -77,6 +77,24 @@ export async function conUsuario<T>(
   });
 }
 
+/**
+ * ÚNICA consulta de la API que corre sin usuario: resolver (o dar de alta) el perfil local de una identidad ya
+ * verificada, para saber qué `usuario_id` fijar en `conUsuario()`. Solo ejecuta `app.asegurar_usuario`.
+ */
+export async function asegurarUsuario(
+  bd: BdApp,
+  identidad: { authUid: string; email: string; nombre: string | null },
+): Promise<string> {
+  const r = await bd.pool.query<{ id: string }>("SELECT app.asegurar_usuario($1, $2, $3) AS id", [
+    identidad.authUid,
+    identidad.email,
+    identidad.nombre,
+  ]);
+  const id = r.rows[0]?.id;
+  if (!id) throw new Error("asegurar_usuario no devolvió un id");
+  return id;
+}
+
 /** Ejecuta `fn` en una transacción con el rol de sistema (sin contexto de usuario). */
 export async function conSistema<T>(bd: BdSistema, fn: (tx: Tx) => Promise<T>): Promise<T> {
   return bd.db.transaction(fn);

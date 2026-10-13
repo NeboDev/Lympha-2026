@@ -11,7 +11,7 @@ export LYMPHA_IMAGE=ghcr.io/ci/lympha-server:ci APP_ENV=staging API_DOMAIN=a.exa
   MQTT_DOMAIN=m.example.test ACME_EMAIL=ci@example.test POSTGRES_USER=p POSTGRES_PASSWORD=x \
   PW_OWNER=x PW_APP=x PW_SYSTEM=x PW_BACKUP=x VALKEY_PW_API=x VALKEY_PW_INGEST=x VALKEY_PW_WORKER=x \
   MQTT_ADMIN_USER=a MQTT_ADMIN_PASSWORD=x MQTT_INGEST_USER=i MQTT_INGEST_PASSWORD=x \
-  MQTT_CONTROL_USER=c MQTT_CONTROL_PASSWORD=x CLAIM_PEPPER=x
+  MQTT_CONTROL_USER=c MQTT_CONTROL_PASSWORD=x CLAIM_PEPPER=x FIREBASE_PROJECT_ID=lympha-ci
 
 salida="$(docker compose -p prueba -f "$RAIZ/infra/compose/base.yml" -f "$RAIZ/infra/compose/prod.yml" config)"
 
@@ -31,6 +31,19 @@ fi
 # Ningún servicio de aplicación debe recibir los secretos de otro (p. ej. la contraseña del dueño de la base).
 if awk '/^  (api|ingest|worker|notifier):/{s=$1} /^  [a-z-]+:$/{if($1!~/^(api|ingest|worker|notifier):$/)s=""} s!="" && /PW_OWNER|POSTGRES_PASSWORD|MQTT_ADMIN_PASSWORD/{print s": "$0}' <<<"$salida" | grep -q .; then
   echo "FALLA: un proceso de aplicación recibe un secreto que no le corresponde" >&2
+  exit 1
+fi
+
+# La variante de la VM de staging local no cambia los puertos y solo reemplaza el Caddyfile.
+local_salida="$(docker compose -p prueba -f "$RAIZ/infra/compose/base.yml" -f "$RAIZ/infra/compose/prod.yml" \
+  -f "$RAIZ/infra/compose/staging-local.yml" config)"
+local_publicados="$(grep -E '^\s+published:' <<<"$local_salida" | tr -d ' "' | sort -u | tr '\n' ' ')"
+if [[ "$local_publicados" != "$publicados" ]]; then
+  echo "FALLA: staging-local.yml cambia los puertos publicados" >&2
+  exit 1
+fi
+if ! grep -q 'Caddyfile\.local' <<<"$local_salida" || grep -Eq 'source: .*[/\]Caddyfile$' <<<"$local_salida"; then
+  echo "FALLA: staging-local.yml no reemplaza el Caddyfile" >&2
   exit 1
 fi
 

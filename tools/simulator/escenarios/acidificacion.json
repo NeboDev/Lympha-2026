@@ -1,0 +1,10 @@
+{
+  "nombre": "acidificacion",
+  "descripcion": "El pH baja de 7.2 a 5.8 en 20 minutos y se queda ahí: debe pasar a mala/critica y, al volver, recuperarse con histéresis.",
+  "pasos": [
+    { "duracionS": 300, "ph": 7.2 },
+    { "duracionS": 1200, "ph": { "de": 7.2, "a": 5.8 } },
+    { "duracionS": 600, "ph": 5.8 },
+    { "duracionS": 600, "ph": { "de": 5.8, "a": 7.2 } }
+  ]
+}

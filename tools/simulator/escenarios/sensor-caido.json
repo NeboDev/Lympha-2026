@@ -1,0 +1,9 @@
+{
+  "nombre": "sensor-caido",
+  "descripcion": "El sensor de pH deja de responder 10 minutos (null): debe verse 'revisar sensor', no un nivel de calidad.",
+  "pasos": [
+    { "duracionS": 300, "ph": 7.2 },
+    { "duracionS": 600, "ph": null },
+    { "duracionS": 300, "ph": 7.2 }
+  ]
+}

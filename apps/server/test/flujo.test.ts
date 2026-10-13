@@ -29,6 +29,7 @@ import {
   type PostgresDePrueba,
   type ValkeyDePrueba,
 } from "./helpers/contenedores.ts";
+import { tokenDe, verificadorDePrueba } from "./helpers/verificador.ts";
 
 const ID = {
   ana: "0192f3a7-0000-7000-8000-00000000a001",
@@ -79,6 +80,7 @@ const cfgApi = () =>
       MQTT_CONTROL_USER: "lympha-control",
       MQTT_CONTROL_PASSWORD: MQTT_PW.control,
       CLAIM_PEPPER: "pepper",
+      FIREBASE_PROJECT_ID: "lympha-test",
     }),
   );
 
@@ -140,7 +142,8 @@ beforeAll(async () => {
      INSERT INTO app.nodos (id, lote_id, espacio_id, estado, claim_hash, reclamado_en)
        VALUES ('${ID.nodo}', '${ID.lote}', '${ID.espacioAna}', 'reclamado', '\\x00', now());
      INSERT INTO app.nodos (id, lote_id, estado, claim_hash)
-       VALUES ('${ID.nodoLibre}', '${ID.lote}', 'fabricado', '\\x00');`,
+       VALUES ('${ID.nodoLibre}', '${ID.lote}', 'fabricado', '\\x00');
+     INSERT INTO app.estado_nodo (nodo_id, espacio_id) VALUES ('${ID.nodo}', '${ID.espacioAna}');`,
   );
 
   const admin = crearClienteMqtt({
@@ -283,13 +286,13 @@ describe("de la lectura MQTT a la API", () => {
   });
 
   it("la API devuelve las lecturas por app.v_lecturas y aísla entre usuarios (404)", async () => {
-    const api = await crearApi(cfgApi(), log);
+    const api = await crearApi(cfgApi(), log, { verificador: verificadorDePrueba });
     try {
-      const url = `/dev/nodos/${ID.nodo}/lecturas?limite=5`;
+      const url = `/api/nodos/${ID.nodo}/lecturas?limite=5`;
       const ana = await api.app.inject({
         method: "GET",
         url,
-        headers: { "x-dev-usuario-id": ID.ana },
+        headers: { authorization: tokenDe("uid-ana", "ana@example.com") },
       });
       expect(ana.statusCode).toBe(200);
       const cuerpo = ana.json() as { lecturas: { seq: number; nodo_id: string }[] };
@@ -300,29 +303,78 @@ describe("de la lectura MQTT a la API", () => {
       const beto = await api.app.inject({
         method: "GET",
         url,
-        headers: { "x-dev-usuario-id": ID.beto },
+        headers: { authorization: tokenDe("uid-beto", "beto@example.com") },
       });
       expect(beto.statusCode).toBe(404);
       const noExiste = await api.app.inject({
         method: "GET",
-        url: "/dev/nodos/0192f3a7-0000-7000-8000-0000000000ee/lecturas",
-        headers: { "x-dev-usuario-id": ID.ana },
+        url: "/api/nodos/0192f3a7-0000-7000-8000-0000000000ee/lecturas",
+        headers: { authorization: tokenDe("uid-ana", "ana@example.com") },
       });
       expect(noExiste.statusCode).toBe(404);
       expect(beto.json()).toEqual(noExiste.json());
-      // sin identificar al usuario no hay respuesta con datos
+      // sin token no hay respuesta con datos
       const anonimo = await api.app.inject({ method: "GET", url });
-      expect(anonimo.statusCode).toBe(400);
-      // un nodo ajeno sin espacio visible tampoco se revela
+      expect(anonimo.statusCode).toBe(401);
+      // un nodo sin espacio tampoco se revela
       const libre = await api.app.inject({
         method: "GET",
-        url: `/dev/nodos/${ID.nodoLibre}/lecturas`,
-        headers: { "x-dev-usuario-id": ID.ana },
+        url: `/api/nodos/${ID.nodoLibre}/lecturas`,
+        headers: { authorization: tokenDe("uid-ana", "ana@example.com") },
       });
       expect(libre.statusCode).toBe(404);
     } finally {
       await api.cerrar();
     }
+  });
+
+  it("status (Last Will) y attributes actualizan el estado del nodo y la última lectura", async () => {
+    const nodo = crearClienteMqtt({
+      url: mq.url,
+      username: ID.nodo,
+      password: PW_NODO,
+      clientId: ID.nodo,
+      reconnectPeriod: 0,
+      will: {
+        topic: topico(ID.nodo, "status"),
+        payload: Buffer.from("offline"),
+        qos: 1,
+        retain: true,
+      },
+    });
+    await esperarConexion(nodo);
+    await nodo.publishAsync(topico(ID.nodo, "status"), "online", { qos: 1, retain: true });
+    await nodo.publishAsync(
+      topico(ID.nodo, "attributes"),
+      JSON.stringify({ v: 1, fw: "9.9.9", rssi: -50 }),
+      { qos: 1 },
+    );
+    const estado = async () =>
+      (
+        await owner.query(
+          `SELECT e.conectado, e.ultima_lectura_en, e.ultimos_valores, n.version_fw
+           FROM app.estado_nodo e JOIN app.nodos n ON n.id = e.nodo_id WHERE e.nodo_id = $1`,
+          [ID.nodo],
+        )
+      ).rows[0];
+    await esperar(async () => {
+      const e = await estado();
+      return e?.conectado === true && e.version_fw === "9.9.9";
+    });
+    expect((await estado()).ultima_lectura_en).not.toBeNull();
+    expect((await estado()).ultimos_valores).toMatchObject({ ph: expect.any(Number) });
+
+    // Caída sin despedirse: el broker publica el Last Will "offline" (retenido) en nombre del nodo.
+    nodo.stream.destroy();
+    await esperar(async () => (await estado()).conectado === false);
+    await new Promise((r) => setTimeout(r, 300));
+    await cerrarCliente(nodo).catch(() => undefined);
+  });
+
+  it("expone métricas de ingest (mensajes recibidos por tipo)", async () => {
+    const texto = await ingest.metricas();
+    expect(texto).toMatch(/lympha_mensajes_recibidos_total\{tipo="telemetry"\} [1-9]/);
+    expect(texto).toMatch(/lympha_mensajes_recibidos_total\{tipo="status"\} [1-9]/);
   });
 });
 

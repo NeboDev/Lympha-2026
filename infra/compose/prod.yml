@@ -136,6 +136,8 @@ services:
       MQTT_CONTROL_USER: ${MQTT_CONTROL_USER:?}
       MQTT_CONTROL_PASSWORD: ${MQTT_CONTROL_PASSWORD:?}
       CLAIM_PEPPER: ${CLAIM_PEPPER:?}
+      FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:?}
+      FIREBASE_SERVICE_ACCOUNT: ${FIREBASE_SERVICE_ACCOUNT:-} # opcional (base64 del JSON)
     ports:
       - "127.0.0.1:3000:3000" # solo para las pruebas de humo; el público entra por Caddy
 
@@ -151,6 +153,7 @@ services:
       MQTT_URL: mqtt://mosquitto:1883
       MQTT_INGEST_USER: ${MQTT_INGEST_USER:?}
       MQTT_INGEST_PASSWORD: ${MQTT_INGEST_PASSWORD:?}
+      METRICS_PORT: 9100
 
   worker:
     <<: [*servidor, *endurecido]
@@ -161,6 +164,7 @@ services:
       LOG_LEVEL: ${LOG_LEVEL:-info}
       DATABASE_URL_SYSTEM: postgres://lympha_system:${PW_SYSTEM:?}@postgres:5432/lympha
       VALKEY_URL: redis://worker:${VALKEY_PW_WORKER:?}@valkey:6379
+      METRICS_PORT: 9100
 
   notifier:
     <<: [*servidor, *endurecido]

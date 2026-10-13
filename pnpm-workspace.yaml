@@ -10,3 +10,4 @@ allowBuilds:
   ssh2: false
   msgpackr-extract: false # opcional (BullMQ); hay alternativa en JS
   protobufjs: false
+  '@firebase/util': false # solo precarga valores de Firebase Hosting; no se usan

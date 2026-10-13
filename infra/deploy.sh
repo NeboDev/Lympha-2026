@@ -18,6 +18,8 @@
 # Configuración del servidor en $LYMPHA_ROOT/deploy.conf (la escribe infra/bootstrap/setup.sh):
 #   IMAGE_REPO=ghcr.io/<dueño>/lympha-server      # repositorio de la imagen
 #   DATA_DIR=/srv/lympha/data
+#   IMAGE_PULL=0                                  # opcional: la imagen ya está cargada en el servidor (VM de staging local)
+#   COMPOSE_EXTRA=infra/compose/staging-local.yml # opcional: archivo Compose adicional, relativo al repositorio
 # La llave age de cada entorno vive en $LYMPHA_ROOT/keys/<entorno>.age (permisos 600) y nunca sale de ahí.
 set -euo pipefail
 
@@ -33,6 +35,8 @@ RAIZ="${LYMPHA_ROOT:-/srv/lympha}"
 [[ -f "$RAIZ/deploy.conf" ]] && source "$RAIZ/deploy.conf"
 : "${IMAGE_REPO:?falta IMAGE_REPO en $RAIZ/deploy.conf}"
 DATA_DIR="${DATA_DIR:-$RAIZ/data}"
+IMAGE_PULL="${IMAGE_PULL:-1}"
+COMPOSE_EXTRA="${COMPOSE_EXTRA:-}"
 REPO="${LYMPHA_REPO_DIR:-$RAIZ}"
 PROYECTO="lympha-$ENTORNO"
 RELEASES="$RAIZ/releases/$ENTORNO"
@@ -65,7 +69,18 @@ cargar_secretos() {
 }
 
 compose() {
-  docker compose -p "$PROYECTO" -f "$REPO/infra/compose/base.yml" -f "$REPO/infra/compose/prod.yml" "$@"
+  local extra=()
+  [[ -n "$COMPOSE_EXTRA" ]] && extra=(-f "$REPO/$COMPOSE_EXTRA")
+  docker compose -p "$PROYECTO" -f "$REPO/infra/compose/base.yml" -f "$REPO/infra/compose/prod.yml" "${extra[@]}" "$@"
+}
+
+# Con IMAGE_PULL=0 (VM de staging local) la imagen se cargó antes con `docker load`; no hay registro.
+traer_imagen() {
+  if [[ "$IMAGE_PULL" == "0" ]]; then
+    docker image inspect "$1" >/dev/null 2>&1
+  else
+    docker pull "$1" >/dev/null
+  fi
 }
 
 actual() { [[ -f "$RELEASES/current" ]] && cat "$RELEASES/current" || true; }
@@ -135,7 +150,7 @@ desplegar() {
   LYMPHA_IMAGE="$(imagen_de "$sha")"
 
   log "descargando $LYMPHA_IMAGE"
-  docker pull "$LYMPHA_IMAGE" >/dev/null || die "no se pudo descargar la imagen"
+  traer_imagen "$LYMPHA_IMAGE" || die "no se pudo obtener la imagen"
 
   esperar_datos
   respaldar "$sha"
@@ -173,7 +188,7 @@ rollback() {
   export LYMPHA_IMAGE
   LYMPHA_IMAGE="$(imagen_de "$sha")"
   log "rollback a $sha"
-  docker pull "$LYMPHA_IMAGE" >/dev/null 2>&1 || log "no se pudo descargar; se usa la copia local"
+  traer_imagen "$LYMPHA_IMAGE" 2>/dev/null || log "no se pudo descargar; se usa la copia local"
   actualizar_procesos || die "no se pudieron reiniciar los procesos"
   humo || die "las pruebas de humo fallaron tras el rollback"
   # intercambia: lo que estaba activo pasa a ser "anterior", para poder volver a avanzar
