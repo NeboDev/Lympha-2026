@@ -48,9 +48,17 @@ export interface EvaluacionParaGuardar {
 /**
  * Gancho que corre DENTRO de la transacción de `guardarEvaluaciones`, justo después de escribir el estado de
  * los nodos. Es donde H3 abre, escala y resuelve alarmas y escribe sus avisos: la alarma y el estado que la
- * causó se confirman juntos. Devuelve los cambios de alarma para publicarlos cuando la transacción termine.
+ * causó se confirman juntos. Recibe cada CAMBIO de estado confirmado (nivel o confianza) de cada nodo, en orden
+ * cronológico y no solo el estado final del lote: un lote con varias lecturas de un mismo nodo (el volcado del
+ * búfer tras una caída) no debe esconder que el agua pasó de regular a mala, ni un episodio que empezó y terminó
+ * dentro del lote. Devuelve los cambios de alarma para publicarlos cuando la transacción termine.
  */
-export type AlGuardarEstados = (tx: Tx, estados: EstadoParaGuardar[]) => Promise<EventoAlarma[]>;
+export type AlGuardarEstados = (tx: Tx, cambios: EstadoParaGuardar[]) => Promise<EventoAlarma[]>;
+
+export interface GanchoAlarmas {
+  cambios: EstadoParaGuardar[];
+  alGuardar: AlGuardarEstados;
+}
 
 /**
  * Escribe evaluaciones y estado en UNA transacción. Es idempotente: una evaluación repetida
@@ -60,12 +68,15 @@ export async function guardarEvaluaciones(
   bd: BdSistema,
   filas: EvaluacionParaGuardar[],
   estados: EstadoParaGuardar[],
-  alGuardarEstados?: AlGuardarEstados,
+  alarmas?: GanchoAlarmas,
 ): Promise<EventoAlarma[]> {
   if (filas.length === 0 && estados.length === 0) return [];
   return conSistema(bd, async (tx) => {
+    // Evaluaciones que esta transacción realmente insertó. Un reintento del lote (la transacción ya se había
+    // confirmado, pero la memoria de Valkey quedó vieja) las encuentra todas escritas y no inserta ninguna.
+    const nuevas = new Set<string>();
     for (let i = 0; i < filas.length; i += 500) {
-      await tx
+      const insertadas = await tx
         .insert(evaluaciones)
         .values(
           filas.slice(i, i + 500).map((f) => ({
@@ -80,7 +91,9 @@ export async function guardarEvaluaciones(
             subindices: f.subindices,
           })),
         )
-        .onConflictDoNothing({ target: [evaluaciones.nodoId, evaluaciones.ts] });
+        .onConflictDoNothing({ target: [evaluaciones.nodoId, evaluaciones.ts] })
+        .returning({ nodoId: evaluaciones.nodoId, ts: evaluaciones.ts });
+      for (const f of insertadas) nuevas.add(`${f.nodoId}|${new Date(f.ts).getTime()}`);
     }
     for (const e of estados) {
       await tx.execute(sql`
@@ -105,7 +118,10 @@ export async function guardarEvaluaciones(
         WHERE app.estado_nodo.ultima_lectura_en IS NULL
            OR app.estado_nodo.ultima_lectura_en <= EXCLUDED.ultima_lectura_en`);
     }
-    return alGuardarEstados ? alGuardarEstados(tx, estados) : [];
+    if (!alarmas) return [];
+    // Solo los cambios de evaluaciones nuevas: así repetir el lote no repite el ciclo de las alarmas.
+    const cambios = alarmas.cambios.filter((c) => nuevas.has(`${c.nodoId}|${c.ts}`));
+    return alarmas.alGuardar(tx, cambios);
   });
 }
 

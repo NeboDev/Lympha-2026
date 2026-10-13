@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { aplicarCiclo, type EstadoConfirmado } from "../src/modules/alarmas/index.ts";
+import { guardarEvaluaciones } from "../src/modules/calidad/repo.ts";
 import { type BdSistema, conSistema, crearBdSistema } from "../src/platform/db.ts";
 import { migrar } from "../src/platform/migrar.ts";
 import { iniciarPostgres, type PostgresDePrueba } from "./helpers/contenedores.ts";
@@ -29,7 +30,7 @@ beforeAll(async () => {
   await migrar(pgc.url("owner"));
   owner = new pg.Client({ connectionString: pgc.url("owner") });
   await owner.connect();
-  const nodos = Array.from({ length: 12 }, (_, i) => nodoN(i + 1));
+  const nodos = Array.from({ length: 14 }, (_, i) => nodoN(i + 1));
   await owner.query(
     `INSERT INTO app.usuarios (id, auth_uid, email, nombre) VALUES
        ('${ID.ana}', 'uid-ana', 'ana@example.com', 'Ana'),
@@ -42,7 +43,7 @@ beforeAll(async () => {
        ('${ID.espacio}', '${ID.carla}', 'miembro');
      INSERT INTO app.vinculos_telegram (usuario_id, chat_id) VALUES ('${ID.ana}', 111), ('${ID.beto}', 222);
      INSERT INTO app.preferencias_notificacion (usuario_id, nodo_id, niveles) VALUES ('${ID.beto}', NULL, '{critica}');
-     INSERT INTO app.lotes (id, cantidad, version_hw) VALUES ('${ID.lote}', 12, 'v1');
+     INSERT INTO app.lotes (id, cantidad, version_hw) VALUES ('${ID.lote}', 14, 'v1');
      INSERT INTO app.nodos (id, lote_id, espacio_id, estado, claim_hash, nombre) VALUES
        ${nodos.map((n, i) => `('${n}', '${ID.lote}', '${ID.espacio}', 'activo', '\\x00', ${i === 0 ? "'Cisterna'" : "NULL"})`).join(",")};
      INSERT INTO app.estado_nodo (nodo_id, espacio_id) VALUES
@@ -295,6 +296,65 @@ describe("alarma de nivel", () => {
     } finally {
       await escucha.end();
     }
+  });
+});
+
+describe("lotes con varias lecturas de un nodo", () => {
+  const evaluacion = (e: EstadoConfirmado) => ({
+    nodoId: e.nodoId,
+    espacioId: e.espacioId,
+    ts: e.ts,
+    wqi: e.wqi,
+    nivel: e.nivel,
+    parametroLimitante: e.parametroLimitante,
+    confianza: e.confianza,
+    versionAlgoritmo: "prueba",
+    subindices: {},
+  });
+
+  it("sigue cada cambio de nivel del lote, y repetir el lote (reintento) no repite nada", async () => {
+    const nodo = nodoN(13);
+    const cambios = [
+      estado(nodo, "regular", T0),
+      estado(nodo, "mala", T0 + 60_000),
+      estado(nodo, "critica", T0 + 120_000),
+      estado(nodo, "mala", T0 + 180_000),
+      estado(nodo, "buena", T0 + 240_000),
+    ];
+    const ahora = T0 + 250_000;
+    // Lo que hace el evaluador: guardar las evaluaciones y estas alarmas en una sola transacción.
+    const guardar = () =>
+      guardarEvaluaciones(bd, cambios.map(evaluacion), [cambios.at(-1) as never], {
+        cambios: cambios as never, // `valores` es `unknown` aquí y tipado en calidad: misma forma en tiempo de ejecución
+        alGuardar: async (tx, c) => (await aplicarCiclo(tx, c, ahora)).eventos,
+      });
+
+    const primera = await guardar();
+    expect(primera.map((e) => [e.cambio, e.severidad])).toEqual([
+      ["abierta", "regular"],
+      ["escalada", "mala"],
+      ["escalada", "critica"],
+      ["mejorada", "mala"],
+      ["resuelta", "mala"],
+    ]);
+    const [alarma] = await alarmasDe(nodo);
+    expect(alarma).toMatchObject({ estado: "resuelta", severidad: "mala" });
+    expect(alarma?.detalle.pico).toBe("critica");
+    // Ana (mala y crítica) no se entera de la apertura en regular; Beto (solo críticas) de la escalada a crítica
+    const salida = await salidaDe((alarma as FilaAlarma).id);
+    expect(
+      salida.filter((f) => f.usuario_id === ID.ana).map((f) => f.evento),
+      "Ana",
+    ).toEqual(["escalada", "escalada", "mejorada", "resuelta"]);
+    expect(
+      salida.filter((f) => f.usuario_id === ID.beto).map((f) => f.evento),
+      "Beto",
+    ).toEqual(["escalada", "mejorada", "resuelta"]);
+
+    // El reintento del mismo lote (la memoria de Valkey quedó vieja) no inserta evaluaciones nuevas: no hace nada.
+    expect(await guardar()).toEqual([]);
+    expect(await alarmasDe(nodo)).toHaveLength(1);
+    expect(await salidaDe((alarma as FilaAlarma).id)).toHaveLength(salida.length);
   });
 });
 

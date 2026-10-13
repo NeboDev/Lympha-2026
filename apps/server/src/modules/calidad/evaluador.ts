@@ -51,6 +51,8 @@ interface PorNodo {
   memoria: MemoriaNodo;
   evaluaciones: EvaluacionParaGuardar[];
   ultimo: { resultado: Resultado; lectura: Lectura } | null;
+  /** Cada cambio de nivel o de confianza confirmado dentro del lote, en orden (alimenta a las alarmas). */
+  cambios: EstadoParaGuardar[];
 }
 
 const aLectura = (l: LecturaTrabajo): Lectura => ({
@@ -107,7 +109,14 @@ export function crearEvaluador(op: OpcionesEvaluador): Evaluador {
 
         // El cálculo es puro: un error aquí es un defecto, y no debe frenar a los demás nodos.
         try {
-          const nodo: PorNodo = { nodoId, espacioId, memoria, evaluaciones: [], ultimo: null };
+          const nodo: PorNodo = {
+            nodoId,
+            espacioId,
+            memoria,
+            evaluaciones: [],
+            ultimo: null,
+            cambios: [],
+          };
           let motor = memoria.motor;
           for (const fila of ordenadas) {
             const lectura = aLectura(fila);
@@ -127,6 +136,11 @@ export function crearEvaluador(op: OpcionesEvaluador): Evaluador {
               subindices: r.subindices as Record<string, number>,
             });
             nodo.ultimo = { resultado: r, lectura };
+            const estado = aEstado(nodoId, fila.espacioId, r, lectura);
+            const previo = nodo.cambios.at(-1);
+            if (!previo || previo.nivel !== estado.nivel || previo.confianza !== estado.confianza) {
+              nodo.cambios.push(estado);
+            }
           }
           nodo.memoria = { espacioId, version: perfil.version, motor };
           if (nodo.ultimo) trabajo.push(nodo);
@@ -146,7 +160,9 @@ export function crearEvaluador(op: OpcionesEvaluador): Evaluador {
         bd,
         evaluacionesLote,
         estados,
-        op.alGuardarEstados,
+        op.alGuardarEstados
+          ? { cambios: trabajo.flatMap((n) => n.cambios), alGuardar: op.alGuardarEstados }
+          : undefined,
       );
       for (const n of trabajo) await guardarMemoria(valkey, n.nodoId, n.memoria);
 
