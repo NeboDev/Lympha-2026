@@ -1,4 +1,4 @@
-import type { EstadoNodoEvento } from "@lympha/contracts";
+import type { EstadoNodoEvento, EventoAlarma } from "@lympha/contracts";
 import {
   CONFIANZAS,
   type Confianza,
@@ -10,7 +10,7 @@ import {
   type Nivel,
 } from "@lympha/wqi";
 import { sql } from "drizzle-orm";
-import { type BdApp, type BdSistema, conSistema, conUsuario } from "../../platform/db.ts";
+import { type BdApp, type BdSistema, conSistema, conUsuario, type Tx } from "../../platform/db.ts";
 import { evaluaciones } from "./tablas.ts";
 
 /** Lo que el worker escribe en `app.estado_nodo` tras evaluar el último lote de un nodo. */
@@ -46,6 +46,13 @@ export interface EvaluacionParaGuardar {
 }
 
 /**
+ * Gancho que corre DENTRO de la transacción de `guardarEvaluaciones`, justo después de escribir el estado de
+ * los nodos. Es donde H3 abre, escala y resuelve alarmas y escribe sus avisos: la alarma y el estado que la
+ * causó se confirman juntos. Devuelve los cambios de alarma para publicarlos cuando la transacción termine.
+ */
+export type AlGuardarEstados = (tx: Tx, estados: EstadoParaGuardar[]) => Promise<EventoAlarma[]>;
+
+/**
  * Escribe evaluaciones y estado en UNA transacción. Es idempotente: una evaluación repetida
  * (mismo nodo y ts) no se duplica y el estado nunca retrocede en el tiempo.
  */
@@ -53,9 +60,10 @@ export async function guardarEvaluaciones(
   bd: BdSistema,
   filas: EvaluacionParaGuardar[],
   estados: EstadoParaGuardar[],
-): Promise<void> {
-  if (filas.length === 0 && estados.length === 0) return;
-  await conSistema(bd, async (tx) => {
+  alGuardarEstados?: AlGuardarEstados,
+): Promise<EventoAlarma[]> {
+  if (filas.length === 0 && estados.length === 0) return [];
+  return conSistema(bd, async (tx) => {
     for (let i = 0; i < filas.length; i += 500) {
       await tx
         .insert(evaluaciones)
@@ -97,6 +105,7 @@ export async function guardarEvaluaciones(
         WHERE app.estado_nodo.ultima_lectura_en IS NULL
            OR app.estado_nodo.ultima_lectura_en <= EXCLUDED.ultima_lectura_en`);
     }
+    return alGuardarEstados ? alGuardarEstados(tx, estados) : [];
   });
 }
 

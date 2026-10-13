@@ -13,6 +13,7 @@ import type { ResolvedorNodo } from "../dispositivos/index.ts";
 import type { LecturaTrabajo } from "../telemetria/index.ts";
 import { guardarMemoria, leerMemoria, type MemoriaNodo } from "./memoria.ts";
 import {
+  type AlGuardarEstados,
   type EstadoParaGuardar,
   type EvaluacionParaGuardar,
   guardarEvaluaciones,
@@ -40,6 +41,8 @@ export interface OpcionesEvaluador {
   valkey: Redis;
   resolver: ResolvedorNodo;
   log: Logger;
+  /** Alarmas de H3: corre en la transacción que guarda el estado (ver `AlGuardarEstados`). */
+  alGuardarEstados?: AlGuardarEstados;
 }
 
 interface PorNodo {
@@ -139,8 +142,22 @@ export function crearEvaluador(op: OpcionesEvaluador): Evaluador {
       // Nada nuevo (lecturas repetidas o nodos sin perfil): no hay qué escribir.
       if (trabajo.length === 0) return;
 
-      await guardarEvaluaciones(bd, evaluacionesLote, estados);
+      const cambiosAlarma = await guardarEvaluaciones(
+        bd,
+        evaluacionesLote,
+        estados,
+        op.alGuardarEstados,
+      );
       for (const n of trabajo) await guardarMemoria(valkey, n.nodoId, n.memoria);
+
+      // Igual que el estado, las alarmas se publican de mejor esfuerzo y después de confirmar la transacción.
+      for (const cambio of cambiosAlarma) {
+        await valkey
+          .publish(canalEspacio(cambio.espacio_id), JSON.stringify(cambio))
+          .catch((e: unknown) => {
+            log.warn({ err: e, alarmaId: cambio.alarma_id }, "no se pudo publicar la alarma");
+          });
+      }
 
       const ahora = new Date().toISOString();
       for (const n of trabajo) {

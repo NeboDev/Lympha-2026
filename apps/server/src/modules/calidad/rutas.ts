@@ -1,3 +1,4 @@
+import { nombreEventoEspacio } from "@lympha/contracts";
 import type { FastifyPluginAsync } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
@@ -15,7 +16,8 @@ const LATIDO_MS = 20_000;
  * Stream SSE de un espacio. El usuario se identifica con `Authorization: Bearer` (se usa `fetch` en streaming,
  * no `EventSource`, que no permite cabeceras; es lo que prevé el documento de arquitectura).
  *
- * Primer evento `snapshot` con el estado de todos los nodos; después un `estado` por cada cambio.
+ * Primer evento `snapshot` con el estado de todos los nodos; después un `estado` por cada cambio y un `alarma`
+ * por cada cambio en el ciclo de vida de una alarma.
  * Un espacio ajeno o inexistente responde 404 igual que cualquier otro recurso (RNF-01).
  */
 export interface DepsCalidad {
@@ -63,7 +65,7 @@ export const rutasCalidad: FastifyPluginAsync<DepsCalidad> = async (app, opcione
       let vivo = false;
       let escribir: (texto: string) => void = () => undefined;
       const quitar = await hubUnico().suscribir(espacioId, (mensaje) => {
-        if (vivo) escribir(`event: estado\ndata: ${mensaje}\n\n`);
+        if (vivo) escribir(`event: ${nombreEventoEspacio(mensaje)}\ndata: ${mensaje}\n\n`);
         else pendientes.push(mensaje);
       });
 
@@ -92,7 +94,9 @@ export const rutasCalidad: FastifyPluginAsync<DepsCalidad> = async (app, opcione
       };
 
       escribir(`retry: 3000\n\nevent: snapshot\ndata: ${JSON.stringify({ nodos })}\n\n`);
-      for (const mensaje of pendientes) escribir(`event: estado\ndata: ${mensaje}\n\n`);
+      for (const mensaje of pendientes) {
+        escribir(`event: ${nombreEventoEspacio(mensaje)}\ndata: ${mensaje}\n\n`);
+      }
       vivo = true;
 
       const latido = setInterval(() => escribir(": latido\n\n"), LATIDO_MS);

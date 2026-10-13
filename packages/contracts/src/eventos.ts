@@ -38,7 +38,20 @@ export const estadoNodoEvento = z.object({
 });
 export type EstadoNodoEvento = z.infer<typeof estadoNodoEvento>;
 
-export const NOMBRES_EVENTO_ESPACIO = ["snapshot", "estado"] as const;
+export const NOMBRES_EVENTO_ESPACIO = ["snapshot", "estado", "alarma"] as const;
+
+/**
+ * El canal `espacio:{id}` lleva dos clases de mensaje: el estado de un nodo (`event: estado`) y un cambio de
+ * alarma (`event: alarma`, ver `eventoAlarma`). Solo las alarmas traen `alarma_id`.
+ */
+export function nombreEventoEspacio(mensaje: string): "estado" | "alarma" {
+  try {
+    const dato: unknown = JSON.parse(mensaje);
+    return typeof dato === "object" && dato !== null && "alarma_id" in dato ? "alarma" : "estado";
+  } catch {
+    return "estado";
+  }
+}
 
 /** Primer evento de cada conexión: el estado de todos los nodos del espacio. */
 export const eventoSnapshot = z.object({ nodos: z.array(estadoNodoEvento) });

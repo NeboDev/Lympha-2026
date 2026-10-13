@@ -1,3 +1,4 @@
+import { aplicarCiclo } from "../modules/alarmas/index.ts";
 import { crearEvaluador } from "../modules/calidad/index.ts";
 import { crearResolvedorNodo } from "../modules/dispositivos/index.ts";
 import { iniciarConsumidor } from "../modules/telemetria/index.ts";
@@ -22,9 +23,31 @@ export async function iniciarWorker(
   const conexion = crearConexionBullmq(config.VALKEY_URL, "worker");
   // Conexión de uso general: memoria del motor WQI, caché de nodos y publicación del estado.
   const valkey = crearValkey(config.VALKEY_URL, "worker");
-  const evaluador = crearEvaluador({ bd, valkey, resolver: crearResolvedorNodo(valkey, bd), log });
 
   const registro = crearRegistro();
+  const avisosEncolados = registro.contador(
+    "lympha_avisos_encolados_total",
+    "Avisos escritos en la bandeja de salida por alarmas",
+  );
+  const cambiosAlarma = registro.contador(
+    "lympha_alarmas_cambios_total",
+    "Cambios en el ciclo de vida de las alarmas",
+    ["tipo", "cambio"],
+  );
+  const evaluador = crearEvaluador({
+    bd,
+    valkey,
+    resolver: crearResolvedorNodo(valkey, bd),
+    log,
+    // Alarmas y avisos en la misma transacción que el estado que los causa (H3).
+    alGuardarEstados: async (tx, estados) => {
+      const r = await aplicarCiclo(tx, estados);
+      avisosEncolados.inc({}, r.avisos);
+      for (const e of r.eventos) cambiosAlarma.inc({ tipo: e.tipo, cambio: e.cambio });
+      return r.eventos;
+    },
+  });
+
   const insertadas = registro.contador(
     "lympha_lecturas_insertadas_total",
     "Lecturas nuevas guardadas en ts.lecturas",

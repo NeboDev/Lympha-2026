@@ -1,3 +1,4 @@
+export { aplicarCiclo, type EstadoConfirmado, type ResultadoCiclo } from "./ciclo.ts";
 export { type DatosAviso, duracion, nombreNodo, textoAviso } from "./plantillas.ts";
 export {
   type AccionNivel,
