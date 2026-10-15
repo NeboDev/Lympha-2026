@@ -151,6 +151,11 @@ Cambio de plan: no habrá VPS hasta el inicio de H5. Todo se desarrolla y prueba
 - **Retención:** `app.alarmas` no tiene limpieza; el mantenimiento nocturno solo borra avisos de más de 90 días.
 - Siguen pendientes los de H1 (ensayo de la VM y del `setup.sh`, verificar tokens reales de Firebase, agregados continuos al borrar una cuenta, Sentry/Grafana/monitor externo).
 
+## H4
+
+- **Alcance acordado con el dueño del proyecto (2026-10-14).** `CLAUDE.md` decía «solo backend; `apps/web` vacío», pero H4 es la PWA: se levanta ese límite. Stack: el del plan (React 19, Vite, TanStack Query, React Router, `vite-plugin-pwa`, Playwright) más el SDK web `firebase` (el plan nombra Firebase Auth pero no la dependencia del navegador); sin librería de gráficas (SVG/CSS a mano). Backend dentro de H4: CORS configurable y el historial de 7 y 30 días (RF-35) por una ruta nueva que lee `app.v_evaluaciones_dia`/`v_lecturas_dia` (hoy ninguna ruta las lee). Fuera: RF-36 (historial por parámetro hasta 12 meses) y RF-11 (WiFi desde el teléfono, depende del firmware). Reclamo (RF-10): código escrito siempre y QR con `BarcodeDetector` cuando el navegador lo ofrezca, sin dependencia nueva.
+- **Base:** la rama salía de `c1df961` (antes de H3); se adelantó a la punta de `dev` (`17e328b`) con `--ff-only` antes de empezar.
+
 ## Pendiente al cerrar H0 (histórico; lo de H1 y del modo local está arriba)
 
 - Crear los servidores, el dominio, los proyectos de Firebase y los bots de Telegram; configurar los entornos `staging`/`production` y sus secretos en GitHub; generar las llaves age y reemplazar los marcadores de `.sops.yaml`; ejecutar `infra/bootstrap/setup.sh` en un VPS desechable antes de usarlo en serio.

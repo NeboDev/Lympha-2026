@@ -8,9 +8,9 @@ Lympha es un producto IoT B2C de calidad del agua: un nodo ESP32-S3 mide pH, tem
 Documentos fuente (raíz del repo). Precedencia si se contradicen: **datos > plan de implementación > arquitectura > requisitos**.
 
 ## Alcance y estado
-Solo backend e infraestructura. `apps/web` queda como carpeta vacía con README; no se toca el firmware (repo aparte `lympha-firmware`).
+Backend, infraestructura y, **desde H4 (acordado con el dueño del proyecto, 2026-10-14), la PWA en `apps/web`** (React 19 + Vite + TanStack Query + React Router + `vite-plugin-pwa`, más el SDK web `firebase` para el acceso; gráficas y estilos a mano, sin librería de gráficas; Playwright para E2E). No se toca el firmware (repo aparte `lympha-firmware`). H4 incluye los huecos de API que la PWA necesita: CORS configurable (`CORS_ORIGINS`) e historial de 7 y 30 días (RF-35) sobre `app.v_evaluaciones_dia`/`v_lecturas_dia`; el historial por parámetro hasta 12 meses (RF-36) queda pendiente. El reclamo (RF-10) acepta código escrito y escaneo de QR con `BarcodeDetector` si el navegador lo trae. **H4 está en curso; no avanzar a H5 sin instrucción.**
 
-**H0, H1, H2 y H3: terminados en local** (ver `docs/decisiones.md`: "Modo local", "H1", "Pendiente al cerrar H1", "H2", "H3" y "Pendiente al cerrar H3"). **No avanzar a H4 sin instrucción.** H1 dejó: identidad con Firebase (emulador en local), API de espacios/membresías/invitaciones/nodos/lecturas, migración `0010`, `ingest` con `status`/`attributes`/huecos, `/metrics` (prom-client) en `ingest` y `worker`, CLI de fábrica sin grabado (`pnpm factory`) y simulador de flotas con escenarios JSON. Verificado: 100 nodos, reinicios forzados, 0 lecturas perdidas.
+**H0, H1, H2 y H3: terminados en local** (ver `docs/decisiones.md`: "Modo local", "H1", "Pendiente al cerrar H1", "H2", "H3" y "Pendiente al cerrar H3"). H1 dejó: identidad con Firebase (emulador en local), API de espacios/membresías/invitaciones/nodos/lecturas, migración `0010`, `ingest` con `status`/`attributes`/huecos, `/metrics` (prom-client) en `ingest` y `worker`, CLI de fábrica sin grabado (`pnpm factory`) y simulador de flotas con escenarios JSON. Verificado: 100 nodos, reinicios forzados, 0 lecturas perdidas.
 
 **H2 (Calidad y estado)** con curvas **PROVISIONALES `0.1-provisional`** (perfil cisterna, base NOM-127; sin validar por un especialista, ver `docs/decisiones.md`, sección H2). Paquete `@lympha/wqi` puro; ventana móvil + histéresis en el worker (`modules/calidad`, enganchado con `alEvaluar` del consumidor); `ts.evaluaciones` y `app.estado_nodo` (con `causa`/`accion`, migración `0011`); SSE por espacio en `GET /api/espacios/:espacioId/eventos` (Bearer); 12 historias de agua con nivel esperado en `tools/simulator/src/historias.ts`.
 
@@ -48,7 +48,7 @@ Node 24 · TypeScript 5.9 `strict` · pnpm workspaces · Fastify 5 + `fastify-ty
 ## Estructura del repo
 ```
 apps/server/{src/{modules,platform,main,cli},migrations,test,Dockerfile}
-apps/web/                 # vacío + README (fuera de alcance)
+apps/web/                 # PWA (H4): React + Vite; los comandos web se añaden al crearla
 packages/{contracts,wqi}  # wqi: motor WQI puro; el perfil cisterna está en UN archivo (src/perfiles/cisterna.ts)
 tools/{simulator,factory} # simulator: escenarios JSON por tiempo (escenarios.ts) e historias con nivel esperado (historias.ts); factory: solo guarda los lotes generados; el CLI vive en apps/server/src/cli/fabrica.ts
 infra/{compose,caddy,mosquitto,postgres,valkey,firebase,bootstrap,staging-local,secrets,test}  + deploy.sh, smoke.sh
