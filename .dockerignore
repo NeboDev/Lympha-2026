@@ -10,4 +10,5 @@ infra/secrets
 !apps/**/README.md
 .env
 .env.*
-apps/web
+apps/web/*
+!apps/web/package.json

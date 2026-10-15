@@ -48,7 +48,7 @@ Node 24 · TypeScript 5.9 `strict` · pnpm workspaces · Fastify 5 + `fastify-ty
 ## Estructura del repo
 ```
 apps/server/{src/{modules,platform,main,cli},migrations,test,Dockerfile}
-apps/web/                 # PWA (H4): React + Vite; los comandos web se añaden al crearla
+apps/web/                 # PWA (H4): src/{api,paginas,...}; cliente tipado en src/api/cliente.ts (Bearer, zod, sin content-type en cuerpos vacíos)
 packages/{contracts,wqi}  # wqi: motor WQI puro; el perfil cisterna está en UN archivo (src/perfiles/cisterna.ts)
 tools/{simulator,factory} # simulator: escenarios JSON por tiempo (escenarios.ts) e historias con nivel esperado (historias.ts); factory: solo guarda los lotes generados; el CLI vive en apps/server/src/cli/fabrica.ts
 infra/{compose,caddy,mosquitto,postgres,valkey,firebase,bootstrap,staging-local,secrets,test}  + deploy.sh, smoke.sh
@@ -59,6 +59,7 @@ docs/decisiones.md
 
 ## Comandos
 - `pnpm install` · `pnpm dev` (Compose de desarrollo con `--build --watch`) · `pnpm simulator`
+- `pnpm web` (PWA en http://127.0.0.1:5173, contra la API de `pnpm dev`; origen permitido por `CORS_ORIGINS`) · `pnpm web:build`. Las pruebas unitarias de `apps/web/src/**` corren con `pnpm test`.
 - `pnpm test` (unitarias) · `pnpm test:int` (integración, Testcontainers, necesita Docker) · `pnpm test:infra` (deploy.sh y prod.yml)
 - `pnpm lint` / `pnpm lint:fix` (Biome) · `pnpm typecheck`
 - `pnpm --filter @lympha/wqi fixtures` regenera `packages/wqi/fixtures/cisterna.json` (solo al subir la versión del perfil; revisar el diff) · `pnpm simulator --historias` lista las historias

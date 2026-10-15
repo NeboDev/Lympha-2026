@@ -1,3 +1,9 @@
 # apps/web
 
-PWA (React + Vite). Fuera del alcance de H0: esta carpeta se queda vacía hasta H4.
+PWA de Lympha (H4): React 19 + Vite + TanStack Query + React Router. Habla con la API por `@lympha/contracts`.
+
+- `pnpm web` (desde la raíz): servidor de desarrollo en <http://127.0.0.1:5173>. Necesita la API (`pnpm dev`), que por defecto
+  permite ese origen por CORS (`CORS_ORIGINS`).
+- `pnpm web:build`: build de producción en `apps/web/dist`.
+- `VITE_API_URL` (ver `.env.example`) cambia la URL de la API; por defecto `http://127.0.0.1:3000`.
+- Todo lo que empieza con `VITE_` llega al navegador: nunca pongas secretos.

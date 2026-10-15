@@ -16,6 +16,8 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY packages/contracts/package.json packages/contracts/
 COPY packages/wqi/package.json packages/wqi/
 COPY apps/server/package.json apps/server/
+# La PWA no entra en la imagen del servidor, pero su manifiesto debe estar para que --frozen-lockfile cuadre.
+COPY apps/web/package.json apps/web/
 COPY tools/simulator/package.json tools/simulator/
 
 FROM manifiestos AS deps-prod

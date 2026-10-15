@@ -36,6 +36,8 @@ jobs:
         run: pnpm typecheck
       - name: Unitarias (incluye la cobertura de aislamiento de rutas)
         run: pnpm test
+      - name: Build de la PWA (sin publicarla)
+        run: pnpm web:build
 
   integracion:
     name: Integración (Testcontainers)
