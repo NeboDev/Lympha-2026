@@ -30,7 +30,11 @@ export function RutaProtegida() {
   if (estado.tipo === "cargando") return <p className="pagina">Cargando…</p>;
   if (estado.tipo === "fuera") {
     return (
-      <Navigate to="/acceso" replace state={{ desde: ubicacion.pathname + ubicacion.search }} />
+      <Navigate
+        to="/acceso"
+        replace
+        state={{ desde: ubicacion.pathname + ubicacion.search + ubicacion.hash }}
+      />
     );
   }
   return <Outlet />;
