@@ -1,4 +1,4 @@
-import { nombreEventoEspacio } from "@lympha/contracts";
+import { DIAS_HISTORIAL, nombreEventoEspacio, respuestaHistorial } from "@lympha/contracts";
 import type { FastifyPluginAsync } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
@@ -6,8 +6,19 @@ import type { BdApp } from "../../platform/db.ts";
 import { NoEncontrado } from "../../platform/errors.ts";
 import type { Redis } from "../../platform/valkey.ts";
 import { type Autenticador, usuarioDe } from "../identidad/index.ts";
+import { historialDelNodo } from "./historial.ts";
 import { crearHubEspacios, type HubEspacios } from "./hub.ts";
 import { estadosDelEspacio } from "./repo.ts";
+
+/** Cabeceras con valor que ya puso un hook (p. ej. CORS), para copiarlas a la respuesta secuestrada. */
+function cabecerasFijadas(
+  cabeceras: Record<string, string | number | string[] | undefined>,
+): Record<string, string | number | string[]> {
+  return Object.fromEntries(Object.entries(cabeceras).filter(([, v]) => v !== undefined)) as Record<
+    string,
+    string | number | string[]
+  >;
+}
 
 /** Segundos entre comentarios de latido; mantienen viva la conexión ante proxies y balanceadores. */
 const LATIDO_MS = 20_000;
@@ -49,6 +60,35 @@ export const rutasCalidad: FastifyPluginAsync<DepsCalidad> = async (app, opcione
     await hub?.cerrar();
   });
 
+  // RF-35: nivel predominante por día de los últimos 7 o 30 días (más promedios por parámetro, RF-23).
+  app.withTypeProvider<ZodTypeProvider>().get(
+    "/api/nodos/:nodoId/historial",
+    {
+      preHandler: opciones.autenticar,
+      schema: {
+        params: z.object({ nodoId: z.string().uuid() }),
+        querystring: z.object({
+          dias: z.coerce
+            .number()
+            .int()
+            .refine((d): d is 7 | 30 => (DIAS_HISTORIAL as readonly number[]).includes(d), "7 o 30")
+            .default(7),
+        }),
+        response: { 200: respuestaHistorial },
+      },
+    },
+    async (req) => {
+      const historial = await historialDelNodo(
+        opciones.bd,
+        usuarioDe(req),
+        req.params.nodoId,
+        req.query.dias,
+      );
+      if (historial === null) throw new NoEncontrado();
+      return historial;
+    },
+  );
+
   app.withTypeProvider<ZodTypeProvider>().get(
     "/api/espacios/:espacioId/eventos",
     {
@@ -84,6 +124,8 @@ export const rutasCalidad: FastifyPluginAsync<DepsCalidad> = async (app, opcione
       reply.hijack();
       const raw = reply.raw;
       raw.writeHead(200, {
+        // lo que ya fijaron los hooks (CORS): al secuestrar la respuesta Fastify no lo copia solo
+        ...cabecerasFijadas(reply.getHeaders()),
         "content-type": "text/event-stream; charset=utf-8",
         "cache-control": "no-cache, no-transform",
         connection: "keep-alive",

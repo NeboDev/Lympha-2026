@@ -138,6 +138,7 @@ services:
       CLAIM_PEPPER: ${CLAIM_PEPPER:?}
       FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:?}
       FIREBASE_SERVICE_ACCOUNT: ${FIREBASE_SERVICE_ACCOUNT:-} # opcional (base64 del JSON)
+      CORS_ORIGINS: ${CORS_ORIGINS:-} # origen de la PWA (https://app.<dominio>); vacío = CORS apagado
       # Telegram por webhook (fuera de local es obligatorio si hay token; lo valida platform/config.ts).
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       PUBLIC_API_URL: ${PUBLIC_API_URL:-}

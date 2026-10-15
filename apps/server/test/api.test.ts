@@ -581,6 +581,86 @@ describe("API de H1", () => {
     expect((await llamar(usuarios.beto, "GET", `${url}/lecturas`)).cuerpo.lecturas).toEqual([]);
   });
 
+  it("historial: un usuario ajeno recibe 404; el miembro ve el nivel predominante por día", async () => {
+    // dueños propios: Ana ya usó su cupo de espacios en pruebas anteriores
+    const hana = tokenDe("uid-hana", "hana@example.com", "Hana");
+    const ivo = tokenDe("uid-ivo", "ivo@example.com", "Ivo");
+    const espacio = await crearEspacio(hana, "Con historial");
+    await invitar(hana, espacio, ivo);
+    const nodo = await fabricarNodo(21);
+    expect(
+      (
+        await llamar(hana, "POST", "/api/nodos/reclamar", {
+          nodoId: nodo,
+          codigo: codigoN(21),
+          espacioId: espacio,
+        })
+      ).status,
+    ).toBe(200);
+    // hoy: 3 buenas y 1 crítica (predominante: buena); hace 5 días: 2 malas y 2 regulares (empate: gana la peor);
+    // hace 10 días: una regular (solo entra en la ventana de 30 días)
+    const evaluar = (cuando: string, nivel: string, wqi: number) =>
+      owner.query(
+        `INSERT INTO ts.evaluaciones (nodo_id, espacio_id, ts, wqi, nivel, confianza, version_algoritmo, subindices)
+         VALUES ($1, $2, now() - $3::interval, $4, $5::app.nivel, 'ok', 'prueba', '{}')`,
+        [nodo, espacio, cuando, wqi, nivel],
+      );
+    for (const [cuando, nivel, wqi] of [
+      ["1 second", "buena", 90],
+      ["2 seconds", "buena", 92],
+      ["3 seconds", "buena", 94],
+      ["4 seconds", "critica", 20],
+      ["5 days 1 second", "mala", 50],
+      ["5 days 2 seconds", "mala", 52],
+      ["5 days 3 seconds", "regular", 70],
+      ["5 days 4 seconds", "regular", 72],
+      ["10 days", "regular", 65],
+    ] as const) {
+      await evaluar(cuando, nivel, wqi);
+    }
+    await owner.query(
+      `INSERT INTO ts.lecturas (nodo_id, espacio_id, ts, seq, ph, tds)
+       VALUES ($1, $2, now() - interval '1 second', 101, 7.0, 300), ($1, $2, now() - interval '2 seconds', 102, 7.4, 320)`,
+      [nodo, espacio],
+    );
+
+    const url = `/api/nodos/${nodo}/historial`;
+    const ajeno = await llamar(usuarios.beto, "GET", url);
+    expect(ajeno.status).toBe(404);
+    expect(ajeno.cuerpo).toEqual(
+      (await llamar(usuarios.beto, "GET", `/api/nodos/${INEXISTENTE}/historial`)).cuerpo,
+    );
+    expect((await llamar(usuarios.beto, "GET", `${url}?dias=30`)).status).toBe(404);
+
+    const hoy = new Date().toLocaleDateString("sv-SE", { timeZone: "America/Mexico_City" });
+    const siete = await llamar(ivo, "GET", url); // 7 por omisión
+    expect(siete.status).toBe(200);
+    expect(siete.cuerpo).toMatchObject({ nodo_id: nodo, dias: 7, zona: "America/Mexico_City" });
+    expect(siete.cuerpo.historial.map((d: { dia: string }) => d.dia.length)).toEqual([10, 10]);
+    const [haceCinco, dia] = siete.cuerpo.historial;
+    expect(dia.dia).toBe(hoy);
+    expect(dia.nivel).toBe("buena");
+    expect(dia.evaluaciones).toEqual({ buena: 3, regular: 0, mala: 0, critica: 1, sin_datos: 0 });
+    expect(dia.wqi_min).toBe(20);
+    expect(dia.promedios).toMatchObject({ lecturas: 2, tds: 310, temperatura: null });
+    expect(dia.promedios.ph).toBeCloseTo(7.2, 4); // la columna es real (float4)
+    expect(haceCinco.nivel).toBe("mala");
+    expect(haceCinco.promedios).toBeNull();
+    expect(haceCinco.dia < dia.dia).toBe(true);
+
+    const treinta = await llamar(ivo, "GET", `${url}?dias=30`);
+    expect(treinta.cuerpo.historial.map((d: { nivel: string }) => d.nivel)).toEqual([
+      "regular",
+      "mala",
+      "buena",
+    ]);
+
+    for (const mala of ["dias=15", "dias=0", "dias=abc"]) {
+      expect((await llamar(ivo, "GET", `${url}?${mala}`)).status).toBe(400);
+    }
+    expect((await llamar("token-invalido", "GET", url)).status).toBe(401);
+  });
+
   it("eliminar la cuenta borra solo lo propio y no afecta a otros", async () => {
     const zoe = tokenDe("uid-zoe", "zoe@example.com", "Zoe");
     const espacioSolo = await crearEspacio(zoe, "Solo de Zoe");

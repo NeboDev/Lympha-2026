@@ -89,6 +89,8 @@ services:
       FIREBASE_USE_EMULATOR: ${FIREBASE_USE_EMULATOR:-true}
       FIREBASE_AUTH_EMULATOR_HOST: firebase-auth:9099
       FIREBASE_SERVICE_ACCOUNT: ${FIREBASE_SERVICE_ACCOUNT:-}
+      # Orígenes de la PWA (Vite en :5173); se pueden cambiar en tu .env.
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       PUBLIC_API_URL: ${PUBLIC_API_URL:-}
       TELEGRAM_WEBHOOK_SECRET: ${TELEGRAM_WEBHOOK_SECRET:-}

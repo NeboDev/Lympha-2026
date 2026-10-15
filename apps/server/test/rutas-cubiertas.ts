@@ -60,6 +60,11 @@ export const RUTAS_CUBIERTAS: Record<string, Cobertura> = {
     "un usuario ajeno recibe 404 en el nodo, sus lecturas y sus acciones",
   ),
 
+  // H4: historial diario (RF-35), por las vistas app.v_*_dia
+  "GET /api/nodos/:nodoId/historial": ajeno(
+    "historial: un usuario ajeno recibe 404; el miembro ve el nivel predominante por día",
+  ),
+
   // H3: el vínculo de Telegram y las preferencias de aviso son del usuario en sesión (la RLS lo exige).
   "POST /api/yo/telegram/vinculo": ajeno(
     "telegram: el vínculo y las preferencias son de cada usuario",

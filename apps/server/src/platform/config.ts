@@ -27,6 +27,30 @@ const booleano = z.preprocess(
     v === undefined || v === "" ? undefined : v === "true" ? true : v === "false" ? false : v,
   z.boolean().default(false),
 );
+/**
+ * Lista de orígenes separados por coma (`https://app.lympha.app`), sin ruta ni barra final y sin comodín:
+ * CORS solo responde a lo que se enumera aquí. Vacío o ausente = ninguno.
+ */
+const origenesCors = z.preprocess(
+  (v) =>
+    typeof v === "string"
+      ? v
+          .split(",")
+          .map((o) => o.trim())
+          .filter((o) => o !== "")
+      : v,
+  z
+    .array(
+      z.string().refine((o) => {
+        try {
+          return new URL(o).origin === o && /^https?:$/.test(new URL(o).protocol);
+        } catch {
+          return false;
+        }
+      }, "debe ser un origen http(s) sin ruta ni barra final, p. ej. https://app.lympha.app"),
+    )
+    .default([]),
+);
 const puertoMetricas = opcional(z.coerce.number().int().min(1).max(65535));
 
 const cuentaServicio = z
@@ -87,6 +111,8 @@ const esquemas = {
       FIREBASE_AUTH_EMULATOR_HOST: opcional(
         z.string().regex(/^[\w.-]+:\d+$/, "debe ser host:puerto"),
       ),
+      /** Orígenes de la PWA a los que CORS responde (separados por coma). Fuera de local, solo https. */
+      CORS_ORIGINS: origenesCors,
       /** URL pública de la API. Define el modo de Telegram: con ella, webhook; sin ella (solo local), long polling. */
       PUBLIC_API_URL: opcional(z.string().url()),
       TELEGRAM_BOT_TOKEN: opcional(secreto),
@@ -115,6 +141,9 @@ const esquemas = {
         else if (r.cuenta.project_id !== c.FIREBASE_PROJECT_ID) {
           problema("FIREBASE_SERVICE_ACCOUNT", "es de otro proyecto que FIREBASE_PROJECT_ID");
         }
+      }
+      if (c.APP_ENV !== "local" && c.CORS_ORIGINS.some((o) => !o.startsWith("https://"))) {
+        problema("CORS_ORIGINS", "fuera de local deben ser https://");
       }
       if (c.APP_ENV !== "local" && c.PUBLIC_API_URL && !c.PUBLIC_API_URL.startsWith("https://")) {
         problema("PUBLIC_API_URL", "fuera de local debe ser https://");

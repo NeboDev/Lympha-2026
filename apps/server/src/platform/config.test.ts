@@ -184,6 +184,36 @@ describe("cargarConfig", () => {
       expect(c.FIREBASE_SERVICE_ACCOUNT).toBeUndefined();
     });
 
+    it("CORS_ORIGINS: lista de orígenes exactos; vacío = ninguno; sin comodín ni rutas", () => {
+      expect(cargarConfig("api", { ...base, ...api }).CORS_ORIGINS).toEqual([]);
+      expect(cargarConfig("api", { ...base, ...api, CORS_ORIGINS: "" }).CORS_ORIGINS).toEqual([]);
+      expect(
+        cargarConfig("api", {
+          ...base,
+          ...api,
+          CORS_ORIGINS: "http://localhost:5173, http://127.0.0.1:5173",
+        }).CORS_ORIGINS,
+      ).toEqual(["http://localhost:5173", "http://127.0.0.1:5173"]);
+      for (const malo of [
+        "*",
+        "https://app.example.com/",
+        "https://app.example.com/x",
+        "app.example",
+      ]) {
+        expect(() => cargarConfig("api", { ...base, ...api, CORS_ORIGINS: malo })).toThrow(
+          /CORS_ORIGINS/,
+        );
+      }
+    });
+
+    it("fuera de local, CORS_ORIGINS solo admite https", () => {
+      const prod = { ...api, APP_ENV: "production", CORS_ORIGINS: "http://app.example.com" };
+      expect(() => cargarConfig("api", prod)).toThrow(/CORS_ORIGINS: fuera de local/);
+      expect(
+        cargarConfig("api", { ...prod, CORS_ORIGINS: "https://app.example.com" }).CORS_ORIGINS,
+      ).toEqual(["https://app.example.com"]);
+    });
+
     it("en local, Telegram funciona sin PUBLIC_API_URL (long polling)", () => {
       expect(() =>
         cargarConfig("api", { ...base, ...api, TELEGRAM_BOT_TOKEN: "123:abc" }),

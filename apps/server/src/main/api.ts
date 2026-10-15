@@ -145,7 +145,7 @@ export async function crearApi(
     ? crearManejadorTelegram({ bd, valkey, cliente: clienteTelegram, log })
     : manejadorBasico(log);
 
-  const app = crearServidorHttp(log);
+  const app = crearServidorHttp(log, { origenesCors: config.CORS_ORIGINS });
   await registrarRutas(
     app,
     {
