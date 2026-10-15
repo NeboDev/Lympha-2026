@@ -4,7 +4,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router";
 import { crearCliente } from "./api/cliente.ts";
 import { ContextoApi } from "./api/contexto.ts";
 import { Plantilla } from "./componentes/plantilla.tsx";
-import { API_URL, FIREBASE } from "./config.ts";
+import { API_URL, FIREBASE, PROBLEMAS_CONFIG } from "./config.ts";
 import { Acceso } from "./paginas/acceso.tsx";
 import { Ajustes } from "./paginas/ajustes.tsx";
 import { Alertas } from "./paginas/alertas.tsx";
@@ -13,11 +13,28 @@ import { Espacios } from "./paginas/espacios.tsx";
 import { Invitacion } from "./paginas/invitacion.tsx";
 import { Nodo } from "./paginas/nodo.tsx";
 import { Reclamar } from "./paginas/reclamar.tsx";
+import { AvisosPWA } from "./pwa/AvisosPWA.tsx";
 import { crearAlmacenSesion } from "./sesion/almacen.ts";
 import { ProveedorSesion, RutaProtegida } from "./sesion/contexto.tsx";
 import { crearServicioFirebase } from "./sesion/firebase.ts";
 
+/** Un build sin su configuración no debe arrancar a medias: dice qué falta (sus nombres, nunca valores). */
 export function App() {
+  if (PROBLEMAS_CONFIG.length > 0) {
+    return (
+      <main className="pagina">
+        <h1>Lympha</h1>
+        <p role="alert">
+          La aplicación no está configurada. Faltan estas variables al construirla:{" "}
+          {PROBLEMAS_CONFIG.join(", ")}.
+        </p>
+      </main>
+    );
+  }
+  return <Aplicacion />;
+}
+
+function Aplicacion() {
   const [almacen] = useState(() => crearAlmacenSesion(crearServicioFirebase(FIREBASE)));
   const [cliente] = useState(() =>
     crearCliente({ baseUrl: API_URL, obtenerToken: () => almacen.obtenerToken() }),
@@ -43,6 +60,7 @@ export function App() {
       <ContextoApi value={cliente}>
         <QueryClientProvider client={consultas}>
           <BrowserRouter>
+            <AvisosPWA />
             <Routes>
               <Route path="/acceso" element={<Acceso />} />
               <Route element={<RutaProtegida />}>

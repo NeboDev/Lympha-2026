@@ -3,6 +3,11 @@ packages:
   - packages/*
   - tools/*
 
+# `firebase` (PWA) arrastra una versión de @grpc/grpc-js con una vulnerabilidad alta (GHSA-m9gg-hp2v-232j) por
+# Firestore, que la PWA no usa. Se fuerza la versión corregida; se puede quitar cuando `firebase` la incluya.
+overrides:
+  '@grpc/grpc-js': '>=1.13.6'
+
 # pnpm 11 bloquea scripts de instalación salvo los aprobados aquí.
 allowBuilds:
   esbuild: true

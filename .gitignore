@@ -11,3 +11,6 @@ infra/certs/
 infra/staging-local/.estado/
 tools/factory/lotes/
 infra/test/salida-carga/
+
+apps/web/test-results/
+apps/web/playwright-report/

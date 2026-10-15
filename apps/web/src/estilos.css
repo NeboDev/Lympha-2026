@@ -378,6 +378,20 @@ h2 {
   opacity: 0.8;
 }
 
+.avisos-pwa {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: light-dark(#fff4cc, #3b3000);
+  color: CanvasText;
+  border-bottom: 1px solid GrayText;
+}
+
+.avisos-pwa p {
+  margin: 0;
+  padding: 0.5rem 1rem;
+}
+
 .navegacion {
   display: flex;
   gap: 0.25rem;

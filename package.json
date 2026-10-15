@@ -12,6 +12,7 @@
     "dev": "docker compose --env-file .env -f infra/compose/base.yml -f infra/compose/dev.yml up --build --watch",
     "web": "pnpm --filter @lympha/web dev",
     "web:build": "pnpm --filter @lympha/web build",
+    "test:e2e": "pnpm --filter @lympha/web test:e2e",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "typecheck": "pnpm -r typecheck",

@@ -101,9 +101,10 @@ export function combinar(base: NodoApi[], sse: DatosSse, baseEn: number): NodoVi
     return {
       id: n.id,
       nombre: n.nombre,
-      // un nodo «reclamado» que ya mandó una evaluación en vivo dejó de esperar su primera lectura
+      // un nodo «reclamado» que ya mandó una evaluación en vivo dejó de esperar su primera lectura. El snapshot trae
+      // una fila de estado por cada nodo, también el que todavía no ha mandado nada (sin lectura): eso no cuenta.
       visible: estadoVisible(
-        n.estado === "reclamado" && estadoVivo ? "activo" : n.estado,
+        n.estado === "reclamado" && estadoVivo?.ultima_lectura_en ? "activo" : n.estado,
         nivel,
         confianza,
         conectado,

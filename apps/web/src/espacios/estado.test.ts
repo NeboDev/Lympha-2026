@@ -168,6 +168,18 @@ describe("combinar", () => {
     expect(combinar(base, sse, baseEn)[0]?.visible).toBe("buena");
   });
 
+  it("el snapshot trae una fila para el nodo que aún no ha mandado nada: sigue esperando, no «sin conexión»", () => {
+    const base = [nodo(N1, { estado: "reclamado", estado_actual: null })];
+    const sse = conSnapshot(
+      {
+        nodos: [evento(N1, { nivel: "sin_datos", wqi: null, ultima_lectura_en: null })],
+        conexiones: [{ nodo_id: N1, conectado: false, cambio_conexion_en: null }],
+      },
+      2000,
+    );
+    expect(combinar(base, sse, baseEn)[0]?.visible).toBe("esperando");
+  });
+
   it("un nodo recién reclamado, sin estado, espera su primera lectura", () => {
     const [v] = combinar(
       [nodo(N1, { estado: "reclamado", estado_actual: null })],

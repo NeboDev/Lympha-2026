@@ -29,10 +29,29 @@ export function resolverConfigFirebase(env: Entorno, desarrollo: boolean): Confi
   };
 }
 
-/** URL base de la API, sin barra final. */
-export const API_URL: string = (import.meta.env.VITE_API_URL || DESARROLLO_API).replace(/\/+$/, "");
+/**
+ * URL base de la API, sin barra final. En desarrollo, `http://127.0.0.1:3000` por omisión; en un build de producción
+ * no hay valor por omisión (una PWA publicada que apunta a localhost no serviría de nada) y devuelve `""`.
+ */
+export function resolverApiUrl(env: Entorno, desarrollo: boolean): string {
+  return (env.VITE_API_URL || (desarrollo ? DESARROLLO_API : "")).replace(/\/+$/, "");
+}
+
+/** Qué le falta a la configuración para funcionar (nombres de variable, nunca valores). Vacío = completa. */
+export function problemasDeConfig(env: Entorno, desarrollo: boolean): string[] {
+  const falta: string[] = [];
+  if (resolverApiUrl(env, desarrollo) === "") falta.push("VITE_API_URL");
+  const fb = resolverConfigFirebase(env, desarrollo);
+  if (!fb.projectId) falta.push("VITE_FIREBASE_PROJECT_ID");
+  if (!fb.apiKey) falta.push("VITE_FIREBASE_API_KEY");
+  return falta;
+}
+
+export const API_URL: string = resolverApiUrl(import.meta.env, import.meta.env.DEV);
 
 export const FIREBASE: ConfigFirebase = resolverConfigFirebase(
   import.meta.env,
   import.meta.env.DEV,
 );
+
+export const PROBLEMAS_CONFIG: string[] = problemasDeConfig(import.meta.env, import.meta.env.DEV);

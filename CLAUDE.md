@@ -8,7 +8,9 @@ Lympha es un producto IoT B2C de calidad del agua: un nodo ESP32-S3 mide pH, tem
 Documentos fuente (raíz del repo). Precedencia si se contradicen: **datos > plan de implementación > arquitectura > requisitos**.
 
 ## Alcance y estado
-Backend, infraestructura y, **desde H4 (acordado con el dueño del proyecto, 2026-10-14), la PWA en `apps/web`** (React 19 + Vite + TanStack Query + React Router + `vite-plugin-pwa`, más el SDK web `firebase` para el acceso; gráficas y estilos a mano, sin librería de gráficas; Playwright para E2E). No se toca el firmware (repo aparte `lympha-firmware`). H4 incluye los huecos de API que la PWA necesita: CORS configurable (`CORS_ORIGINS`) e historial de 7 y 30 días (RF-35) sobre `app.v_evaluaciones_dia`/`v_lecturas_dia`; el historial por parámetro hasta 12 meses (RF-36) queda pendiente. El reclamo (RF-10) acepta código escrito y escaneo de QR con `BarcodeDetector` si el navegador lo trae. **H4 está en curso; no avanzar a H5 sin instrucción.**
+Backend, infraestructura y, **desde H4 (acordado con el dueño del proyecto, 2026-10-14), la PWA en `apps/web`** (React 19 + Vite + TanStack Query + React Router + `vite-plugin-pwa`, más el SDK web `firebase` para el acceso; gráficas y estilos a mano, sin librería de gráficas; Playwright para E2E). No se toca el firmware (repo aparte `lympha-firmware`). H4 incluye los huecos de API que la PWA necesita: CORS configurable (`CORS_ORIGINS`) e historial de 7 y 30 días (RF-35) sobre `app.v_evaluaciones_dia`/`v_lecturas_dia`; el historial por parámetro hasta 12 meses (RF-36) queda pendiente. El reclamo (RF-10) acepta código escrito y escaneo de QR con `BarcodeDetector` si el navegador lo trae.
+
+**H4 (PWA): terminado en local** (ver `docs/decisiones.md`, "H4" y "Pendiente al cerrar H4"). **No avanzar a H5 sin instrucción.** `apps/web` trae: acceso con Firebase (emulador solo en desarrollo), espacios, reclamo (QR o código), invitaciones, miembros, inicio con semáforo en vivo por SSE (incluida la conexión de los nodos, evento `conexion` aditivo del servidor), detalle del nodo con historial de 7 y 30 días y modo avanzado (gráficas SVG propias), alertas con historial, ajustes de Telegram y preferencias de aviso, y PWA instalable (manifiesto, iconos, service worker que guarda solo el cascarón, jamás la API). E2E con Playwright contra el stack real (`pnpm test:e2e`, no está en el CI). Lo que NO se pudo probar: la cámara con un QR real, «Iniciar» en un Telegram real, Google y el proyecto real de Firebase, ni dispositivos móviles reales (ver «Pendiente al cerrar H4»).
 
 **H0, H1, H2 y H3: terminados en local** (ver `docs/decisiones.md`: "Modo local", "H1", "Pendiente al cerrar H1", "H2", "H3" y "Pendiente al cerrar H3"). H1 dejó: identidad con Firebase (emulador en local), API de espacios/membresías/invitaciones/nodos/lecturas, migración `0010`, `ingest` con `status`/`attributes`/huecos, `/metrics` (prom-client) en `ingest` y `worker`, CLI de fábrica sin grabado (`pnpm factory`) y simulador de flotas con escenarios JSON. Verificado: 100 nodos, reinicios forzados, 0 lecturas perdidas.
 
@@ -48,7 +50,7 @@ Node 24 · TypeScript 5.9 `strict` · pnpm workspaces · Fastify 5 + `fastify-ty
 ## Estructura del repo
 ```
 apps/server/{src/{modules,platform,main,cli},migrations,test,Dockerfile}
-apps/web/                 # PWA (H4): src/{api,paginas,...}; cliente tipado en src/api/cliente.ts (Bearer, zod, sin content-type en cuerpos vacíos)
+apps/web/                 # PWA (H4): src/{api,sesion,espacios,historial,graficas,alertas,ajustes,paginas,componentes,pwa}; cliente tipado en src/api/cliente.ts (Bearer, zod, sin content-type en cuerpos vacíos); e2e/ (Playwright); public/ (iconos generados por scripts/generar-iconos.mjs)
 packages/{contracts,wqi}  # wqi: motor WQI puro; el perfil cisterna está en UN archivo (src/perfiles/cisterna.ts)
 tools/{simulator,factory} # simulator: escenarios JSON por tiempo (escenarios.ts) e historias con nivel esperado (historias.ts); factory: solo guarda los lotes generados; el CLI vive en apps/server/src/cli/fabrica.ts
 infra/{compose,caddy,mosquitto,postgres,valkey,firebase,bootstrap,staging-local,secrets,test}  + deploy.sh, smoke.sh
@@ -60,6 +62,7 @@ docs/decisiones.md
 ## Comandos
 - `pnpm install` · `pnpm dev` (Compose de desarrollo con `--build --watch`) · `pnpm simulator`
 - `pnpm web` (PWA en http://127.0.0.1:5173, contra la API de `pnpm dev`; origen permitido por `CORS_ORIGINS`) · `pnpm web:build`. Las pruebas unitarias de `apps/web/src/**` corren con `pnpm test`.
+- `pnpm test:e2e` (Playwright, **necesita el stack de `pnpm dev` arriba**; `E2E_CHANNEL=msedge` usa el Edge instalado, o `pnpm --filter @lympha/web exec playwright install chromium`): proyecto `app` (recorrido completo con el simulador, ~2.5 min) y `pwa` (build de producción con `vite preview`). Un build de producción necesita `VITE_API_URL`, `VITE_FIREBASE_PROJECT_ID` y `VITE_FIREBASE_API_KEY` (ver `apps/web/.env.example`); sin ellas la app dice qué falta.
 - `pnpm test` (unitarias) · `pnpm test:int` (integración, Testcontainers, necesita Docker) · `pnpm test:infra` (deploy.sh y prod.yml)
 - `pnpm lint` / `pnpm lint:fix` (Biome) · `pnpm typecheck`
 - `pnpm --filter @lympha/wqi fixtures` regenera `packages/wqi/fixtures/cisterna.json` (solo al subir la versión del perfil; revisar el diff) · `pnpm simulator --historias` lista las historias
@@ -82,6 +85,7 @@ docs/decisiones.md
 - Todo en UTC (`timestamptz`); `America/Mexico_City` solo al agregar por día y mostrar. IDs UUIDv7.
 - Ingesta idempotente: `ON CONFLICT (nodo_id, ts) DO NOTHING`; `PUBACK` solo tras encolar. Los jobs de BullMQ no llevan `jobId` (BullMQ rechaza `:`).
 - Alarmas y avisos (H3): la alarma y sus filas de `notificaciones_salida` se escriben en la misma transacción que el estado que las causa, deciden contra la alarma **abierta** (reintentar no repite nada) y solo para evaluaciones recién insertadas. Los cierres (`resuelta`, `reconectado`) van solo a quien ya fue avisado. Los textos de aviso nunca dicen "potable" ni "seguro" (RNF-32; lo verifica una prueba). `lympha_app` no puede actualizar `vinculos_telegram` (solo insertar y borrar).
+- PWA (H4): el service worker guarda solo el cascarón (sin `runtimeCaching`: ninguna respuesta de la API, RNF-01; lo verifica el E2E `pwa`); un build de producción ignora el emulador de Firebase; el estado de color nunca va solo (texto y símbolo); ningún texto de la app dice «potable» ni «seguro». En la base de desarrollo, **no** correr `refresh_continuous_aggregate` con ventana abierta (adelanta la marca de agua y el día en curso deja de verse en el historial).
 - Sin datos personales en logs ni Sentry (ids, no correos). pino con `redact`.
 - Commits Conventional Commits; trunk-based sobre `dev` (ver "Flujo de ramas"); cada paso termina con tests, lint y typecheck limpios.
 - No agregar dependencias fuera del stack sin preguntar.
