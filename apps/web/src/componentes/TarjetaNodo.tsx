@@ -1,3 +1,5 @@
+import type { NivelApi } from "@lympha/contracts";
+import { Link } from "react-router";
 import type { EstadoVisible, NodoVista } from "../espacios/estado.ts";
 import { haceCuanto, horaYDia } from "../espacios/tiempo.ts";
 
@@ -24,9 +26,20 @@ const NOMBRES_PARAMETRO: Record<string, string> = {
 };
 
 export const etiquetaEstadoVisible = (v: EstadoVisible) => ESTADOS[v].etiqueta;
+export const etiquetaNivel = (n: NivelApi) => ESTADOS[n].etiqueta;
+export const simboloNivel = (n: NivelApi) => ESTADOS[n].simbolo;
 
 /** Tarjeta de un nodo: su semáforo, la frase de causa y acción (RF-20) y cuándo se supo algo de él. */
-export function TarjetaNodo({ nodo, ahora }: { nodo: NodoVista; ahora: number }) {
+export function TarjetaNodo({
+  nodo,
+  ahora,
+  conEnlace = true,
+}: {
+  nodo: NodoVista;
+  ahora: number;
+  /** El nombre lleva al detalle del nodo (no en el propio detalle). */
+  conEnlace?: boolean;
+}) {
   const { etiqueta, simbolo } = ESTADOS[nodo.visible];
   const parametro = nodo.parametroLimitante
     ? (NOMBRES_PARAMETRO[nodo.parametroLimitante] ?? nodo.parametroLimitante)
@@ -34,7 +47,13 @@ export function TarjetaNodo({ nodo, ahora }: { nodo: NodoVista; ahora: number })
 
   return (
     <article className={`nodo nivel-${nodo.visible}`} aria-label={nodo.nombre ?? "Nodo sin nombre"}>
-      <h3>{nodo.nombre ?? "Nodo sin nombre"}</h3>
+      <h3>
+        {conEnlace ? (
+          <Link to={`/nodos/${nodo.id}`}>{nodo.nombre ?? "Nodo sin nombre"}</Link>
+        ) : (
+          (nodo.nombre ?? "Nodo sin nombre")
+        )}
+      </h3>
       <p className="semaforo">
         <span className="insignia">
           <span aria-hidden="true">{simbolo}</span> {etiqueta}

@@ -239,6 +239,145 @@ h2 {
   --texto: light-dark(#ffffff, #160b3a);
 }
 
+.nodo h3 a {
+  color: inherit;
+}
+
+.selector {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin: 0.5rem 0 1rem;
+}
+
+.selector button {
+  width: auto;
+}
+
+.interruptor {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.interruptor input {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+/* Tira de días (RF-35): cada día es un botón con color, símbolo y nombre accesible. */
+.tira {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(2.6rem, 1fr));
+  gap: 0.25rem;
+  margin-bottom: 1rem;
+}
+
+/* Los colores vienen de .nivel-* (más arriba); sin nivel conocido, un gris de respaldo. */
+.dia {
+  display: grid;
+  place-items: center;
+  min-height: 3rem;
+  padding: 0.15rem;
+  line-height: 1.1;
+  background: var(--fondo, light-dark(#5b6670, #8793a0));
+  color: var(--texto, light-dark(#ffffff, #10151a));
+  border: 2px solid transparent;
+}
+
+.dia .numero {
+  font-weight: 700;
+}
+
+.dia.vacio {
+  background: transparent;
+  color: inherit;
+  border: 1px dashed GrayText;
+}
+
+.dia.elegido {
+  border-color: CanvasText;
+  outline: 2px solid Canvas;
+  outline-offset: -4px;
+}
+
+.panel-dia {
+  border: 1px solid GrayText;
+  border-radius: 0.5rem;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+}
+
+.panel-dia h3 {
+  margin: 0 0 0.5rem;
+}
+
+.panel-dia h3::first-letter {
+  text-transform: uppercase;
+}
+
+.valores {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+  gap: 0.5rem 1rem;
+  margin: 0.5rem 0;
+}
+
+.valores div {
+  display: grid;
+}
+
+.valores dt {
+  font-size: 0.85rem;
+  opacity: 0.8;
+}
+
+.valores dd {
+  margin: 0;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.grafica {
+  margin: 0 0 1.25rem;
+}
+
+.grafica figcaption {
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+
+.grafica svg {
+  width: 100%;
+  height: auto;
+  border: 1px solid GrayText;
+  border-radius: 0.5rem;
+}
+
+.grafica .eje {
+  stroke: GrayText;
+  stroke-width: 0.5;
+  opacity: 0.5;
+}
+
+.grafica .linea {
+  fill: none;
+  stroke: light-dark(#0b57d0, #8ab4ff);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+
+.grafica .punto {
+  fill: light-dark(#0b57d0, #8ab4ff);
+}
+
+.grafica .etiqueta {
+  fill: currentColor;
+  font-size: 11px;
+  opacity: 0.8;
+}
+
 .acciones {
   display: flex;
   gap: 0.25rem;

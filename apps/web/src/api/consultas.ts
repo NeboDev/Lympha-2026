@@ -3,7 +3,9 @@ import {
   crearInvitacionRespuesta,
   espacioApi,
   espacioDetalleApi,
+  lecturaApi,
   nodoApi,
+  respuestaHistorial,
   usuarioApi,
 } from "@lympha/contracts";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -34,14 +36,61 @@ export function useEspacios() {
   });
 }
 
+/** `espacioId` vacío = sin consulta (p. ej. un nodo desvinculado no tiene espacio). */
 export function useEspacio(espacioId: string) {
   const api = useApi();
   return useQuery({
     queryKey: ["espacio", espacioId],
     queryFn: ({ signal }) =>
       api.pedir(`/api/espacios/${espacioId}`, { esquema: espacioDetalleApi, signal }),
+    enabled: espacioId !== "",
     // un espacio ajeno o inexistente es un 404 definitivo: no se reintenta
     retry: (n, error) => n < 1 && (error as { status?: number }).status !== 404,
+  });
+}
+
+const sinReintentarSiNoExiste = (n: number, error: unknown) =>
+  n < 1 && (error as { status?: number }).status !== 404;
+
+export function useNodo(nodoId: string) {
+  const api = useApi();
+  return useQuery({
+    queryKey: ["nodo", nodoId],
+    queryFn: ({ signal }) => api.pedir(`/api/nodos/${nodoId}`, { esquema: nodoApi, signal }),
+    retry: sinReintentarSiNoExiste,
+  });
+}
+
+const listaLecturas = z.object({ lecturas: z.array(lecturaApi) });
+
+/** Las últimas lecturas del nodo (la API las da de la más reciente a la más antigua). Solo si `activa`. */
+export function useLecturas(nodoId: string, limite: number, activa: boolean) {
+  const api = useApi();
+  return useQuery({
+    queryKey: ["lecturas", nodoId, limite],
+    queryFn: ({ signal }) =>
+      api.pedir(`/api/nodos/${nodoId}/lecturas?limite=${limite}`, {
+        esquema: listaLecturas,
+        signal,
+      }),
+    enabled: activa,
+    refetchInterval: 30_000,
+    retry: sinReintentarSiNoExiste,
+  });
+}
+
+/** Historial diario de 7 o 30 días (RF-35). */
+export function useHistorial(nodoId: string, dias: 7 | 30) {
+  const api = useApi();
+  return useQuery({
+    queryKey: ["historial", nodoId, dias],
+    queryFn: ({ signal }) =>
+      api.pedir(`/api/nodos/${nodoId}/historial?dias=${dias}`, {
+        esquema: respuestaHistorial,
+        signal,
+      }),
+    staleTime: 60_000,
+    retry: sinReintentarSiNoExiste,
   });
 }
 

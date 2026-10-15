@@ -23,6 +23,7 @@ export function useEstadoEspacio(espacioId: string) {
   const [flujo, setFlujo] = useState<EstadoFlujo>("conectando");
 
   useEffect(() => {
+    if (espacioId === "") return; // sin espacio no hay stream
     const control = new AbortController();
     setSse(sseVacio);
 

@@ -51,13 +51,15 @@ async function todasLasRutas(): Promise<string[]> {
 }
 
 describe("cobertura de aislamiento de las rutas", () => {
+  // La primera prueba carga todos los módulos de la API: en frío (transformación de TypeScript) puede pasar de los
+  // 5 s por omisión y fallar sin que nada esté mal.
   it("toda ruta registrada está declarada pública o con su prueba de acceso cruzado", async () => {
     const sinCobertura = (await todasLasRutas()).filter((r) => !(r in RUTAS_CUBIERTAS));
     expect(
       sinCobertura,
       "Rutas sin prueba de aislamiento: agrégalas a test/rutas-cubiertas.ts con su prueba (RNF-01)",
     ).toEqual([]);
-  });
+  }, 30_000);
 
   it("no queda ninguna entrada obsoleta en el registro", async () => {
     const reales = new Set(await todasLasRutas());

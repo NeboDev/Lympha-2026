@@ -9,6 +9,7 @@ import { Acceso } from "./paginas/acceso.tsx";
 import { Espacio } from "./paginas/espacio.tsx";
 import { Espacios } from "./paginas/espacios.tsx";
 import { Invitacion } from "./paginas/invitacion.tsx";
+import { Nodo } from "./paginas/nodo.tsx";
 import { Reclamar } from "./paginas/reclamar.tsx";
 import { crearAlmacenSesion } from "./sesion/almacen.ts";
 import { ProveedorSesion, RutaProtegida } from "./sesion/contexto.tsx";
@@ -47,6 +48,7 @@ export function App() {
                   <Route path="/" element={<Espacios />} />
                   <Route path="/espacios/:espacioId" element={<Espacio />} />
                   <Route path="/espacios/:espacioId/reclamar" element={<Reclamar />} />
+                  <Route path="/nodos/:nodoId" element={<Nodo />} />
                   <Route path="/invitacion" element={<Invitacion />} />
                 </Route>
               </Route>
