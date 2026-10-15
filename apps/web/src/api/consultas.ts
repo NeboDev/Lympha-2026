@@ -1,12 +1,18 @@
 import {
+  alarmaApi,
   type crearEspacioBody,
   crearInvitacionRespuesta,
   espacioApi,
   espacioDetalleApi,
+  estadoTelegramApi,
   lecturaApi,
+  listaAlarmasRespuesta,
   nodoApi,
+  type PreferenciaNotificacion,
+  preferenciasRespuesta,
   respuestaHistorial,
   usuarioApi,
+  vinculoTelegramRespuesta,
 } from "@lympha/contracts";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
@@ -77,6 +83,96 @@ export function useLecturas(nodoId: string, limite: number, activa: boolean) {
     refetchInterval: 30_000,
     retry: sinReintentarSiNoExiste,
   });
+}
+
+/** Alarmas de un espacio (RF-32): `abiertas` (activas y atendidas) o todas, con su historial. */
+export function useAlarmas(espacioId: string, estado: "abiertas" | "todas") {
+  const api = useApi();
+  return useQuery({
+    queryKey: ["alarmas", espacioId, estado],
+    queryFn: ({ signal }) =>
+      api.pedir(
+        `/api/espacios/${espacioId}/alarmas?limite=${estado === "todas" ? 100 : 50}${estado === "abiertas" ? "&estado=abiertas" : ""}`,
+        { esquema: listaAlarmasRespuesta, signal },
+      ),
+    enabled: espacioId !== "",
+    retry: sinReintentarSiNoExiste,
+  });
+}
+
+/** Marcar una alarma como atendida. Refresca las alertas de su espacio. */
+export function useAtenderAlarma() {
+  const api = useApi();
+  const consultas = useQueryClient();
+  return useMutation({
+    // POST sin cuerpo: el cliente no manda content-type
+    mutationFn: (alarmaId: string) =>
+      api.pedir(`/api/alarmas/${alarmaId}/atender`, { metodo: "POST", esquema: alarmaApi }),
+    onSettled: (_r, _e, _id) => {
+      // también tras un 409 (otra persona la atendió primero): hay que ver el estado real
+      void consultas.invalidateQueries({ queryKey: ["alarmas"] });
+    },
+  });
+}
+
+/** Estado del vínculo de Telegram de la persona. `sondear` lo vuelve a pedir cada pocos segundos (mientras se vincula). */
+export function useTelegram(sondear = false) {
+  const api = useApi();
+  return useQuery({
+    queryKey: ["telegram"],
+    queryFn: ({ signal }) => api.pedir("/api/yo/telegram", { esquema: estadoTelegramApi, signal }),
+    refetchInterval: sondear ? 3000 : false,
+  });
+}
+
+export function useAccionesTelegram() {
+  const api = useApi();
+  const consultas = useQueryClient();
+  return {
+    vincular: useMutation({
+      mutationFn: () =>
+        api.pedir("/api/yo/telegram/vinculo", {
+          metodo: "POST",
+          esquema: vinculoTelegramRespuesta,
+        }),
+    }),
+    desvincular: useMutation({
+      mutationFn: () => api.pedir("/api/yo/telegram", { metodo: "DELETE" }),
+      onSuccess: () => void consultas.invalidateQueries({ queryKey: ["telegram"] }),
+    }),
+  };
+}
+
+/** Preferencias de aviso (RF-31): la general y las de cada nodo que se personalizó. */
+export function usePreferencias() {
+  const api = useApi();
+  return useQuery({
+    queryKey: ["preferencias"],
+    queryFn: ({ signal }) =>
+      api.pedir("/api/yo/notificaciones", { esquema: preferenciasRespuesta, signal }),
+  });
+}
+
+export function useAccionesPreferencias() {
+  const api = useApi();
+  const consultas = useQueryClient();
+  const refrescar = () => void consultas.invalidateQueries({ queryKey: ["preferencias"] });
+  return {
+    guardar: useMutation({
+      mutationFn: (preferencia: PreferenciaNotificacion) =>
+        api.pedir("/api/yo/notificaciones", {
+          metodo: "PUT",
+          cuerpo: preferencia,
+          esquema: preferenciasRespuesta,
+        }),
+      onSuccess: refrescar,
+    }),
+    quitarDeNodo: useMutation({
+      mutationFn: (nodoId: string) =>
+        api.pedir(`/api/yo/notificaciones/${nodoId}`, { metodo: "DELETE" }),
+      onSuccess: refrescar,
+    }),
+  };
 }
 
 /** Historial diario de 7 o 30 días (RF-35). */

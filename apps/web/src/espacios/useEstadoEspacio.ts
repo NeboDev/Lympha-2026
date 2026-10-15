@@ -1,4 +1,5 @@
 import { eventoConexion, eventoEstado, eventoSnapshot } from "@lympha/contracts";
+import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { useEspacio } from "../api/consultas.ts";
 import { useApi } from "../api/contexto.ts";
@@ -18,6 +19,7 @@ import {
  */
 export function useEstadoEspacio(espacioId: string) {
   const api = useApi();
+  const consultas = useQueryClient();
   const detalle = useEspacio(espacioId);
   const [sse, setSse] = useState<DatosSse>(sseVacio);
   const [flujo, setFlujo] = useState<EstadoFlujo>("conectando");
@@ -44,8 +46,10 @@ export function useEstadoEspacio(espacioId: string) {
       } else if (m.evento === "conexion") {
         const r = eventoConexion.safeParse(dato);
         if (r.success) setSse((previo) => conConexion(previo, r.data, ahora));
+      } else if (m.evento === "alarma") {
+        // una alarma se abrió, escaló, mejoró, se atendió o se resolvió: las alertas de este espacio ya no están al día
+        void consultas.invalidateQueries({ queryKey: ["alarmas", espacioId] });
       }
-      // `alarma`: las alertas llegan en otro paso
     };
 
     void mantenerFlujo({
@@ -55,7 +59,7 @@ export function useEstadoEspacio(espacioId: string) {
       alEstado: setFlujo,
     });
     return () => control.abort();
-  }, [api, espacioId]);
+  }, [api, espacioId, consultas]);
 
   const nodos = useMemo(
     () => combinar(detalle.data?.nodos ?? [], sse, detalle.dataUpdatedAt),

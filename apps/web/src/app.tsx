@@ -6,6 +6,8 @@ import { ContextoApi } from "./api/contexto.ts";
 import { Plantilla } from "./componentes/plantilla.tsx";
 import { API_URL, FIREBASE } from "./config.ts";
 import { Acceso } from "./paginas/acceso.tsx";
+import { Ajustes } from "./paginas/ajustes.tsx";
+import { Alertas } from "./paginas/alertas.tsx";
 import { Espacio } from "./paginas/espacio.tsx";
 import { Espacios } from "./paginas/espacios.tsx";
 import { Invitacion } from "./paginas/invitacion.tsx";
@@ -49,6 +51,8 @@ export function App() {
                   <Route path="/espacios/:espacioId" element={<Espacio />} />
                   <Route path="/espacios/:espacioId/reclamar" element={<Reclamar />} />
                   <Route path="/nodos/:nodoId" element={<Nodo />} />
+                  <Route path="/alertas" element={<Alertas />} />
+                  <Route path="/ajustes" element={<Ajustes />} />
                   <Route path="/invitacion" element={<Invitacion />} />
                 </Route>
               </Route>

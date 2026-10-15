@@ -1,4 +1,4 @@
-import { Link, Outlet } from "react-router";
+import { Link, NavLink, Outlet } from "react-router";
 import { useYo } from "../api/consultas.ts";
 import { useSesion } from "../sesion/contexto.tsx";
 
@@ -12,6 +12,13 @@ export function Plantilla() {
         <Link to="/" className="marca">
           Lympha
         </Link>
+        <nav aria-label="Principal" className="navegacion">
+          <NavLink to="/" end>
+            Inicio
+          </NavLink>
+          <NavLink to="/alertas">Alertas</NavLink>
+          <NavLink to="/ajustes">Ajustes</NavLink>
+        </nav>
         <span className="usuario">{yo.data?.nombre ?? yo.data?.email ?? ""}</span>
         <button type="button" className="enlace" onClick={() => void sesion.salir()}>
           Salir

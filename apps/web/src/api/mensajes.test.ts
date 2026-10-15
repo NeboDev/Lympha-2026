@@ -30,6 +30,8 @@ describe("mensajeDeError", () => {
       "invitacion_invalida",
       "limite_espacios",
       "transferir_primero",
+      "telegram_no_disponible",
+      "alarma_no_activa",
       "demasiadas_solicitudes",
       "prohibido",
       "no_encontrado",

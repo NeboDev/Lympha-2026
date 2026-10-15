@@ -8,6 +8,9 @@ const POR_CODIGO: Record<string, string> = {
   limite_espacios: "Ya alcanzaste el máximo de espacios.",
   transferir_primero: "Transfiere la propiedad de este espacio antes de salir.",
   demasiadas_solicitudes: "Demasiados intentos. Espera unos minutos e inténtalo de nuevo.",
+  telegram_no_disponible:
+    "Los avisos por Telegram no están disponibles en este momento. Inténtalo más tarde.",
+  alarma_no_activa: "Esa alerta ya fue atendida o resuelta por alguien más.",
   prohibido: "No tienes permiso para hacer esto.",
   no_encontrado: "No encontramos lo que buscas.",
   no_autenticado: "Tu sesión no es válida. Vuelve a entrar.",
