@@ -1,4 +1,4 @@
-import type { EstadoNodoEvento, EventoAlarma } from "@lympha/contracts";
+import type { ConexionNodo, EstadoNodoEvento, EventoAlarma } from "@lympha/contracts";
 import {
   CONFIANZAS,
   type Confianza,
@@ -186,6 +186,35 @@ export async function reconstruirEstado(
       confianza: canalNuevo<Confianza>(esConfianza(fila.confianza) ? fila.confianza : "ok"),
       limitante: null,
     };
+  });
+}
+
+/**
+ * Conexión de todos los nodos de un espacio (para el snapshot del SSE), por `conUsuario()`: la RLS decide qué ve.
+ * Un espacio ajeno o inexistente da lista vacía; quien llama ya comprobó el acceso con `estadosDelEspacio`.
+ */
+export async function conexionesDelEspacio(
+  bd: BdApp,
+  usuarioId: string,
+  espacioId: string,
+): Promise<ConexionNodo[]> {
+  return conUsuario(bd, usuarioId, async (tx) => {
+    const r = await tx.execute<{
+      nodo_id: string;
+      conectado: boolean;
+      cambio_conexion_en: Date | null;
+    }>(sql`
+      SELECT nodo_id, conectado, cambio_conexion_en
+      FROM app.estado_nodo
+      WHERE espacio_id = ${espacioId}::uuid
+      ORDER BY nodo_id`);
+    return r.rows.map((f) => ({
+      nodo_id: f.nodo_id,
+      conectado: f.conectado,
+      cambio_conexion_en: f.cambio_conexion_en
+        ? new Date(f.cambio_conexion_en).toISOString()
+        : null,
+    }));
   });
 }
 

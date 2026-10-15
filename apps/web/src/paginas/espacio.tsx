@@ -1,21 +1,19 @@
 import type { TipoEspacio } from "@lympha/contracts";
 import { type FormEvent, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
-import { useAccionesEspacio, useEspacio, useYo } from "../api/consultas.ts";
+import { useAccionesEspacio, useYo } from "../api/consultas.ts";
 import { mensajeDeError } from "../api/mensajes.ts";
-import {
-  etiquetaEstadoNodo,
-  etiquetaRol,
-  etiquetaTipo,
-  TIPOS_ESPACIO,
-} from "../componentes/etiquetas.ts";
+import { etiquetaRol, etiquetaTipo, TIPOS_ESPACIO } from "../componentes/etiquetas.ts";
+import { AvisoFlujo, TarjetaNodo } from "../componentes/TarjetaNodo.tsx";
+import { useAhora, useEstadoEspacio } from "../espacios/useEstadoEspacio.ts";
 
 /** Detalle de un espacio: nodos, miembros, invitaciones y, para el propietario, edición y transferencia. */
 export function Espacio() {
   const { espacioId = "" } = useParams();
   const navegar = useNavigate();
   const yo = useYo();
-  const detalle = useEspacio(espacioId);
+  const { detalle, nodos: nodosVivos, flujo } = useEstadoEspacio(espacioId);
+  const ahora = useAhora();
   const acciones = useAccionesEspacio();
   const [editando, setEditando] = useState(false);
   const [nombre, setNombre] = useState("");
@@ -38,7 +36,7 @@ export function Espacio() {
     );
   }
 
-  const { espacio, miembros, nodos } = detalle.data;
+  const { espacio, miembros } = detalle.data;
   const soyPropietario = espacio.rol === "propietario";
   const miId = yo.data?.id;
 
@@ -121,17 +119,13 @@ export function Espacio() {
       )}
 
       <h2>Nodos</h2>
-      {nodos.length === 0 && <p>Todavía no hay nodos en este espacio.</p>}
-      <ul className="tarjetas">
-        {nodos.map((n) => (
-          <li key={n.id}>
-            <div>
-              <strong>{n.nombre ?? "Nodo sin nombre"}</strong>
-              <span>{etiquetaEstadoNodo(n)}</span>
-            </div>
-          </li>
+      <AvisoFlujo flujo={flujo} />
+      {nodosVivos.length === 0 && <p>Todavía no hay nodos en este espacio.</p>}
+      <div className="rejilla">
+        {nodosVivos.map((n) => (
+          <TarjetaNodo key={n.id} nodo={n} ahora={ahora} />
         ))}
-      </ul>
+      </div>
       {soyPropietario && <Link to={`/espacios/${espacioId}/reclamar`}>Reclamar un nodo</Link>}
 
       <h2>Miembros</h2>

@@ -1,11 +1,44 @@
-import type { TipoEspacio } from "@lympha/contracts";
+import type { EspacioApi, TipoEspacio } from "@lympha/contracts";
 import { type FormEvent, useState } from "react";
 import { Link } from "react-router";
 import { useAccionesEspacio, useEspacios } from "../api/consultas.ts";
 import { mensajeDeError } from "../api/mensajes.ts";
 import { etiquetaRol, etiquetaTipo, TIPOS_ESPACIO } from "../componentes/etiquetas.ts";
+import { AvisoFlujo, TarjetaNodo } from "../componentes/TarjetaNodo.tsx";
+import { useAhora, useEstadoEspacio } from "../espacios/useEstadoEspacio.ts";
 
-/** Inicio: los espacios de la persona y el formulario para crear uno. */
+/** Un espacio con el semáforo en vivo de todos sus nodos (RF-22). */
+function SeccionEspacio({ espacio }: { espacio: EspacioApi }) {
+  const { detalle, nodos, flujo } = useEstadoEspacio(espacio.id);
+  const ahora = useAhora();
+  return (
+    <section className="espacio" aria-labelledby={`esp-${espacio.id}`}>
+      <h2 id={`esp-${espacio.id}`}>
+        <Link to={`/espacios/${espacio.id}`}>{espacio.nombre}</Link>
+      </h2>
+      <p className="detalle">
+        {etiquetaTipo(espacio.tipo)} · {etiquetaRol(espacio.rol)}
+      </p>
+      <AvisoFlujo flujo={flujo} />
+      {detalle.isError && <p role="alert">{mensajeDeError(detalle.error)}</p>}
+      {detalle.data && nodos.length === 0 && (
+        <p>
+          Todavía no hay nodos en este espacio.{" "}
+          {espacio.rol === "propietario" && (
+            <Link to={`/espacios/${espacio.id}/reclamar`}>Reclamar un nodo</Link>
+          )}
+        </p>
+      )}
+      <div className="rejilla">
+        {nodos.map((n) => (
+          <TarjetaNodo key={n.id} nodo={n} ahora={ahora} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/** Inicio: el estado de los nodos de cada espacio y el formulario para crear otro espacio. */
 export function Espacios() {
   const espacios = useEspacios();
   const { crear } = useAccionesEspacio();
@@ -26,19 +59,9 @@ export function Espacios() {
       {espacios.data && espacios.data.espacios.length === 0 && (
         <p>Aún no tienes espacios. Crea el primero, por ejemplo «Mi casa».</p>
       )}
-      <ul className="tarjetas">
-        {espacios.data?.espacios.map((e) => (
-          <li key={e.id}>
-            <Link to={`/espacios/${e.id}`}>
-              <strong>{e.nombre}</strong>
-              <span>
-                {etiquetaTipo(e.tipo)} · {etiquetaRol(e.rol)} ·{" "}
-                {e.nodos === 1 ? "1 nodo" : `${e.nodos} nodos`}
-              </span>
-            </Link>
-          </li>
-        ))}
-      </ul>
+      {espacios.data?.espacios.map((e) => (
+        <SeccionEspacio key={e.id} espacio={e} />
+      ))}
 
       <h2>Nuevo espacio</h2>
       <form onSubmit={enviar}>

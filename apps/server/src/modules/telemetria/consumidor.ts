@@ -45,6 +45,16 @@ export interface OpcionesConsumidor {
    * evento y NO debe lanzar: si falla, el barrido de mantenimiento cierra la alarma de desconexión de todos modos.
    */
   alReconectar?: (nodoId: string) => Promise<void>;
+  /**
+   * La conexión de un nodo cambió de verdad (cae o vuelve; no un evento repetido ni uno viejo). Es para avisar a
+   * la PWA por el stream del espacio. NO debe lanzar: es una notificación, no parte de guardar el lote.
+   */
+  alCambiarConexion?: (cambio: {
+    nodoId: string;
+    espacioId: string;
+    conectado: boolean;
+    en: Date;
+  }) => void | Promise<void>;
 }
 
 export interface Consumidor {
@@ -137,6 +147,18 @@ export async function iniciarConsumidor(op: OpcionesConsumidor): Promise<Consumi
         for (const evento of lote.eventos) {
           const cambio = await aplicarEvento(op.bd, evento);
           if (cambio === "conectado") reconectados.push(evento.nodoId);
+          if (cambio !== null && evento.tipo === "estado") {
+            await Promise.resolve(
+              op.alCambiarConexion?.({
+                nodoId: evento.nodoId,
+                espacioId: evento.espacioId,
+                conectado: cambio === "conectado",
+                en: new Date(evento.recibidoEn),
+              }),
+            ).catch((e: unknown) =>
+              op.log.warn({ err: e }, "no se pudo avisar el cambio de conexión"),
+            );
+          }
         }
         for (const nodoId of reconectados) await op.alReconectar?.(nodoId);
         await op.alEvaluar?.(lote.filas);

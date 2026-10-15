@@ -8,7 +8,7 @@ import type { Redis } from "../../platform/valkey.ts";
 import { type Autenticador, usuarioDe } from "../identidad/index.ts";
 import { historialDelNodo } from "./historial.ts";
 import { crearHubEspacios, type HubEspacios } from "./hub.ts";
-import { estadosDelEspacio } from "./repo.ts";
+import { conexionesDelEspacio, estadosDelEspacio } from "./repo.ts";
 
 /** Cabeceras con valor que ya puso un hook (p. ej. CORS), para copiarlas a la respuesta secuestrada. */
 function cabecerasFijadas(
@@ -110,8 +110,12 @@ export const rutasCalidad: FastifyPluginAsync<DepsCalidad> = async (app, opcione
       });
 
       let nodos: Awaited<ReturnType<typeof estadosDelEspacio>>;
+      let conexiones: Awaited<ReturnType<typeof conexionesDelEspacio>> = [];
       try {
         nodos = await estadosDelEspacio(opciones.bd, usuarioDe(req), espacioId);
+        if (nodos !== null) {
+          conexiones = await conexionesDelEspacio(opciones.bd, usuarioDe(req), espacioId);
+        }
       } catch (error) {
         await quitar();
         throw error;
@@ -135,7 +139,9 @@ export const rutasCalidad: FastifyPluginAsync<DepsCalidad> = async (app, opcione
         if (!raw.writableEnded) raw.write(texto);
       };
 
-      escribir(`retry: 3000\n\nevent: snapshot\ndata: ${JSON.stringify({ nodos })}\n\n`);
+      escribir(
+        `retry: 3000\n\nevent: snapshot\ndata: ${JSON.stringify({ nodos, conexiones })}\n\n`,
+      );
       for (const mensaje of pendientes) {
         escribir(`event: ${nombreEventoEspacio(mensaje)}\ndata: ${mensaje}\n\n`);
       }

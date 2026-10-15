@@ -1,4 +1,4 @@
-import { canalEspacio } from "@lympha/contracts";
+import { canalEspacio, type EventoConexion } from "@lympha/contracts";
 import {
   aplicarCiclo,
   iniciarMantenimiento,
@@ -92,6 +92,17 @@ export async function iniciarWorker(
           "no se pudo cerrar la alarma de desconexión; lo hará el barrido",
         );
       }
+    },
+    // La PWA se entera por el stream del espacio (RF-13); si Valkey falla, el snapshot de la próxima conexión lo corrige.
+    alCambiarConexion: async (c) => {
+      const evento: EventoConexion = {
+        nodo_id: c.nodoId,
+        espacio_id: c.espacioId,
+        conectado: c.conectado,
+        cambio_conexion_en: c.en.toISOString(),
+        actualizado_en: new Date().toISOString(),
+      };
+      await valkey.publish(canalEspacio(c.espacioId), JSON.stringify(evento));
     },
     alGuardar: (r, n) => {
       insertadas.inc({}, r.insertadas);

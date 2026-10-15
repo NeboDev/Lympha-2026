@@ -144,6 +144,101 @@ h2 {
   opacity: 0.75;
 }
 
+.espacio {
+  margin-bottom: 1.5rem;
+}
+
+.espacio h2 a {
+  color: inherit;
+}
+
+.detalle {
+  margin: 0.25rem 0;
+  font-size: 0.9rem;
+  opacity: 0.8;
+}
+
+.aviso {
+  padding: 0.5rem 0.75rem;
+  border: 1px dashed GrayText;
+  border-radius: 0.5rem;
+}
+
+/* Semáforo: cada nivel define su color de fondo y de texto; el texto del nivel siempre se muestra aparte del color. */
+.rejilla {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  margin: 0.5rem 0 1rem;
+}
+
+.nodo {
+  --fondo: light-dark(#5b6670, #8793a0);
+  --texto: light-dark(#ffffff, #10151a);
+  border: 1px solid GrayText;
+  border-left: 0.5rem solid var(--fondo);
+  border-radius: 0.5rem;
+  padding: 0.75rem 1rem;
+}
+
+.nodo h3 {
+  margin: 0 0 0.5rem;
+  font-size: 1.05rem;
+}
+
+.nodo p {
+  margin: 0.25rem 0;
+}
+
+.nodo .semaforo {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.nodo .insignia {
+  background: var(--fondo);
+  color: var(--texto);
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 0.2rem 0.75rem;
+}
+
+.nodo .wqi {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.8;
+}
+
+.nodo .accion {
+  font-weight: 600;
+}
+
+.nivel-buena {
+  --fondo: light-dark(#17703a, #5fcf86);
+  --texto: light-dark(#ffffff, #07240f);
+}
+
+.nivel-regular {
+  --fondo: light-dark(#f2b705, #f2b705);
+  --texto: #2b2000;
+}
+
+.nivel-mala {
+  --fondo: light-dark(#c4560a, #ff9a52);
+  --texto: light-dark(#ffffff, #2a1100);
+}
+
+.nivel-critica {
+  --fondo: light-dark(#b3141f, #ff6b73);
+  --texto: light-dark(#ffffff, #2c0407);
+}
+
+.nivel-revisar {
+  --fondo: light-dark(#5b3fa8, #b9a4ff);
+  --texto: light-dark(#ffffff, #160b3a);
+}
+
 .acciones {
   display: flex;
   gap: 0.25rem;

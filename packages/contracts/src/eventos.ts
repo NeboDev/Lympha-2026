@@ -38,23 +38,52 @@ export const estadoNodoEvento = z.object({
 });
 export type EstadoNodoEvento = z.infer<typeof estadoNodoEvento>;
 
-export const NOMBRES_EVENTO_ESPACIO = ["snapshot", "estado", "alarma"] as const;
+/**
+ * Conexión de un nodo con el broker (RF-13): el nodo se cayó (`conectado: false`, incluido el Last Will) o volvió.
+ * Va aparte del estado de calidad porque cambia por otras causas y a otro ritmo (no depende de las lecturas).
+ */
+export const conexionNodo = z.object({
+  nodo_id: z.string().uuid(),
+  conectado: z.boolean(),
+  /** Cuándo cambió la conexión (hora en que el servidor lo supo); `null` si el nodo nunca se ha conectado. */
+  cambio_conexion_en: z.string().datetime().nullable(),
+});
+export type ConexionNodo = z.infer<typeof conexionNodo>;
+
+/** Cambio de conexión de un nodo (`event: conexion`). */
+export const eventoConexion = conexionNodo.extend({
+  espacio_id: z.string().uuid(),
+  cambio_conexion_en: z.string().datetime(),
+  actualizado_en: z.string().datetime(),
+});
+export type EventoConexion = z.infer<typeof eventoConexion>;
+
+export const NOMBRES_EVENTO_ESPACIO = ["snapshot", "estado", "alarma", "conexion"] as const;
 
 /**
- * El canal `espacio:{id}` lleva dos clases de mensaje: el estado de un nodo (`event: estado`) y un cambio de
- * alarma (`event: alarma`, ver `eventoAlarma`). Solo las alarmas traen `alarma_id`.
+ * El canal `espacio:{id}` lleva tres clases de mensaje: el estado de calidad de un nodo (`event: estado`), un
+ * cambio de alarma (`event: alarma`, ver `eventoAlarma`, trae `alarma_id`) y un cambio de conexión
+ * (`event: conexion`, trae `conectado`). El estado de calidad no trae ninguna de las dos claves.
  */
-export function nombreEventoEspacio(mensaje: string): "estado" | "alarma" {
+export function nombreEventoEspacio(mensaje: string): "estado" | "alarma" | "conexion" {
   try {
     const dato: unknown = JSON.parse(mensaje);
-    return typeof dato === "object" && dato !== null && "alarma_id" in dato ? "alarma" : "estado";
+    if (typeof dato !== "object" || dato === null) return "estado";
+    if ("alarma_id" in dato) return "alarma";
+    return "conectado" in dato ? "conexion" : "estado";
   } catch {
     return "estado";
   }
 }
 
-/** Primer evento de cada conexión: el estado de todos los nodos del espacio. */
-export const eventoSnapshot = z.object({ nodos: z.array(estadoNodoEvento) });
+/**
+ * Primer evento de cada conexión: el estado de todos los nodos del espacio y su conexión. `conexiones` es
+ * aditivo: un cliente anterior que no lo conoce lo ignora.
+ */
+export const eventoSnapshot = z.object({
+  nodos: z.array(estadoNodoEvento),
+  conexiones: z.array(conexionNodo).default([]),
+});
 export type EventoSnapshot = z.infer<typeof eventoSnapshot>;
 
 /** Cambio de estado de un nodo (`event: estado`). */

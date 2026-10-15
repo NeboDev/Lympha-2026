@@ -1,4 +1,10 @@
-import { type EstadoNodoEvento, topico } from "@lympha/contracts";
+import {
+  type ConexionNodo,
+  type EstadoNodoEvento,
+  type EventoConexion,
+  eventoConexion,
+  topico,
+} from "@lympha/contracts";
 import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { HISTORIAS, type Historia } from "../../../tools/simulator/src/historias.ts";
@@ -429,6 +435,31 @@ describe("de la lectura MQTT al semáforo", () => {
               (e.datos as EstadoNodoEvento).nivel === "critica",
           ),
         );
+
+        // conexión (RF-13): el snapshot trae la de cada nodo del espacio y el stream avisa cuando el nodo
+        // entra y cuando se despide; cada quien recibe solo la de su espacio
+        const conexiones = (snapshot.datos as { conexiones: ConexionNodo[] }).conexiones;
+        expect(conexiones.map((c) => c.nodo_id).sort()).toEqual(nodos.map((n) => n.nodo_id).sort());
+        expect(conexiones.some((c) => c.nodo_id === ID.nodoBeto)).toBe(false);
+        const conexionDe = (nodoId: string, conectado: boolean) => (e: EventoSse) =>
+          e.evento === "conexion" &&
+          (e.datos as EventoConexion).nodo_id === nodoId &&
+          (e.datos as EventoConexion).conectado === conectado;
+        const entro = await esperar(async () => ana.eventos.find(conexionDe(ID.nodoSse, true)));
+        expect(entro.datos).toMatchObject({ espacio_id: ID.espacioAna });
+        const salio = await esperar(async () => ana.eventos.find(conexionDe(ID.nodoSse, false)));
+        expect(ana.eventos.indexOf(entro)).toBeLessThan(ana.eventos.indexOf(salio));
+        expect(
+          eventoConexion.safeParse(salio.datos).success &&
+            eventoConexion.safeParse(entro.datos).success,
+        ).toBe(true);
+        expect((await estadoDe(ID.nodoSse)).conectado).toBe(false);
+        await esperar(async () => beto.eventos.find(conexionDe(ID.nodoBeto, false)));
+        const conexionesAna = ana.eventos
+          .filter((e) => e.evento === "conexion")
+          .map((e) => e.datos as EventoConexion);
+        expect(conexionesAna.every((c) => c.espacio_id === ID.espacioAna)).toBe(true);
+        expect(conexionesAna.some((c) => c.nodo_id === ID.nodoBeto)).toBe(false);
 
         // aislamiento del canal: cada quien recibe solo los eventos de su espacio
         const deAna = ana.eventos
