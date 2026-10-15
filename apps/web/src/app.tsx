@@ -1,28 +1,51 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useState } from "react";
-import { BrowserRouter, Route, Routes } from "react-router";
+import { useEffect, useState } from "react";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router";
 import { crearCliente } from "./api/cliente.ts";
 import { ContextoApi } from "./api/contexto.ts";
-import { API_URL } from "./config.ts";
+import { API_URL, FIREBASE } from "./config.ts";
+import { Acceso } from "./paginas/acceso.tsx";
 import { Inicio } from "./paginas/inicio.tsx";
+import { crearAlmacenSesion } from "./sesion/almacen.ts";
+import { ProveedorSesion, RutaProtegida } from "./sesion/contexto.tsx";
+import { crearServicioFirebase } from "./sesion/firebase.ts";
 
 export function App() {
-  const [cliente] = useState(() => crearCliente({ baseUrl: API_URL }));
+  const [almacen] = useState(() => crearAlmacenSesion(crearServicioFirebase(FIREBASE)));
+  const [cliente] = useState(() =>
+    crearCliente({ baseUrl: API_URL, obtenerToken: () => almacen.obtenerToken() }),
+  );
   const [consultas] = useState(
     () =>
       new QueryClient({
         defaultOptions: { queries: { staleTime: 15_000, retry: 1, refetchOnWindowFocus: true } },
       }),
   );
+
+  // Al cerrar la sesión no debe quedar en memoria nada de la cuenta anterior.
+  useEffect(
+    () =>
+      almacen.suscribir(() => {
+        if (almacen.obtenerEstado().tipo === "fuera") consultas.clear();
+      }),
+    [almacen, consultas],
+  );
+
   return (
-    <ContextoApi value={cliente}>
-      <QueryClientProvider client={consultas}>
-        <BrowserRouter>
-          <Routes>
-            <Route path="*" element={<Inicio />} />
-          </Routes>
-        </BrowserRouter>
-      </QueryClientProvider>
-    </ContextoApi>
+    <ProveedorSesion almacen={almacen}>
+      <ContextoApi value={cliente}>
+        <QueryClientProvider client={consultas}>
+          <BrowserRouter>
+            <Routes>
+              <Route path="/acceso" element={<Acceso />} />
+              <Route element={<RutaProtegida />}>
+                <Route path="/" element={<Inicio />} />
+              </Route>
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </BrowserRouter>
+        </QueryClientProvider>
+      </ContextoApi>
+    </ProveedorSesion>
   );
 }

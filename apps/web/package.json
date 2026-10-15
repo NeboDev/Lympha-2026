@@ -12,6 +12,7 @@
   "dependencies": {
     "@lympha/contracts": "workspace:*",
     "@tanstack/react-query": "^5.104.2",
+    "firebase": "^12.19.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "react-router": "^8.4.0",

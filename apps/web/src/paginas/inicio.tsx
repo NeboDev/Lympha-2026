@@ -1,24 +1,34 @@
-import { respuestaHealth } from "@lympha/contracts";
+import { usuarioApi } from "@lympha/contracts";
 import { useQuery } from "@tanstack/react-query";
+import { ErrorApi } from "../api/cliente.ts";
 import { useApi } from "../api/contexto.ts";
+import { useSesion } from "../sesion/contexto.tsx";
 
-/** Página provisional del andamiaje: comprueba que la PWA alcanza la API (CORS incluido). */
+/** Página provisional (los espacios y el semáforo llegan en los pasos siguientes): confirma la sesión con la API. */
 export function Inicio() {
   const api = useApi();
-  const salud = useQuery({
-    queryKey: ["health"],
-    queryFn: ({ signal }) => api.pedir("/health", { esquema: respuestaHealth, signal }),
+  const sesion = useSesion();
+  const yo = useQuery({
+    queryKey: ["yo"],
+    queryFn: ({ signal }) => api.pedir("/api/yo", { esquema: usuarioApi, signal }),
+    retry: false,
   });
 
   return (
     <main className="pagina">
       <h1>Lympha</h1>
-      <p>Calidad del agua de tu cisterna, en un vistazo.</p>
-      <p role="status" data-estado={salud.isError ? "error" : (salud.data?.estado ?? "cargando")}>
-        {salud.isPending && "Conectando con Lympha…"}
-        {salud.isError && "No se pudo conectar con Lympha."}
-        {salud.data && `Servicio: ${salud.data.estado === "ok" ? "en línea" : "con fallas"}`}
-      </p>
+      {yo.isPending && <p role="status">Cargando…</p>}
+      {yo.data && <p role="status">Hola, {yo.data.nombre ?? yo.data.email}.</p>}
+      {yo.isError && (
+        <p role="alert">
+          {yo.error instanceof ErrorApi && yo.error.status === 401
+            ? "No pudimos validar tu sesión. Si acabas de crear tu cuenta, verifica tu correo y vuelve a entrar."
+            : "No se pudo conectar con Lympha."}
+        </p>
+      )}
+      <button type="button" className="secundario" onClick={() => void sesion.salir()}>
+        Salir
+      </button>
     </main>
   );
 }
