@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useAccionesTelegram, useTelegram } from "../api/consultas.ts";
 import { mensajeDeError } from "../api/mensajes.ts";
+import { IcoCheck, IcoEnviar } from "../componentes/Iconos.tsx";
 
 /** Solo se enlaza a Telegram: el enlace viene de la API, pero se revisa antes de ponerlo en un `href`. */
 const esEnlaceDeTelegram = (url: string) => url.startsWith("https://t.me/");
@@ -32,8 +33,18 @@ export function SeccionTelegram() {
   const vencido = enlace !== null && !vigente && !vinculado;
 
   return (
-    <section aria-labelledby="h-telegram">
-      <h2 id="h-telegram">Telegram</h2>
+    <section className="tarjeta grid gap-3 p-5" aria-labelledby="h-telegram">
+      <div className="flex items-center gap-3">
+        <span
+          className={`grid size-11 shrink-0 place-items-center rounded-full ${vinculado ? "bg-(--good-soft) text-text" : "bg-surface-2 text-text-2"}`}
+          aria-hidden="true"
+        >
+          {vinculado ? <IcoCheck tamano={22} grosor={2.6} /> : <IcoEnviar tamano={22} />}
+        </span>
+        <h2 id="h-telegram" className="m-0">
+          Telegram
+        </h2>
+      </div>
       {telegram.isPending && <p role="status">Cargando…</p>}
       {telegram.isError && <p role="alert">{mensajeDeError(telegram.error)}</p>}
 
@@ -48,7 +59,7 @@ export function SeccionTelegram() {
           </p>
           <button
             type="button"
-            className="secundario"
+            className="secundario peligro justify-self-start"
             disabled={desvincular.isPending}
             onClick={() => {
               if (window.confirm("¿Desvincular Telegram? Dejarás de recibir avisos por ahí.")) {
@@ -71,6 +82,7 @@ export function SeccionTelegram() {
           {!vigente && (
             <button
               type="button"
+              className="justify-self-start"
               disabled={vincular.isPending}
               onClick={() =>
                 vincular.mutate(undefined, {
@@ -87,9 +99,14 @@ export function SeccionTelegram() {
           {vincular.isError && <p role="alert">{mensajeDeError(vincular.error)}</p>}
           {vencido && <p role="alert">El enlace venció. Pide uno nuevo.</p>}
           {vigente && enlace && (
-            <div className="invitacion">
+            <div className="invitacion grid gap-2 rounded-ctl bg-surface-2 p-3">
               {esEnlaceDeTelegram(enlace.url) ? (
-                <a className="boton" href={enlace.url} target="_blank" rel="noopener noreferrer">
+                <a
+                  className="boton justify-self-start"
+                  href={enlace.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
                   Abrir Telegram
                 </a>
               ) : (

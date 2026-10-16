@@ -64,7 +64,7 @@ export function FormularioPreferencia({
   }
 
   return (
-    <form onSubmit={enviar} className="preferencia">
+    <form onSubmit={enviar} className="preferencia m-0">
       <fieldset>
         <legend>Avisarme cuando la calidad del agua sea</legend>
         {NIVELES_ELEGIBLES.map((n) => (
@@ -93,7 +93,7 @@ export function FormularioPreferencia({
           No avisarme durante un horario
         </label>
         {b.silencioActivo && (
-          <div className="horario">
+          <div className="horario grid grid-cols-2 gap-3">
             <label>
               Desde
               <input
@@ -146,7 +146,7 @@ export function FormularioPreferencia({
       </label>
 
       {(error ?? errorDelServidor) && <p role="alert">{error ?? errorDelServidor}</p>}
-      <div className="acciones">
+      <div className="acciones flex flex-wrap gap-2">
         <button type="submit" disabled={ocupado}>
           {textoGuardar}
         </button>
