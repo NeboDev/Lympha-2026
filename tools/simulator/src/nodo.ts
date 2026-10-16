@@ -1,13 +1,17 @@
 import { readFileSync } from "node:fs";
-import { estadoConexion, type Telemetria, telemetria, topico } from "@lympha/contracts";
+import { comandoV1, estadoConexion, type Telemetria, telemetria, topico } from "@lympha/contracts";
 import type { Mediciones } from "@lympha/wqi";
 import { connect, type IClientOptions, type MqttClient } from "mqtt";
+import { BufferLecturas, capacidadParaHoras, type LecturaGuardada } from "./buffer.ts";
+import { type OpcionesOta, OTA_POR_DEFECTO, resolverOta } from "./comandos.ts";
 import { type Escenario, evaluarEscenario } from "./escenarios.ts";
 import { aTelemetria, type Historia, medicionesDeHistoria } from "./historias.ts";
 
 /**
  * Nodo simulado: se comporta como el firmware según el contrato v1 (identidad propia, TLS,
- * Last Will retenido en `status`, atributos al conectar y telemetría periódica con `seq` y `ts`).
+ * Last Will retenido en `status`, atributos al conectar y telemetría periódica con `seq` y `ts`). Sin conexión
+ * guarda las lecturas en un buffer (24 h) y las envía en orden al volver; atiende `cmd` (reboot, ota) y responde en
+ * `cmd/ack`, incluido un reinicio y un rollback simulados.
  */
 
 export interface OpcionesNodo {
@@ -29,6 +33,12 @@ export interface OpcionesNodo {
   semilla?: number;
   /** Versión de firmware que dice tener. */
   firmware?: string;
+  /** Cómo reacciona a un comando `ota` (por defecto: éxito, con descarga y verificación del hash). */
+  ota?: Partial<OpcionesOta>;
+  /** Lecturas que caben en el buffer sin conexión (por defecto, 24 h a su intervalo). */
+  bufferMax?: number;
+  /** Lecturas por segundo al vaciar el buffer tras reconectar. */
+  vaciadoPorSegundo?: number;
   log?: (mensaje: string, extra?: Record<string, unknown>) => void;
   /** Reloj inyectable para pruebas. */
   ahora?: () => number;
@@ -38,6 +48,12 @@ export interface NodoSimulado {
   readonly cliente: MqttClient;
   /** Lecturas publicadas y confirmadas por el broker. */
   readonly publicadas: () => number;
+  /** Lecturas esperando conexión en el buffer. */
+  readonly enBuffer: () => number;
+  /** Lecturas perdidas porque el buffer se llenó. */
+  readonly descartadas: () => number;
+  /** Versión de firmware actual (cambia tras un OTA exitoso). */
+  readonly firmware: () => string;
   /** Resuelve cuando se alcanza `maxLecturas`. */
   terminado: Promise<void>;
   detener(): Promise<void>;
@@ -74,17 +90,25 @@ export function crearModeloAgua(semilla = Date.now()) {
 export async function iniciarNodo(op: OpcionesNodo): Promise<NodoSimulado> {
   const log = op.log ?? (() => undefined);
   const ahora = op.ahora ?? Date.now;
-  const intervaloMs = (op.intervaloS ?? 60) * 1000;
+  const intervaloS = op.intervaloS ?? 60;
+  const intervaloMs = intervaloS * 1000;
   const modelo = crearModeloAgua();
   const guion = op.historia ? medicionesDeHistoria(op.historia, op.semilla) : undefined;
   const maxLecturas = op.maxLecturas ?? op.historia?.lecturas;
+  const ota: OpcionesOta = { ...OTA_POR_DEFECTO, ...op.ota };
+  const buffer = new BufferLecturas(op.bufferMax ?? capacidadParaHoras(24, intervaloS));
+  let firmware = op.firmware ?? "sim-0.1.0";
   let seq = 0;
   let publicadas = 0;
   const inicio = ahora();
   let temporizador: NodeJS.Timeout | undefined;
+  let temporizadorReinicio: NodeJS.Timeout | undefined;
   let cerrado = false;
-  /** El escenario lo tiene "caído": sin conexión y sin publicar. */
-  let caido = false;
+  let vaciando = false;
+  /** Motivos por los que el nodo está sin conexión a propósito. */
+  let caidoEscenario = false;
+  let caidoReinicio = false;
+  let sinConexion = false;
 
   const opciones: IClientOptions = {
     username: op.deviceId,
@@ -106,7 +130,7 @@ export async function iniciarNodo(op: OpcionesNodo): Promise<NodoSimulado> {
   const cliente = connect(op.url, opciones);
   cliente.on("error", (e) => log("error MQTT", { motivo: e.message }));
   cliente.on("reconnect", () => {
-    if (!caido) log("reconectando");
+    if (!sinConexion) log("reconectando");
   });
 
   await new Promise<void>((resolve, reject) => {
@@ -115,39 +139,137 @@ export async function iniciarNodo(op: OpcionesNodo): Promise<NodoSimulado> {
   });
   log("conectado", { url: op.url, tls: op.url.startsWith("mqtts") });
 
-  /** Lo que hace el firmware en cada conexión: anunciarse y publicar sus atributos. */
-  async function anunciarse(): Promise<void> {
-    await cliente.publishAsync(topico(op.deviceId, "status"), "online", { qos: 1, retain: true });
-    await cliente.publishAsync(
-      topico(op.deviceId, "attributes"),
-      JSON.stringify({ v: 1, fw: op.firmware ?? "sim-0.1.0", rssi: -58, buffered: 0 }),
-      { qos: 1 },
-    );
-  }
-  await anunciarse();
-  // Tras una caída (del escenario o de la red) el nodo vuelve a anunciarse.
-  cliente.on("connect", () => void anunciarse().catch(() => undefined));
-
   let alTerminar!: () => void;
   const terminado = new Promise<void>((r) => {
     alTerminar = r;
   });
 
-  async function publicarLectura(): Promise<void> {
-    const muestra = op.escenario ? evaluarEscenario(op.escenario, (ahora() - inicio) / 1000) : null;
-    if (muestra?.desconectado) {
-      if (!caido) {
-        caido = true;
-        log("caída sin despedirse (escenario)");
-        cliente.end(true); // sin DISCONNECT: el broker publica el Last Will
+  /** Cae o vuelve a conectarse según los motivos activos. Una caída no manda DISCONNECT: se dispara el Last Will. */
+  async function ajustarConexion(): Promise<void> {
+    if (cerrado) return;
+    const quiereConexion = !caidoEscenario && !caidoReinicio;
+    if (!quiereConexion && !sinConexion) {
+      sinConexion = true;
+      log("sin conexión", { escenario: caidoEscenario, reinicio: caidoReinicio });
+      cliente.end(true);
+    } else if (quiereConexion && sinConexion) {
+      sinConexion = false;
+      log("vuelve a conectarse");
+      cliente.reconnect();
+      await new Promise<void>((resolver) => cliente.once("connect", () => resolver()));
+    }
+  }
+
+  async function publicarGuardada(l: LecturaGuardada): Promise<void> {
+    await cliente.publishAsync(
+      topico(op.deviceId, "telemetry"),
+      JSON.stringify(telemetria.parse({ v: 1, ...l })),
+      { qos: 1 },
+    );
+    publicadas++;
+    log("lectura publicada", { seq: l.seq, ph: l.ph });
+    if (maxLecturas !== undefined && publicadas >= maxLecturas) alTerminar();
+  }
+
+  /** Envía en orden lo acumulado sin conexión, a ritmo limitado y con el `ts` y el `seq` originales. */
+  async function vaciarBuffer(): Promise<void> {
+    if (vaciando || buffer.tamano === 0) return;
+    vaciando = true;
+    try {
+      const n = await buffer.vaciar(publicarGuardada, {
+        porSegundo: op.vaciadoPorSegundo ?? 20,
+        vigente: () => cliente.connected && !cerrado,
+      });
+      if (n > 0) log("buffer vaciado", { lecturas: n, restantes: buffer.tamano });
+    } finally {
+      vaciando = false;
+    }
+  }
+
+  /** Lo que hace el firmware en cada conexión: escuchar comandos, anunciarse, publicar atributos y vaciar el buffer. */
+  async function alConectar(): Promise<void> {
+    await cliente.subscribeAsync(topico(op.deviceId, "cmd"), { qos: 1 });
+    await cliente.publishAsync(topico(op.deviceId, "status"), "online", { qos: 1, retain: true });
+    await cliente.publishAsync(
+      topico(op.deviceId, "attributes"),
+      JSON.stringify({ v: 1, fw: firmware, rssi: -58, buffered: buffer.tamano }),
+      { qos: 1 },
+    );
+    await vaciarBuffer();
+  }
+  await alConectar();
+  cliente.on("connect", () => void alConectar().catch(() => undefined));
+
+  async function responder(id: string, ok: boolean, detail: string): Promise<void> {
+    await cliente
+      .publishAsync(topico(op.deviceId, "cmd/ack"), JSON.stringify({ v: 1, id, ok, detail }), {
+        qos: 1,
+      })
+      .catch((e: Error) => log("ack no enviado", { motivo: e.message }));
+  }
+
+  /** Reinicio: cae sin despedirse, espera y vuelve con `nuevaVersion` (o con la misma si es un reinicio o rollback). */
+  function reiniciar(nuevaVersion: string | null, segundos: number): void {
+    caidoReinicio = true;
+    void ajustarConexion();
+    temporizadorReinicio = setTimeout(() => {
+      if (nuevaVersion) firmware = nuevaVersion;
+      caidoReinicio = false;
+      void ajustarConexion().catch(() => undefined);
+    }, segundos * 1000);
+  }
+
+  async function atenderComando(carga: Buffer): Promise<void> {
+    let json: unknown;
+    try {
+      json = JSON.parse(carga.toString("utf8"));
+    } catch {
+      log("comando ilegible");
+      return;
+    }
+    const c = comandoV1.safeParse(json);
+    if (!c.success) {
+      log("comando no válido");
+      return;
+    }
+    const cmd = c.data;
+    log("comando recibido", { op: cmd.op, id: cmd.id });
+    if (cmd.op === "reboot") {
+      await responder(cmd.id, true, "reiniciando");
+      reiniciar(null, ota.reinicioS);
+      return;
+    }
+    const r = await resolverOta(cmd, ota);
+    if (r.ack) await responder(cmd.id, r.ack.ok, r.ack.detalle);
+    if (r.luego === "reiniciar_nueva") reiniciar(cmd.version, ota.reinicioS);
+    // la versión nueva no logra conectarse: el bootloader revierte y vuelve la versión anterior
+    if (r.luego === "reiniciar_y_revertir") reiniciar(null, ota.rollbackS);
+  }
+  cliente.on("message", (t, carga) => {
+    if (t === topico(op.deviceId, "cmd")) void atenderComando(carga);
+  });
+
+  async function enviar(lectura: LecturaGuardada): Promise<void> {
+    if (cliente.connected && buffer.tamano === 0 && !vaciando) {
+      try {
+        await publicarGuardada(lectura);
+      } catch (error) {
+        log("lectura no confirmada; se guarda en el buffer", { motivo: (error as Error).message });
+        buffer.agregar(lectura);
       }
       return;
     }
-    if (caido) {
-      caido = false;
-      log("vuelve a conectarse (escenario)");
-      cliente.reconnect();
-      await new Promise<void>((resolver) => cliente.once("connect", () => resolver()));
+    // sin conexión, o con lecturas viejas por salir: se respeta el orden
+    buffer.agregar(lectura);
+    if (cliente.connected) void vaciarBuffer();
+  }
+
+  async function tomarLectura(): Promise<void> {
+    if (maxLecturas !== undefined && seq >= maxLecturas) return;
+    const muestra = op.escenario ? evaluarEscenario(op.escenario, (ahora() - inicio) / 1000) : null;
+    if (muestra) {
+      caidoEscenario = muestra.desconectado;
+      await ajustarConexion();
     }
     const numero = seq++;
     const base = guion
@@ -160,35 +282,33 @@ export async function iniciarNodo(op: OpcionesNodo): Promise<NodoSimulado> {
       ...base,
       ...(muestra?.valores ?? {}),
     });
-    try {
-      await cliente.publishAsync(topico(op.deviceId, "telemetry"), JSON.stringify(payload), {
-        qos: 1,
-      });
-      publicadas++;
-      log("lectura publicada", { seq: payload.seq, ph: payload.ph });
-    } catch (error) {
-      log("lectura no confirmada", { motivo: (error as Error).message });
-    }
-    if (maxLecturas !== undefined && publicadas >= maxLecturas) alTerminar();
+    const { v: _v, ...lectura } = payload;
+    await enviar(lectura as LecturaGuardada);
   }
 
-  await publicarLectura();
-  if (maxLecturas === undefined || publicadas < maxLecturas) {
-    temporizador = setInterval(() => void publicarLectura(), intervaloMs);
+  await tomarLectura();
+  if (maxLecturas === undefined || seq < maxLecturas) {
+    temporizador = setInterval(() => void tomarLectura().catch(() => undefined), intervaloMs);
   }
 
   return {
     cliente,
     publicadas: () => publicadas,
+    enBuffer: () => buffer.tamano,
+    descartadas: () => buffer.descartadas,
+    firmware: () => firmware,
     terminado,
     async detener() {
       if (cerrado) return;
       cerrado = true;
       if (temporizador) clearInterval(temporizador);
+      if (temporizadorReinicio) clearTimeout(temporizadorReinicio);
       // desconexión limpia: el nodo avisa que se va (no se dispara el Last Will)
-      await cliente
-        .publishAsync(topico(op.deviceId, "status"), "offline", { qos: 1, retain: true })
-        .catch(() => undefined);
+      if (cliente.connected) {
+        await cliente
+          .publishAsync(topico(op.deviceId, "status"), "offline", { qos: 1, retain: true })
+          .catch(() => undefined);
+      }
       await cliente.endAsync(false);
     },
   };

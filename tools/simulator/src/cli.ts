@@ -11,6 +11,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
+import { COMPORTAMIENTOS_OTA, type ComportamientoOta } from "./comandos.ts";
 import { type Escenario, leerEscenario } from "./escenarios.ts";
 import { buscarHistoria, HISTORIAS } from "./historias.ts";
 import { iniciarNodo, type NodoSimulado } from "./nodo.ts";
@@ -31,6 +32,13 @@ const { values } = parseArgs({
     intervalo: { type: "string", default: "60" },
     lecturas: { type: "string" },
     "conexiones-por-segundo": { type: "string", default: "25" },
+    firmware: { type: "string" },
+    ota: { type: "string" },
+    "rollback-s": { type: "string" },
+    "reinicio-s": { type: "string" },
+    "sin-descarga": { type: "boolean" },
+    "buffer-max": { type: "string" },
+    "vaciado-por-segundo": { type: "string" },
     ayuda: { type: "boolean", short: "h" },
   },
 });
@@ -39,7 +47,9 @@ if (values.ayuda) {
   console.log(`Uso: simulator [--device-id ID --password PW | --identidades archivo.json [--nodos N]]
                  [--url mqtts://host:8883] [--ca ca.crt] [--intervalo segundos=60] [--lecturas N]
                  [--escenario nombre|ruta.json] [--escenario-nodos N] [--conexiones-por-segundo 25]
-                 [--historia nombre] [--semilla N]
+                 [--historia nombre] [--semilla N] [--firmware 1.0.0]
+                 [--ota exito|rechaza|rollback|ignora] [--reinicio-s 3] [--rollback-s 30] [--sin-descarga]
+                 [--buffer-max N=24 h] [--vaciado-por-segundo 20]
        simulator --historias      (lista las historias de agua con su nivel esperado)`);
   process.exit(0);
 }
@@ -95,6 +105,18 @@ if (values.identidades) {
   credenciales = [{ deviceId, password }];
 }
 
+const comportamientoOta = (values.ota ?? "exito") as ComportamientoOta;
+if (!COMPORTAMIENTOS_OTA.includes(comportamientoOta)) {
+  console.error(`--ota debe ser: ${COMPORTAMIENTOS_OTA.join(", ")}`);
+  process.exit(1);
+}
+const otaOpciones = {
+  comportamiento: comportamientoOta,
+  descargar: !values["sin-descarga"],
+  ...(values["reinicio-s"] ? { reinicioS: Number(values["reinicio-s"]) } : {}),
+  ...(values["rollback-s"] ? { rollbackS: Number(values["rollback-s"]) } : {}),
+};
+
 const varios = credenciales.length > 1;
 const registrar = (deviceId: string) => (mensaje: string, extra?: Record<string, unknown>) => {
   // Con una flota solo se muestran los eventos que importan; una línea por lectura la volvería ilegible.
@@ -122,6 +144,12 @@ for (const [i, c] of credenciales.entries()) {
         ...(escenario && i < escenarioNodos ? { escenario } : {}),
         ...(historia ? { historia } : {}),
         ...(values.semilla ? { semilla: Number(values.semilla) } : {}),
+        ...(values.firmware ? { firmware: values.firmware } : {}),
+        ota: otaOpciones,
+        ...(values["buffer-max"] ? { bufferMax: Number(values["buffer-max"]) } : {}),
+        ...(values["vaciado-por-segundo"]
+          ? { vaciadoPorSegundo: Number(values["vaciado-por-segundo"]) }
+          : {}),
         log: registrar(c.deviceId),
       }),
     );

@@ -62,7 +62,7 @@ docs/decisiones.md
 `main/` tiene cuatro entrypoints (`api`, `ingest`, `worker`, `notifier`); **una sola imagen, cuatro comandos** (`node src/main/<proceso>.ts`). `cli/` tiene los jobs: `migrate`, `mqtt-bootstrap`, `seed`, `fabrica`, `dev-token`.
 
 ## Comandos
-- `pnpm install` · `pnpm dev` (Compose de desarrollo con `--build --watch`) · `pnpm simulator`
+- `pnpm install` · `pnpm dev` (Compose de desarrollo con `--build --watch`) · `pnpm simulator` (flags de H5: `--ota exito|rechaza|rollback|ignora`, `--rollback-s`, `--buffer-max`, `--firmware`)
 - `pnpm web` (PWA en http://127.0.0.1:5173, contra la API de `pnpm dev`; origen permitido por `CORS_ORIGINS`) · `pnpm web:build`. Las pruebas unitarias de `apps/web/src/**` corren con `pnpm test`.
 - `pnpm test:e2e` (Playwright, **necesita el stack de `pnpm dev` arriba**; `E2E_CHANNEL=msedge` usa el Edge instalado, o `pnpm --filter @lympha/web exec playwright install chromium`): proyecto `app` (recorrido completo con el simulador, ~2.5 min) y `pwa` (build de producción con `vite preview`). Un build de producción necesita `VITE_API_URL`, `VITE_FIREBASE_PROJECT_ID` y `VITE_FIREBASE_API_KEY` (ver `apps/web/.env.example`); sin ellas la app dice qué falta.
 - `pnpm test` (unitarias) · `pnpm test:int` (integración, Testcontainers, necesita Docker) · `pnpm test:infra` (deploy.sh y prod.yml)
