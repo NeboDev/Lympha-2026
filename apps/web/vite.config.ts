@@ -1,13 +1,15 @@
+import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 import { VitePWA } from "vite-plugin-pwa";
 
-const COLOR = "#0b57d0";
+const COLOR = "#497be5";
 
 // Puerto 5173: es el origen que CORS_ORIGINS permite por defecto en desarrollo (infra/compose/dev.yml);
 // 4173 es el de `vite preview` (el build con el service worker).
 export default defineConfig({
   plugins: [
+    tailwindcss(),
     react(),
     VitePWA({
       // «prompt»: una versión nueva no recarga la pantalla de golpe (podría haber un formulario a medias);
