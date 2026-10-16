@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./historial/historial.css";
 
 /* Figtree, autoalojada (sin CDN): el .woff2 entra al cascarón que guarda el service worker. Subconjunto latino. */
 @font-face {

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useParams } from "react-router";
 import { useHistorial, useLecturas, useNodo } from "../api/consultas.ts";
 import { mensajeDeError } from "../api/mensajes.ts";
+import { IcoAtras, IcoInfo } from "../componentes/Iconos.tsx";
 import {
   type ClaveParametro,
   formatearValor,
@@ -54,7 +55,9 @@ export function Nodo() {
   if (nodo.isPending) {
     return (
       <main className="pagina">
-        <p role="status">Cargando…</p>
+        <p role="status" className="detalle">
+          Cargando…
+        </p>
       </main>
     );
   }
@@ -62,7 +65,9 @@ export function Nodo() {
     return (
       <main className="pagina">
         <p role="alert">{mensajeDeError(nodo.error)}</p>
-        <Link to="/">Volver al inicio</Link>
+        <Link to="/" className="volver">
+          <IcoAtras tamano={20} /> Volver al inicio
+        </Link>
       </main>
     );
   }
@@ -81,119 +86,153 @@ export function Nodo() {
   };
 
   return (
-    <main className="pagina">
-      <p>
-        {nodo.data.espacio_id ? (
-          <Link to={`/espacios/${nodo.data.espacio_id}`}>← Volver al espacio</Link>
-        ) : (
-          <Link to="/">← Volver al inicio</Link>
-        )}
-      </p>
-      <h1>{nodo.data.nombre ?? "Nodo sin nombre"}</h1>
-      <p className="detalle">Perfil de uso: {nodo.data.perfil_id}</p>
+    <main className="pagina grid gap-6">
+      <Link
+        to={nodo.data.espacio_id ? `/espacios/${nodo.data.espacio_id}` : "/"}
+        className="volver"
+      >
+        <IcoAtras tamano={20} />
+        {nodo.data.espacio_id ? "Volver al espacio" : "Volver al inicio"}
+      </Link>
+      <header className="grid gap-0.5">
+        <h1 className="m-0">{nodo.data.nombre ?? "Nodo sin nombre"}</h1>
+        <p className="detalle m-0">Perfil de uso: {nodo.data.perfil_id}</p>
+      </header>
 
       <AvisoFlujo flujo={flujo} />
-      {vista && <TarjetaNodo nodo={vista} ahora={ahora} conEnlace={false} />}
+      {vista && <TarjetaNodo nodo={vista} ahora={ahora} conEnlace={false} grande />}
 
-      <h2>Historial</h2>
-      <div className="selector" role="group" aria-label="Periodo del historial">
-        {([7, 30] as const).map((n) => (
-          <button
-            key={n}
-            type="button"
-            className={dias === n ? "" : "secundario"}
-            aria-pressed={dias === n}
-            onClick={() => {
-              setDias(n);
-              setElegido(null);
-            }}
-          >
-            {n} días
-          </button>
-        ))}
-      </div>
-      {historial.isPending && <p role="status">Cargando el historial…</p>}
-      {historial.isError && <p role="alert">{mensajeDeError(historial.error)}</p>}
-      {historial.data && (
-        <>
-          {historial.data.historial.length === 0 && <p>Todavía no hay datos de este periodo.</p>}
-          <TiraDias celdas={celdas} elegido={celdaElegida?.dia ?? null} alElegir={setElegido} />
-          {celdaElegida && <PanelDia celda={celdaElegida} />}
-        </>
-      )}
-
-      <h2>Valores y gráficas</h2>
-      <label className="interruptor">
-        <input
-          type="checkbox"
-          checked={avanzado}
-          onChange={(e) => cambiarAvanzado(e.target.checked)}
-        />
-        Modo avanzado
-      </label>
-
-      {avanzado && (
-        <>
-          <h3>Valores más recientes</h3>
-          <dl className="valores">
-            {PARAMETROS.map((p) => (
-              <div key={p.clave}>
-                <dt>{p.nombre}</dt>
-                <dd>{formatearValor(p, vista?.valores?.[p.clave])}</dd>
-              </div>
-            ))}
-          </dl>
-          {vista?.ultimaLecturaEn && (
-            <p className="detalle">Última lectura {haceCuanto(vista.ultimaLecturaEn, ahora)}.</p>
-          )}
-          {vista && vista.wqi !== null && (
-            <p className="detalle">
-              Índice de calidad en la última evaluación: {Math.round(vista.wqi)} de 100. El nivel
-              del semáforo solo cambia tras varias lecturas seguidas, así que puede ir por detrás de
-              este número.
-            </p>
-          )}
-
-          <div className="selector" role="group" aria-label="Parámetro de las gráficas">
-            {PARAMETROS.map((p) => (
+      <section className="tarjeta grid gap-4 p-5" aria-labelledby="h-historial">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 id="h-historial" className="m-0">
+            Historial
+          </h2>
+          <div className="selector seg" role="group" aria-label="Periodo del historial">
+            {([7, 30] as const).map((n) => (
               <button
-                key={p.clave}
+                key={n}
                 type="button"
-                className={clave === p.clave ? "" : "secundario"}
-                aria-pressed={clave === p.clave}
-                onClick={() => setClave(p.clave)}
+                aria-pressed={dias === n}
+                onClick={() => {
+                  setDias(n);
+                  setElegido(null);
+                }}
               >
-                {p.nombre.replace(" (TDS)", "")}
+                {n} días
               </button>
             ))}
           </div>
+        </div>
+        {historial.isPending && (
+          <p role="status" className="detalle m-0">
+            Cargando el historial…
+          </p>
+        )}
+        {historial.isError && <p role="alert">{mensajeDeError(historial.error)}</p>}
+        {historial.data && (
+          <>
+            {historial.data.historial.length === 0 && (
+              <p className="m-0">Todavía no hay datos de este periodo.</p>
+            )}
+            <TiraDias celdas={celdas} elegido={celdaElegida?.dia ?? null} alElegir={setElegido} />
+            {celdaElegida && <PanelDia celda={celdaElegida} />}
+          </>
+        )}
+      </section>
 
-          {lecturas.isPending && <p role="status">Cargando las lecturas…</p>}
-          {lecturas.isError && <p role="alert">{mensajeDeError(lecturas.error)}</p>}
-          {lecturas.data && (
-            <GraficaLinea
-              titulo={`${parametro.nombre}: últimas ${lecturas.data.lecturas.length} lecturas`}
-              parametro={parametro}
-              formatoX={horaCorta}
-              puntos={[...lecturas.data.lecturas].reverse().map((l) => ({
-                x: Date.parse(l.ts),
-                y: l[clave],
-              }))}
+      <section className="tarjeta grid gap-4 p-5" aria-labelledby="h-valores">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 id="h-valores" className="m-0">
+              Valores y gráficas
+            </h2>
+            <p className="detalle m-0">Los números y las curvas de cada parámetro.</p>
+          </div>
+          <label className="interruptor">
+            <input
+              type="checkbox"
+              checked={avanzado}
+              onChange={(e) => cambiarAvanzado(e.target.checked)}
             />
-          )}
-          {historial.data && (
-            <GraficaLinea
-              titulo={`${parametro.nombre}: promedio diario de ${dias} días`}
-              parametro={parametro}
-              formatoX={(x) => etiquetaCorta(new Date(x).toISOString().slice(0, 10))}
-              puntos={celdas.map((c) => ({
-                x: Date.parse(`${c.dia}T12:00:00Z`),
-                y: c.datos?.promedios?.[clave] ?? null,
-              }))}
-            />
-          )}
-        </>
-      )}
+            Modo avanzado
+          </label>
+        </div>
+
+        {avanzado && (
+          <>
+            <h3 className="m-0">Valores más recientes</h3>
+            <dl className="valores">
+              {PARAMETROS.map((p) => (
+                <div key={p.clave}>
+                  <dt>{p.nombre}</dt>
+                  <dd>{formatearValor(p, vista?.valores?.[p.clave])}</dd>
+                </div>
+              ))}
+            </dl>
+            {vista?.ultimaLecturaEn && (
+              <p className="detalle m-0">
+                Última lectura {haceCuanto(vista.ultimaLecturaEn, ahora)}.
+              </p>
+            )}
+            {vista && vista.wqi !== null && (
+              <p className="m-0 flex items-start gap-2 rounded-ctl bg-surface-2 p-3 text-sm">
+                <IcoInfo tamano={16} className="mt-0.5 shrink-0" />
+                <span>
+                  Índice de calidad en la última evaluación: {Math.round(vista.wqi)} de 100. El
+                  nivel del semáforo solo cambia tras varias lecturas seguidas, así que puede ir por
+                  detrás de este número.
+                </span>
+              </p>
+            )}
+
+            <div
+              className="selector seg flex-wrap"
+              role="group"
+              aria-label="Parámetro de las gráficas"
+            >
+              {PARAMETROS.map((p) => (
+                <button
+                  key={p.clave}
+                  type="button"
+                  aria-pressed={clave === p.clave}
+                  onClick={() => setClave(p.clave)}
+                >
+                  {p.nombre.replace(" (TDS)", "")}
+                </button>
+              ))}
+            </div>
+
+            {lecturas.isPending && (
+              <p role="status" className="detalle m-0">
+                Cargando las lecturas…
+              </p>
+            )}
+            {lecturas.isError && <p role="alert">{mensajeDeError(lecturas.error)}</p>}
+            {lecturas.data && (
+              <GraficaLinea
+                titulo={`${parametro.nombre}: últimas ${lecturas.data.lecturas.length} lecturas`}
+                parametro={parametro}
+                formatoX={horaCorta}
+                puntos={[...lecturas.data.lecturas].reverse().map((l) => ({
+                  x: Date.parse(l.ts),
+                  y: l[clave],
+                }))}
+              />
+            )}
+            {historial.data && (
+              <GraficaLinea
+                titulo={`${parametro.nombre}: promedio diario de ${dias} días`}
+                parametro={parametro}
+                formatoX={(x) => etiquetaCorta(new Date(x).toISOString().slice(0, 10))}
+                puntos={celdas.map((c) => ({
+                  x: Date.parse(`${c.dia}T12:00:00Z`),
+                  y: c.datos?.promedios?.[clave] ?? null,
+                }))}
+              />
+            )}
+          </>
+        )}
+      </section>
     </main>
   );
 }

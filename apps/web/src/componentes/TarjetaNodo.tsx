@@ -3,7 +3,7 @@ import { Link } from "react-router";
 import type { EstadoVisible, NodoVista } from "../espacios/estado.ts";
 import { haceCuanto, horaYDia } from "../espacios/tiempo.ts";
 import { Anillo, Insignia } from "./estados.tsx";
-import { IcoReloj } from "./Iconos.tsx";
+import { IcoFoco, IcoReloj } from "./Iconos.tsx";
 
 /** Texto y símbolo de cada estado: el color nunca es lo único que lo distingue (accesibilidad). */
 const ESTADOS: Record<EstadoVisible, { etiqueta: string; simbolo: string }> = {
@@ -36,11 +36,14 @@ export function TarjetaNodo({
   nodo,
   ahora,
   conEnlace = true,
+  grande = false,
 }: {
   nodo: NodoVista;
   ahora: number;
   /** El nombre lleva al detalle del nodo (no en el propio detalle). */
   conEnlace?: boolean;
+  /** Versión del detalle del nodo: anillo grande y la acción como bloque «Qué hacer». */
+  grande?: boolean;
 }) {
   const { etiqueta } = ESTADOS[nodo.visible];
   const parametro = nodo.parametroLimitante
@@ -52,10 +55,12 @@ export function TarjetaNodo({
       className={`nodo nivel-${nodo.visible} relative flex gap-4 rounded-card border border-line p-4 shadow-1 transition-shadow duration-200 hover:shadow-2`}
       aria-label={nodo.nombre ?? "Nodo sin nombre"}
     >
-      <Anillo estado={nodo.visible} />
+      <Anillo estado={nodo.visible} tamano={grande ? 112 : 76} />
       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
         <div className="flex items-start justify-between gap-2">
-          <h3 className="m-0 min-w-0 text-sm font-semibold text-text-2">
+          <h3
+            className={`m-0 min-w-0 font-semibold text-text-2 ${grande ? "text-base" : "text-sm"}`}
+          >
             {conEnlace ? (
               <Link
                 to={`/nodos/${nodo.id}`}
@@ -77,11 +82,22 @@ export function TarjetaNodo({
         </div>
 
         {nodo.visible !== "sin_conexion" && nodo.causa && (
-          <p className="causa m-0 text-lg leading-snug font-bold">{nodo.causa}</p>
+          <p className={`causa m-0 leading-snug font-bold ${grande ? "text-xl" : "text-lg"}`}>
+            {nodo.causa}
+          </p>
         )}
-        {nodo.visible !== "sin_conexion" && nodo.accion && (
-          <p className="accion m-0 text-sm font-semibold">{nodo.accion}</p>
-        )}
+        {nodo.visible !== "sin_conexion" &&
+          nodo.accion &&
+          (grande ? (
+            <div className="mt-1 rounded-ctl border border-line bg-surface/70 p-3">
+              <p className="m-0 mb-1 inline-flex items-center gap-1.5 text-sm font-bold text-text-2">
+                <IcoFoco tamano={16} /> Qué hacer
+              </p>
+              <p className="accion m-0 font-semibold">{nodo.accion}</p>
+            </div>
+          ) : (
+            <p className="accion m-0 text-sm font-semibold">{nodo.accion}</p>
+          ))}
         {nodo.visible === "sin_conexion" && (
           <p className="detalle m-0">
             {nodo.sinDatosDesde
