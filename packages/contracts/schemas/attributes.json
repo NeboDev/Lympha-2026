@@ -1,0 +1,29 @@
+{
+  "type": "object",
+  "properties": {
+    "v": {
+      "type": "number",
+      "const": 1
+    },
+    "fw": {
+      "type": "string",
+      "maxLength": 32
+    },
+    "rssi": {
+      "type": "integer"
+    },
+    "buffered": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "cal": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "number"
+      }
+    }
+  },
+  "required": ["v", "fw"],
+  "additionalProperties": false,
+  "$schema": "http://json-schema.org/draft-07/schema#"
+}
