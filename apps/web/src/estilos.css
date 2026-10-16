@@ -492,3 +492,33 @@
     background: var(--surface-2);
   }
 }
+
+@layer components {
+  a.volver {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    min-height: 44px;
+    width: fit-content;
+    font-weight: 700;
+    text-decoration: none;
+    color: var(--brand-text);
+  }
+  a.volver:hover {
+    text-decoration: underline;
+  }
+  .codigo {
+    font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .escaner video {
+    width: 100%;
+    border-radius: var(--radius-card);
+    background: #000;
+  }
+  .escaner {
+    display: grid;
+    gap: 0.75rem;
+  }
+}

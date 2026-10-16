@@ -2,6 +2,7 @@ import { type FormEvent, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { useAccionesEspacio } from "../api/consultas.ts";
 import { mensajeDeError } from "../api/mensajes.ts";
+import { IcoAtras, IcoCamara } from "../componentes/Iconos.tsx";
 import { interpretarReclamo } from "../nodos/codigo-qr.ts";
 import { EscanerQr, escaneoDisponible } from "../nodos/EscanerQr.tsx";
 
@@ -48,25 +49,29 @@ export function Reclamar() {
   }
 
   return (
-    <main className="pagina acceso">
-      <p>
-        <Link to={`/espacios/${espacioId}`}>← Volver al espacio</Link>
-      </p>
-      <h1>Reclamar un nodo</h1>
-      <p>Usa la etiqueta del nodo: escanea su QR o escribe el identificador y el código.</p>
+    <main className="pagina grid max-w-xl gap-5">
+      <Link to={`/espacios/${espacioId}`} className="volver">
+        <IcoAtras tamano={20} /> Volver al espacio
+      </Link>
+      <header className="grid gap-1">
+        <h1 className="m-0">Reclamar un nodo</h1>
+        <p className="m-0 text-text-2">
+          Usa la etiqueta del nodo: escanea su QR o escribe el identificador y el código.
+        </p>
+      </header>
 
       {escaneando ? (
         <EscanerQr alLeer={alLeerQr} alCerrar={() => setEscaneando(false)} />
       ) : (
         escaneoDisponible() && (
-          <button type="button" onClick={() => setEscaneando(true)}>
-            Escanear el QR
+          <button type="button" className="justify-self-start" onClick={() => setEscaneando(true)}>
+            <IcoCamara tamano={20} /> Escanear el QR
           </button>
         )
       )}
       {aviso && <p role="alert">{aviso}</p>}
 
-      <form onSubmit={enviar}>
+      <form onSubmit={enviar} className="tarjeta m-0 p-5">
         <label>
           Identificador del nodo
           <input
