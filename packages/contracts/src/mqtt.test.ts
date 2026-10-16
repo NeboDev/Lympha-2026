@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parsearTopico, telemetria, topico } from "./mqtt.ts";
+import { ackComandoV1, comandoV1, configV1, parsearTopico, telemetria, topico } from "./mqtt.ts";
 
 const ID = "0192f3a7-5d1c-7a2b-8c3d-0123456789ab";
 
@@ -46,5 +46,50 @@ describe("tópicos", () => {
     expect(parsearTopico("lympha/v1/d/no-es-uuid/telemetry")).toBeNull();
     expect(parsearTopico(`lympha/v1/d/${ID}/desconocido`)).toBeNull();
     expect(parsearTopico(`lympha/v1/d/${ID}`)).toBeNull();
+  });
+});
+
+describe("comandos, ack y config", () => {
+  const sha = "a".repeat(64);
+
+  it("acepta reboot y ota", () => {
+    expect(comandoV1.safeParse({ v: 1, id: "c1", op: "reboot" }).success).toBe(true);
+    expect(
+      comandoV1.safeParse({
+        v: 1,
+        id: "c2",
+        op: "ota",
+        url: "http://192.168.1.50:8080/fw/1.1.0.bin",
+        sha256: sha,
+        version: "1.1.0",
+      }).success,
+    ).toBe(true);
+  });
+
+  it("rechaza ota sin hash válido, ops desconocidas y campos extra", () => {
+    const ota = { v: 1, id: "c2", op: "ota", url: "http://x.test/f.bin", version: "1.1.0" };
+    expect(comandoV1.safeParse({ ...ota, sha256: "xyz" }).success).toBe(false);
+    expect(comandoV1.safeParse({ v: 1, id: "c3", op: "formatear" }).success).toBe(false);
+    expect(comandoV1.safeParse({ v: 1, id: "c1", op: "reboot", extra: 1 }).success).toBe(false);
+  });
+
+  it("valida el ack", () => {
+    expect(
+      ackComandoV1.safeParse({ v: 1, id: "c1", ok: true, detail: "reiniciando" }).success,
+    ).toBe(true);
+    expect(ackComandoV1.safeParse({ v: 1, id: "c1" }).success).toBe(false);
+  });
+
+  it("valida la configuración y rechaza intervalos absurdos y parámetros desconocidos", () => {
+    const cfg = {
+      v: 1,
+      intervalo_s: 60,
+      led: { umbrales: { ph: { buena: { min: 6.5, max: 8.5 }, regular: { min: 6, max: 9 } } } },
+    };
+    expect(configV1.safeParse(cfg).success).toBe(true);
+    expect(configV1.safeParse({ ...cfg, intervalo_s: 1 }).success).toBe(false);
+    expect(
+      configV1.safeParse({ v: 1, intervalo_s: 60, led: { umbrales: { cloro: {} } } }).success,
+    ).toBe(false);
   });
 });
