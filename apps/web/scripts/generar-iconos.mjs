@@ -10,7 +10,7 @@ import { deflateSync } from "node:zlib";
 const PUBLICO = join(dirname(fileURLToPath(import.meta.url)), "..", "public");
 mkdirSync(PUBLICO, { recursive: true });
 
-const FONDO = [11, 87, 208]; // #0b57d0
+const FONDO = [65, 111, 219]; // #416fdb (botones de marca)
 const GOTA = [255, 255, 255];
 const SUPERMUESTREO = 4;
 
@@ -122,7 +122,7 @@ for (const [nombre, n, opciones] of iconos) {
 writeFileSync(
   join(PUBLICO, "favicon.svg"),
   `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect width="64" height="64" rx="14" fill="#0b57d0"/>
+  <rect width="64" height="64" rx="14" fill="#416fdb"/>
   <path d="M32 9 C32 9 17.5 26 17.5 38 a14.5 14.5 0 0 0 29 0 C46.5 26 32 9 32 9 Z" fill="#fff"/>
 </svg>
 `,

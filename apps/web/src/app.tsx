@@ -24,7 +24,7 @@ export function App() {
     return (
       <main className="pagina">
         <h1>Lympha</h1>
-        <p role="alert">
+        <p role="alert" className="tarjeta p-5">
           La aplicación no está configurada. Faltan estas variables al construirla:{" "}
           {PROBLEMAS_CONFIG.join(", ")}.
         </p>

@@ -27,7 +27,12 @@ export function useSesion(): AlmacenSesion & { estado: EstadoSesion } {
 export function RutaProtegida() {
   const { estado } = useSesion();
   const ubicacion = useLocation();
-  if (estado.tipo === "cargando") return <p className="pagina">Cargando…</p>;
+  if (estado.tipo === "cargando")
+    return (
+      <p role="status" className="pagina detalle">
+        Cargando…
+      </p>
+    );
   if (estado.tipo === "fuera") {
     return (
       <Navigate
