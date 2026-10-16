@@ -435,3 +435,27 @@
   white-space: nowrap;
   border: 0;
 }
+
+/* Página: columna centrada; deja espacio abajo para las pestañas del teléfono. */
+@layer components {
+  .pagina {
+    width: 100%;
+    max-width: 48rem;
+    margin: 0 auto;
+    padding: 1.5rem 1rem 1rem;
+    display: block;
+  }
+  @media (min-width: 1024px) {
+    .pagina {
+      max-width: 64rem;
+      padding: 2.5rem 2rem 1.5rem;
+    }
+  }
+  .pagina > * + * {
+    margin-top: 1rem;
+  }
+  .pagina > h2,
+  .pagina > section > h2 {
+    margin-top: 2rem;
+  }
+}
