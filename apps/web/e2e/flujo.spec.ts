@@ -65,6 +65,7 @@ test.describe
       await ana
         .getByLabel("Identificador del nodo")
         .fill(`lympha://reclamar?n=${nodo.deviceId}&c=${nodo.codigo}`);
+      await ana.getByRole("button", { name: "Continuar" }).click(); // paso 2: el nombre
       await ana.getByLabel("Nombre del nodo").fill(NOMBRE_NODO);
       await ana.getByRole("button", { name: "Reclamar nodo" }).click();
 
@@ -84,6 +85,7 @@ test.describe
         await otra.getByRole("link", { name: "Reclamar un nodo" }).click();
         // el nodo ya es de Ana: reclamarlo con su código real tampoco funciona para otra persona
         await otra.getByLabel("Identificador del nodo").fill(`${nodo.deviceId} ${nodo.codigo}`);
+        await otra.getByRole("button", { name: "Continuar" }).click();
         await otra.getByRole("button", { name: "Reclamar nodo" }).click();
         await expect(otra.getByRole("alert")).toContainText("No pudimos reclamar ese nodo");
         await expect(otra).toHaveURL(/\/reclamar$/);

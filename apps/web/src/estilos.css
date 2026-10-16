@@ -523,3 +523,108 @@
     gap: 0.75rem;
   }
 }
+
+@layer components {
+  /* Visor del escáner: marco con esquinas; la línea solo se anima con la cámara encendida. */
+  .visor {
+    position: relative;
+    display: grid;
+    place-items: center;
+    aspect-ratio: 4 / 3;
+    overflow: hidden;
+    border-radius: var(--radius-card);
+    border: 1px solid var(--line);
+    background: var(--surface-2);
+  }
+  .visor .escaner {
+    position: absolute;
+    inset: 0;
+    display: block;
+  }
+  .visor .escaner video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 0;
+  }
+  .visor .escaner button {
+    position: absolute;
+    bottom: 0.75rem;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+  .visor .esquina {
+    position: absolute;
+    width: 34px;
+    height: 34px;
+    border: 4px solid var(--brand);
+    pointer-events: none;
+  }
+  .visor .tl {
+    top: 14px;
+    left: 14px;
+    border-right: 0;
+    border-bottom: 0;
+    border-top-left-radius: 12px;
+  }
+  .visor .tr {
+    top: 14px;
+    right: 14px;
+    border-left: 0;
+    border-bottom: 0;
+    border-top-right-radius: 12px;
+  }
+  .visor .bl {
+    bottom: 14px;
+    left: 14px;
+    border-right: 0;
+    border-top: 0;
+    border-bottom-left-radius: 12px;
+  }
+  .visor .br {
+    bottom: 14px;
+    right: 14px;
+    border-left: 0;
+    border-top: 0;
+    border-bottom-right-radius: 12px;
+  }
+  .visor .linea {
+    position: absolute;
+    left: 14%;
+    right: 14%;
+    height: 3px;
+    border-radius: 3px;
+    background: var(--brand);
+    box-shadow: 0 0 12px var(--brand);
+    animation: barrido 2.2s ease-in-out infinite alternate;
+  }
+  @keyframes barrido {
+    from {
+      top: 18%;
+    }
+    to {
+      top: 80%;
+    }
+  }
+
+  /* Chip de sugerencia / opción alternable */
+  button.pill {
+    min-height: 44px;
+    padding: 0 1rem;
+    border-radius: 999px;
+    border: 1.5px solid var(--line-strong);
+    background: var(--surface);
+    color: var(--text);
+    font-size: 0.9rem;
+    font-weight: 600;
+    box-shadow: none;
+  }
+  button.pill:hover:not(:disabled) {
+    background: var(--surface-2);
+  }
+  button.pill[aria-pressed="true"] {
+    background: var(--brand-fill);
+    border-color: var(--brand-fill);
+    color: #fff;
+  }
+}
