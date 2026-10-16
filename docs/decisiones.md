@@ -181,3 +181,16 @@ Cambio de plan: no habrá VPS hasta el inicio de H5. Todo se desarrolla y prueba
 - **El WQI numérico no entra a las tarjetas.** El anillo muestra el símbolo del nivel, no el número: el nivel sigue la histéresis y el número puede ir por delante. El número sigue solo en el modo avanzado del detalle (pendiente 9 de H4).
 - **Historial de 30 días como mosaico de siete columnas,** no como barras estrechas: cada día mide al menos 44 px de lado; las barras (altura = índice promedio del día) se usan en los 7 días.
 - **E2E:** se conservaron las clases `.alerta`, `.tira .dia` y `form.preferencia` como ganchos.
+
+## H5
+
+Plan y decisiones de arranque. Se completa conforme avance el hito.
+
+- **Sin VPS: H5 se valida en local.** El Compose local de la PC hace de staging. Los ESP32 se conectan por Wi-Fi al Mosquitto de la PC: IP fija (reserva DHCP en el router) y certificado del broker reemitido con `CERT_SANS=IP:<ip> pnpm certs`. El `ca.crt` actual se conserva y es el que se graba en los nodos; reemitir el certificado del broker no obliga a regrabarlos. El OTA lo sirve la PC dentro de la LAN. Telegram usa long polling y Firebase el emulador o `lympha-dev`.
+- **Riesgo pendiente: validar contra un VPS real se mueve a H6, antes de la beta.** `deploy-staging.yml`, `deploy-prod.yml`, `deploy.sh`, `setup.sh`, `cert-sync.sh` y `vm.sh` siguen escritos pero no probados contra un servidor real (Multipass no está instalado). No son bloqueo de H5. Tampoco se ha probado en un servidor real el certificado de Caddy para MQTT ni el OTA por HTTPS público (URL prefirmada de S3 del plan): en H5 el OTA va por HTTP(S) dentro de la LAN.
+- **Limitación del criterio de salida.** «5 personas instalan en menos de 5 min» solo se puede probar en la red local del dueño del proyecto (router, WiFi y teléfonos conocidos); no mide el comportamiento con redes domésticas distintas.
+- **`main` estaba atrasada.** Al abrir H5 el checkout estaba en `main` (H2) y `dev` ya traía H3 y H4. H5 parte de `dev` (política de ramas).
+- **Firmware en repo aparte `lympha-firmware`,** junto a `LymphaIoT` (acordado). Aquí solo viven el contrato (`packages/contracts`), la fábrica, el servidor del OTA y el simulador.
+- **Brechas del servidor detectadas al empezar:** el contrato tiene Zod para `telemetry`, `attributes` y `status`, pero `cmd`, `cmd/ack` y `config` no tienen esquema de payload; no hay publicador de `cmd`, registro de versiones ni despliegue gradual. Cambiar el contrato requiere aprobación del dueño del proyecto antes de escribirse.
+- **Pregunta abierta (RF-25):** el LED local necesita el nivel sin internet; falta decidir entre portar un WQI simplificado a C o recibir umbrales precalculados por `config`.
+- **Lo que no se puede verificar sin hardware real:** sensores y calibración, desgaste de LittleFS y buffer de 24 h, portal cautivo en iOS/Android, TLS y WiFi reales, rollback del bootloader y el 7 días con 5 nodos. Secure boot y flash encryption queman eFuses: no se activan en desarrollo, solo en una placa sacrificable. Hasta tener hardware, lo del firmware se reporta como «compila y pasa pruebas en host», no como «funciona».
