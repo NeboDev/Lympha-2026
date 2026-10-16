@@ -454,8 +454,41 @@
   .pagina > * + * {
     margin-top: 1rem;
   }
-  .pagina > h2,
-  .pagina > section > h2 {
-    margin-top: 2rem;
+}
+
+@layer components {
+  /* Tarjeta de nodo: un tinte suave del color de su estado; el estado en sí va en el anillo, el chip y las palabras. */
+  .nodo {
+    background: linear-gradient(180deg, var(--tinte, var(--surface)), var(--surface) 80%);
+  }
+  .nodo.nivel-critica,
+  .nodo.nivel-mala {
+    border-color: color-mix(in srgb, var(--fondo) 50%, var(--line));
+  }
+  .rejilla {
+    display: grid;
+    gap: 0.75rem;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 19rem), 1fr));
+  }
+}
+
+@layer components {
+  /* Enlace con aspecto de botón secundario (solo para <a>; los <button> usan .secundario). */
+  a.boton-secundario {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 44px;
+    padding: 0 1rem;
+    border-radius: 14px;
+    border: 1.5px solid var(--line-strong);
+    background: var(--surface);
+    color: var(--text);
+    font-weight: 700;
+    font-size: 0.95rem;
+    text-decoration: none;
+  }
+  a.boton-secundario:hover {
+    background: var(--surface-2);
   }
 }

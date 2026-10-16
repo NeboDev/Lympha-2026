@@ -2,6 +2,8 @@ import type { NivelApi } from "@lympha/contracts";
 import { Link } from "react-router";
 import type { EstadoVisible, NodoVista } from "../espacios/estado.ts";
 import { haceCuanto, horaYDia } from "../espacios/tiempo.ts";
+import { Anillo, Insignia } from "./estados.tsx";
+import { IcoReloj } from "./Iconos.tsx";
 
 /** Texto y símbolo de cada estado: el color nunca es lo único que lo distingue (accesibilidad). */
 const ESTADOS: Record<EstadoVisible, { etiqueta: string; simbolo: string }> = {
@@ -40,43 +42,62 @@ export function TarjetaNodo({
   /** El nombre lleva al detalle del nodo (no en el propio detalle). */
   conEnlace?: boolean;
 }) {
-  const { etiqueta, simbolo } = ESTADOS[nodo.visible];
+  const { etiqueta } = ESTADOS[nodo.visible];
   const parametro = nodo.parametroLimitante
     ? (NOMBRES_PARAMETRO[nodo.parametroLimitante] ?? nodo.parametroLimitante)
     : null;
 
   return (
-    <article className={`nodo nivel-${nodo.visible}`} aria-label={nodo.nombre ?? "Nodo sin nombre"}>
-      <h3>
-        {conEnlace ? (
-          <Link to={`/nodos/${nodo.id}`}>{nodo.nombre ?? "Nodo sin nombre"}</Link>
-        ) : (
-          (nodo.nombre ?? "Nodo sin nombre")
-        )}
-      </h3>
-      <p className="semaforo">
-        <span className="insignia">
-          <span aria-hidden="true">{simbolo}</span> {etiqueta}
-        </span>
-      </p>
+    <article
+      className={`nodo nivel-${nodo.visible} relative flex gap-4 rounded-card border border-line p-4 shadow-1 transition-shadow duration-200 hover:shadow-2`}
+      aria-label={nodo.nombre ?? "Nodo sin nombre"}
+    >
+      <Anillo estado={nodo.visible} />
+      <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+        <div className="flex items-start justify-between gap-2">
+          <h3 className="m-0 min-w-0 text-sm font-semibold text-text-2">
+            {conEnlace ? (
+              <Link
+                to={`/nodos/${nodo.id}`}
+                className="text-inherit no-underline after:absolute after:inset-0 after:rounded-card hover:underline"
+              >
+                {nodo.nombre ?? "Nodo sin nombre"}
+              </Link>
+            ) : (
+              (nodo.nombre ?? "Nodo sin nombre")
+            )}
+          </h3>
+          {nodo.visible !== "sin_conexion" && nodo.ultimaLecturaEn && (
+            <p className="m-0 inline-flex shrink-0 items-center gap-1 text-xs text-text-2 tabular-nums">
+              <IcoReloj tamano={13} />
+              <span className="sr-only">Última lectura </span>
+              <span>{haceCuanto(nodo.ultimaLecturaEn, ahora)}</span>
+            </p>
+          )}
+        </div>
 
-      {nodo.visible === "sin_conexion" && (
-        <p className="detalle">
-          {nodo.sinDatosDesde
-            ? `Sin datos desde ${horaYDia(nodo.sinDatosDesde, ahora)}`
-            : "Todavía no ha mandado datos."}
+        {nodo.visible !== "sin_conexion" && nodo.causa && (
+          <p className="causa m-0 text-lg leading-snug font-bold">{nodo.causa}</p>
+        )}
+        {nodo.visible !== "sin_conexion" && nodo.accion && (
+          <p className="accion m-0 text-sm font-semibold">{nodo.accion}</p>
+        )}
+        {nodo.visible === "sin_conexion" && (
+          <p className="detalle m-0">
+            {nodo.sinDatosDesde
+              ? `Sin datos desde ${horaYDia(nodo.sinDatosDesde, ahora)}`
+              : "Todavía no ha mandado datos."}
+          </p>
+        )}
+        {nodo.sensorPorRevisar && nodo.visible !== "revisar" && (
+          <p className="detalle m-0">
+            Revisa el sensor{parametro ? ` de ${parametro}` : ""}: puede estar fallando.
+          </p>
+        )}
+        <p className="semaforo m-0 mt-1">
+          <Insignia estado={nodo.visible} texto={etiqueta} />
         </p>
-      )}
-      {nodo.visible !== "sin_conexion" && nodo.causa && <p className="causa">{nodo.causa}</p>}
-      {nodo.visible !== "sin_conexion" && nodo.accion && <p className="accion">{nodo.accion}</p>}
-      {nodo.sensorPorRevisar && nodo.visible !== "revisar" && (
-        <p className="detalle">
-          Revisa el sensor{parametro ? ` de ${parametro}` : ""}: puede estar fallando.
-        </p>
-      )}
-      {nodo.visible !== "sin_conexion" && nodo.ultimaLecturaEn && (
-        <p className="detalle">Última lectura {haceCuanto(nodo.ultimaLecturaEn, ahora)}</p>
-      )}
+      </div>
     </article>
   );
 }
