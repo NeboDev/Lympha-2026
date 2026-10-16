@@ -1,9 +1,10 @@
-// CLI de fábrica (H1: sin grabado; el grabado con esptool y la etiqueta son de H5).
+// CLI de fábrica (H1: lotes; H5: imágenes de identidad, etiquetas y grabado).
 //
 //   pnpm factory lote --cantidad 20 --version-hw v1 [--notas "lote piloto"] [--salida tools/factory/lotes]
 //   pnpm factory lote --cantidad 100 --version-hw sim --dev     # solo APP_ENV=local: nodos ya reclamados por el espacio de desarrollo
 //   pnpm factory revocar-nodo <deviceId>
 //   pnpm factory revocar-lote <loteId>
+//   pnpm factory imagenes|etiquetas|grabar|diagnostico ...   (ver fabrica-grabado.ts)
 //
 // Cada lote escribe dos archivos en <salida>/<loteId>/:
 //   manifiesto.json   lote, fecha, cantidad, versión de hardware y los deviceId. NO contiene secretos.
@@ -19,8 +20,20 @@ import { cargarConfigOSalir } from "../platform/config.ts";
 import { ClienteDynsec } from "../platform/dynsec.ts";
 import { crearLogger } from "../platform/logger.ts";
 import { cerrarCliente, crearClienteMqtt, esperarConexion } from "../platform/mqtt.ts";
+import { COMANDOS_GRABADO, ejecutarGrabado } from "./fabrica-grabado.ts";
 
 const [comando, ...resto] = process.argv.slice(2);
+
+if (comando && COMANDOS_GRABADO.includes(comando)) {
+  try {
+    await ejecutarGrabado(comando, resto);
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : error);
+    process.exit(1);
+  }
+  process.exit(0);
+}
+
 const { values, positionals } = parseArgs({
   args: resto,
   allowPositionals: true,

@@ -68,7 +68,7 @@ docs/decisiones.md
 - `pnpm test` (unitarias) · `pnpm test:int` (integración, Testcontainers, necesita Docker) · `pnpm test:infra` (deploy.sh y prod.yml)
 - `pnpm lint` / `pnpm lint:fix` (Biome) · `pnpm typecheck`
 - `pnpm --filter @lympha/wqi fixtures` regenera `packages/wqi/fixtures/cisterna.json` (solo al subir la versión del perfil; revisar el diff) · `pnpm simulator --historias` lista las historias
-- `pnpm migrate` · `pnpm db:seed` · `pnpm factory lote --cantidad N [--dev]` · `pnpm dev:token correo` · `pnpm certs` (`CERT_SANS=IP:...`)
+- `pnpm migrate` · `pnpm db:seed` · `pnpm factory lote --cantidad N [--dev]` · `pnpm factory imagenes|etiquetas|grabar` (ver `tools/factory/README.md`) · `pnpm dev:token correo` · `pnpm certs` (`CERT_SANS=IP:...`)
 - `bash infra/test/carga-local.sh --nodos 100 --duracion 5m` (prueba de carga con reinicios forzados; informe en `infra/test/resultados/`)
 - `infra/staging-local/vm.sh crear|desplegar|rollback|ssh|destruir` (VM de Multipass)
 - Desde el host contra el stack de desarrollo: `node --env-file=infra/compose/dev.env --env-file=infra/compose/host.env apps/server/src/cli/<job>.ts` (`host.env` cambia los nombres internos por 127.0.0.1)

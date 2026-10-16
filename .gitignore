@@ -14,3 +14,4 @@ infra/test/salida-carga/
 
 apps/web/test-results/
 apps/web/playwright-report/
+tools/factory/.venv/
