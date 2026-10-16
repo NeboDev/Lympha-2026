@@ -210,6 +210,29 @@ const esquemas = {
     MQTT_ADMIN_PASSWORD: secreto,
     CLAIM_PEPPER: secreto,
   }),
+  /** CLI del OTA: versiones y despliegues (rol lympha_owner) y comandos a los nodos como `lympha-control`. */
+  ota: comun
+    .extend({
+      DATABASE_URL_MIGRATE: urlPostgres,
+      MQTT_URL: urlMqtt,
+      MQTT_CA_FILE: archivoCa,
+      MQTT_CONTROL_USER: z.string().min(1),
+      MQTT_CONTROL_PASSWORD: secreto,
+      /** Carpeta de los binarios (`lympha-<versión>.bin`). */
+      OTA_DIR: z.string().min(1).default("tools/ota/binarios"),
+      /** Cómo ven los nodos a esta máquina: `http://<IP fija de la PC>:<OTA_PORT>`. Obligatoria para desplegar. */
+      OTA_BASE_URL: opcional(z.string().url()),
+      OTA_PORT: z.coerce.number().int().min(1).max(65535).default(8080),
+    })
+    .superRefine((c, ctx) => {
+      if (c.OTA_BASE_URL && c.APP_ENV !== "local" && !c.OTA_BASE_URL.startsWith("https://")) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["OTA_BASE_URL"],
+          message: "fuera de local debe ser https://",
+        });
+      }
+    }),
   "mqtt-bootstrap": comun.extend({
     MQTT_URL: urlMqtt,
     MQTT_CA_FILE: archivoCa,

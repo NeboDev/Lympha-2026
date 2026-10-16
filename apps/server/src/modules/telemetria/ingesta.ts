@@ -1,4 +1,10 @@
-import { atributosV1, estadoConexion, parsearTopico, telemetria } from "@lympha/contracts";
+import {
+  ackComandoV1,
+  atributosV1,
+  estadoConexion,
+  parsearTopico,
+  telemetria,
+} from "@lympha/contracts";
 import type { Logger } from "../../platform/logger.ts";
 import type { MetaNodo, ResolvedorNodo } from "../dispositivos/index.ts";
 import type { EventoNodo, TrabajoLecturas } from "./schema.ts";
@@ -27,7 +33,7 @@ export type MotivoRechazo =
   | "nodo_no_autorizado";
 
 export interface MetricasIngesta {
-  recibida(tipo: "telemetry" | "status" | "attributes"): void;
+  recibida(tipo: "telemetry" | "status" | "attributes" | "cmd/ack"): void;
   rechazada(motivo: MotivoRechazo): void;
   /** Lecturas que faltan según `seq` (un hueco de 3 suma 3). */
   huecos(n: number): void;
@@ -175,19 +181,47 @@ export function crearIngesta(deps: DepsIngesta): Ingesta {
     return CODIGO_PUBACK.ok;
   }
 
+  async function ackDe(nodoId: string, carga: Buffer): Promise<number> {
+    let json: unknown;
+    try {
+      json = JSON.parse(carga.toString("utf8"));
+    } catch {
+      return rechazar("json_ilegible", CODIGO_PUBACK.payloadInvalido);
+    }
+    const parsed = ackComandoV1.safeParse(json);
+    if (!parsed.success) {
+      deps.log.warn({ nodoId }, "ack rechazado: payload inválido");
+      return rechazar("payload_invalido", CODIGO_PUBACK.payloadInvalido);
+    }
+    const meta = await nodoAutorizado(nodoId);
+    if (!meta) return rechazar("nodo_no_autorizado", CODIGO_PUBACK.nodoNoAutorizado);
+    await deps.encolarEvento({
+      tipo: "ack",
+      nodoId,
+      espacioId: meta.espacioId,
+      comandoId: parsed.data.id,
+      ok: parsed.data.ok,
+      detalle: parsed.data.detail ?? null,
+      recibidoEn: ahora(),
+    });
+    return CODIGO_PUBACK.ok;
+  }
+
   return {
     async manejar(topico, carga) {
       const t = parsearTopico(topico);
-      if (!t || !["telemetry", "status", "attributes"].includes(t.tipo)) {
+      if (!t || !["telemetry", "status", "attributes", "cmd/ack"].includes(t.tipo)) {
         deps.log.warn({ topico }, "tópico no válido");
         return rechazar("topico_invalido", CODIGO_PUBACK.topicoInvalido);
       }
-      m?.recibida(t.tipo as "telemetry" | "status" | "attributes");
+      m?.recibida(t.tipo as "telemetry" | "status" | "attributes" | "cmd/ack");
       switch (t.tipo) {
         case "status":
           return estadoDe(t.deviceId, carga);
         case "attributes":
           return atributosDe(t.deviceId, carga);
+        case "cmd/ack":
+          return ackDe(t.deviceId, carga);
         default:
           return telemetriaDe(t.deviceId, carga);
       }

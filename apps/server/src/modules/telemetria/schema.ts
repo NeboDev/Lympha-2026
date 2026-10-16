@@ -25,7 +25,7 @@ export type TrabajoLecturas = z.infer<typeof trabajoLecturas>;
 
 /**
  * Hechos del nodo que no son lecturas y viajan por la misma cola (`lecturas`), en el orden en que llegaron:
- * un cambio de conexión (Last Will `offline` incluido) o los atributos que el nodo publica al conectar.
+ * un cambio de conexión (Last Will `offline` incluido) los atributos que el nodo publica al conectar o la respuesta a un comando (`cmd/ack`).
  */
 export const eventoNodo = z.discriminatedUnion("tipo", [
   z.object({
@@ -41,6 +41,16 @@ export const eventoNodo = z.discriminatedUnion("tipo", [
     nodoId: z.string().uuid(),
     espacioId: z.string().uuid(),
     fw: z.string().max(32),
+    recibidoEn: z.number().int().positive(),
+  }),
+  z.object({
+    tipo: z.literal("ack"),
+    nodoId: z.string().uuid(),
+    espacioId: z.string().uuid(),
+    /** `id` del comando al que responde el nodo. */
+    comandoId: z.string().min(1).max(64),
+    ok: z.boolean(),
+    detalle: z.string().max(200).nullable(),
     recibidoEn: z.number().int().positive(),
   }),
 ]);

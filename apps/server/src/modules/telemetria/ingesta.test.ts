@@ -182,6 +182,40 @@ describe("crearIngesta", () => {
     });
   });
 
+  describe("cmd/ack", () => {
+    it("encola la respuesta al comando y rechaza las inválidas", async () => {
+      const { ingesta, eventos } = preparar(meta());
+      const ok = Buffer.from(
+        JSON.stringify({ v: 1, id: "c1", ok: false, detail: "sha256 distinto" }),
+      );
+      expect(await ingesta.manejar(topico(NODO, "cmd/ack"), ok)).toBe(CODIGO_PUBACK.ok);
+      expect(eventos).toEqual([
+        {
+          tipo: "ack",
+          nodoId: NODO,
+          espacioId: ESPACIO,
+          comandoId: "c1",
+          ok: false,
+          detalle: "sha256 distinto",
+          recibidoEn: AHORA,
+        },
+      ]);
+      const malo = Buffer.from(JSON.stringify({ v: 1, id: "c1" }));
+      expect(await ingesta.manejar(topico(NODO, "cmd/ack"), malo)).toBe(
+        CODIGO_PUBACK.payloadInvalido,
+      );
+    });
+
+    it("no acepta acks de un nodo sin espacio", async () => {
+      const { ingesta, eventos } = preparar(meta({ espacioId: null, estado: "fabricado" }));
+      const ack = Buffer.from(JSON.stringify({ v: 1, id: "c1", ok: true }));
+      expect(await ingesta.manejar(topico(NODO, "cmd/ack"), ack)).toBe(
+        CODIGO_PUBACK.nodoNoAutorizado,
+      );
+      expect(eventos).toEqual([]);
+    });
+  });
+
   it("propaga los fallos de la cola para que ingest reintente sin confirmar", async () => {
     const ingesta = crearIngesta({
       resolver: { resolver: async () => meta(), invalidar: async () => undefined },

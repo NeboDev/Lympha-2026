@@ -68,7 +68,7 @@ docs/decisiones.md
 - `pnpm test` (unitarias) · `pnpm test:int` (integración, Testcontainers, necesita Docker) · `pnpm test:infra` (deploy.sh y prod.yml)
 - `pnpm lint` / `pnpm lint:fix` (Biome) · `pnpm typecheck`
 - `pnpm --filter @lympha/wqi fixtures` regenera `packages/wqi/fixtures/cisterna.json` (solo al subir la versión del perfil; revisar el diff) · `pnpm simulator --historias` lista las historias
-- `pnpm migrate` · `pnpm db:seed` · `pnpm factory lote --cantidad N [--dev]` · `pnpm factory imagenes|etiquetas|grabar` (ver `tools/factory/README.md`) · `pnpm dev:token correo` · `pnpm certs` (`CERT_SANS=IP:...`)
+- `pnpm migrate` · `pnpm db:seed` · `pnpm factory lote --cantidad N [--dev]` · `pnpm factory imagenes|etiquetas|grabar` (ver `tools/factory/README.md`) · `pnpm ota registrar|servir|desplegar|estado|abortar` (OTA en la LAN, ver `docs/decisiones.md`, «Servidor del OTA») · `pnpm dev:token correo` · `pnpm certs` (`CERT_SANS=IP:...`)
 - `bash infra/test/carga-local.sh --nodos 100 --duracion 5m` (prueba de carga con reinicios forzados; informe en `infra/test/resultados/`)
 - `infra/staging-local/vm.sh crear|desplegar|rollback|ssh|destruir` (VM de Multipass)
 - Desde el host contra el stack de desarrollo: `node --env-file=infra/compose/dev.env --env-file=infra/compose/host.env apps/server/src/cli/<job>.ts` (`host.env` cambia los nombres internos por 127.0.0.1)
@@ -94,7 +94,7 @@ docs/decisiones.md
 - Archivos largos con heredoc en Bash fallan en este entorno: usar la herramienta Write.
 
 ## Contrato MQTT
-`lympha/v1/d/{deviceId}/{telemetry|attributes|status|config|cmd|cmd/ack}`; payload con `v`; `telemetry` = `{"v":1,"ts":<epoch s>,"seq":n,"ph","t","ec","turb","tds"}`; `status` es LWT retenido `online|offline`; `ingest` atiende `telemetry`, `status` y `attributes`. Usuario = client id = `deviceId` (Dynamic Security lo exige); `lympha-ingest` fijo a su client id; `lympha-control` sin client id fijo (`-api`, `-worker`).
+`lympha/v1/d/{deviceId}/{telemetry|attributes|status|config|cmd|cmd/ack}`; payload con `v`; `telemetry` = `{"v":1,"ts":<epoch s>,"seq":n,"ph","t","ec","turb","tds"}`; `status` es LWT retenido `online|offline`; `ingest` atiende `telemetry`, `status`, `attributes` y `cmd/ack`; `cmd` y `config` están definidos en `@lympha/contracts` (`comandoV1`, `configV1`). Usuario = client id = `deviceId` (Dynamic Security lo exige); `lympha-ingest` fijo a su client id; `lympha-control` sin client id fijo (`-api`, `-worker`).
 
 ## Cuándo preguntar
 Si un documento tiene contradicción o hueco que cambia el diseño: detenerse y preguntar. Si es menor: decidir, anotar en `docs/decisiones.md` y seguir.

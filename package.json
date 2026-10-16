@@ -23,6 +23,7 @@
     "factory": "node --env-file=infra/compose/dev.env --env-file=infra/compose/host.env apps/server/src/cli/fabrica.ts",
     "dev:telegram": "node --env-file=infra/compose/dev.env --env-file=infra/compose/host.env apps/server/src/cli/probar-telegram.ts",
     "dev:token": "node --env-file=infra/compose/dev.env --env-file=infra/compose/host.env apps/server/src/cli/dev-token.ts",
+    "ota": "node --env-file=infra/compose/dev.env --env-file=infra/compose/host.env --env-file-if-exists=.env apps/server/src/cli/ota.ts",
     "certs": "node scripts/certs.mjs",
     "simulator": "node --env-file=infra/compose/dev.env tools/simulator/src/cli.ts --url mqtts://localhost:8883 --ca infra/certs/ca.crt",
     "test:infra": "bash infra/test/deploy.test.sh && bash infra/test/prod-compose.test.sh"

@@ -118,7 +118,9 @@ export async function iniciarIngest(
   mqtt.on("connect", () => {
     log.info("MQTT conectado");
     // `status` es retenido: al suscribirse llega el último estado de cada nodo (concilia online/offline).
-    const filtros = (["telemetry", "status", "attributes"] as const).map((t) => topico("+", t));
+    const filtros = (["telemetry", "status", "attributes", "cmd/ack"] as const).map((t) =>
+      topico("+", t),
+    );
     mqtt.subscribe(filtros, { qos: 1 }, (error, granted) => {
       if (error || granted?.some((g) => g.qos >= 128)) {
         log.error({ err: error }, "suscripción a los tópicos de los nodos denegada");
