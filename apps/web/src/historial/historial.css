@@ -6,7 +6,9 @@
   /* 7 días: una barra por día, anclada abajo. */
   .tira-semana {
     grid-template-columns: repeat(7, minmax(0, 1fr));
-    gap: 0.4rem;
+    gap: 0.25rem;
+    /* sale al borde de la tarjeta en el teléfono: así cada barra mide al menos 44 px de ancho */
+    margin-inline: -1rem;
     height: 9.5rem;
     align-items: stretch;
   }
@@ -56,9 +58,9 @@
       0 0 0 4px var(--text);
   }
 
-  /* 30 días: mosaico de siete columnas; cada día mide al menos 44 px. */
+  /* 30 días: mosaico de seis columnas (cinco filas); cada día mide al menos 44 px. */
   .tira-mes {
-    grid-template-columns: repeat(7, minmax(0, 1fr));
+    grid-template-columns: repeat(6, minmax(0, 1fr));
     gap: 0.35rem;
   }
   .tira-mes .dia {

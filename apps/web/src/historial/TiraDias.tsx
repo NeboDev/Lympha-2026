@@ -9,7 +9,7 @@ const NIVELES_ORDEN = ["buena", "regular", "mala", "critica", "sin_datos"] as co
  * Nivel predominante por día (RF-35). Cada día es un botón con color, símbolo Y texto («14, Regular»): el color solo
  * nunca dice el nivel. Un día sin ningún registro se muestra vacío y se dice «sin registro».
  * 7 días: una barra por día, tan alta como su índice promedio (segunda señal además del color).
- * 30 días: un mosaico de siete columnas, para que cada día siga siendo un objetivo táctil de al menos 44 px.
+ * 30 días: un mosaico de seis columnas, para que cada día siga siendo un objetivo táctil de al menos 44 px.
  */
 export function TiraDias({
   celdas,
