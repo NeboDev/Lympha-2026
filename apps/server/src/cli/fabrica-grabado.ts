@@ -90,6 +90,7 @@ export async function ejecutarGrabado(comando: string, args: string[]): Promise<
           codigoReclamo: nodo.codigoReclamo,
           loteId: ident.loteId,
           versionHw,
+          apKey: nodo.apKey,
         }),
         { mode: 0o600 },
       );

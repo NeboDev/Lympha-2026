@@ -1,5 +1,11 @@
 export { DEV } from "./dev.ts";
-export { type DatosEtiqueta, etiquetaSvg, textoQrNodo, textoQrReclamo } from "./etiqueta.ts";
+export {
+  type DatosEtiqueta,
+  etiquetaSvg,
+  nombreAp,
+  textoQrReclamo,
+  textoQrWifi,
+} from "./etiqueta.ts";
 export {
   argumentosEsptool,
   asegurarLlaveNvs,
