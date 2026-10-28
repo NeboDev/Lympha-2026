@@ -26,6 +26,9 @@ importers:
 
   apps/server:
     dependencies:
+      '@lympha/calibracion':
+        specifier: workspace:*
+        version: link:../../packages/calibracion
       '@lympha/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
@@ -84,6 +87,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@lympha/calibracion':
+        specifier: workspace:*
+        version: link:../../packages/calibracion
       '@lympha/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
@@ -133,6 +139,8 @@ importers:
       vite:
         specifier: ^8.3.4
         version: 8.3.4(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1)
+
+  packages/calibracion: {}
 
   packages/contracts:
     dependencies:

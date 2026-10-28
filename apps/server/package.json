@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@lympha/contracts": "workspace:*",
+    "@lympha/calibracion": "workspace:*",
     "@lympha/wqi": "workspace:*",
     "bullmq": "~5.81.5",
     "drizzle-orm": "^0.45.4",
