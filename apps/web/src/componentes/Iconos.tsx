@@ -79,6 +79,12 @@ export const IcoAjustes = crear(
     <circle cx="12" cy="12" r="3" />
   </>,
 );
+export const IcoCalibrar = crear(
+  <>
+    <path d="M10 2v7.527a2 2 0 0 1-.211.896L4.72 20.55a1 1 0 0 0 .9 1.45h12.76a1 1 0 0 0 .9-1.45l-5.069-10.127A2 2 0 0 1 14 9.527V2" />
+    <path d="M8.5 2h7M7 16h10" />
+  </>,
+);
 export const IcoAtras = crear(<path d="m15 18-6-6 6-6" />);
 export const IcoAdelante = crear(<path d="m9 18 6-6-6-6" />);
 export const IcoAbajo = crear(<path d="m6 9 6 6 6-6" />);

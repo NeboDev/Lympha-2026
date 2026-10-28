@@ -1,5 +1,6 @@
 import type { NivelApi } from "@lympha/contracts";
 import { Link } from "react-router";
+import { InsigniaCalibracion } from "../calibracion/InsigniaCalibracion.tsx";
 import type { EstadoVisible, NodoVista } from "../espacios/estado.ts";
 import { haceCuanto, horaYDia } from "../espacios/tiempo.ts";
 import { Anillo, Insignia } from "./estados.tsx";
@@ -113,6 +114,16 @@ export function TarjetaNodo({
         <p className="semaforo m-0 mt-1">
           <Insignia estado={nodo.visible} texto={etiqueta} />
         </p>
+        {nodo.calibracion && (
+          <p className="relative m-0">
+            <InsigniaCalibracion resumen={nodo.calibracion} ahora={ahora} />
+            {nodo.calibracion.estado !== "vigente" && (
+              <Link to={`/calibracion?nodo=${nodo.id}`} className="ml-2 text-sm font-semibold">
+                Calibrar
+              </Link>
+            )}
+          </p>
+        )}
       </div>
     </article>
   );

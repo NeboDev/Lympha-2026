@@ -11,6 +11,12 @@ const POR_CODIGO: Record<string, string> = {
   telegram_no_disponible:
     "Los avisos por Telegram no están disponibles en este momento. Inténtalo más tarde.",
   alarma_no_activa: "Esa alerta ya fue atendida o resuelta por alguien más.",
+  puntos_repetidos:
+    "El sensor midió lo mismo en todos los puntos, así que no se puede calcular la calibración. Revisa que la sonda esté dentro de cada solución.",
+  puntos_insuficientes: "Se necesitan al menos dos puntos para calibrar.",
+  valor_invalido: "Alguno de los valores capturados no es un número válido.",
+  pendiente_no_positiva:
+    "El sensor responde al revés de lo esperado. Revisa la sonda y los valores de las soluciones.",
   prohibido: "No tienes permiso para hacer esto.",
   no_encontrado: "No encontramos lo que buscas.",
   no_autenticado: "Tu sesión no es válida. Vuelve a entrar.",

@@ -4,6 +4,7 @@ import type {
   EventoConexion,
   EventoSnapshot,
   NodoApi,
+  ResumenCalibracion,
   ValoresApi,
 } from "@lympha/contracts";
 
@@ -38,6 +39,8 @@ export interface NodoVista {
   /** Desde cuándo no hay datos, si el nodo está sin conexión. */
   sinDatosDesde: string | null;
   valores: ValoresApi | null;
+  /** Última calibración y si ya venció (lo trae la API REST; no cambia con cada lectura). */
+  calibracion?: ResumenCalibracion | undefined;
 }
 
 /** Lo último que llegó por el stream, con el momento (del reloj de la PWA) en que llegó. */
@@ -119,6 +122,7 @@ export function combinar(base: NodoApi[], sse: DatosSse, baseEn: number): NodoVi
       ultimaLecturaEn: ultimaLectura,
       sinDatosDesde: conectado === false ? (cambioConexion ?? ultimaLectura) : null,
       valores: estadoVivo ? estadoVivo.valores : (valoresRest ?? null),
+      calibracion: n.calibracion,
     };
   });
 }

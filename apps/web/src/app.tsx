@@ -8,6 +8,7 @@ import { API_URL, FIREBASE, PROBLEMAS_CONFIG } from "./config.ts";
 import { Acceso } from "./paginas/acceso.tsx";
 import { Ajustes } from "./paginas/ajustes.tsx";
 import { Alertas } from "./paginas/alertas.tsx";
+import { Calibracion } from "./paginas/calibracion.tsx";
 import { Espacio } from "./paginas/espacio.tsx";
 import { Espacios } from "./paginas/espacios.tsx";
 import { Invitacion } from "./paginas/invitacion.tsx";
@@ -70,6 +71,7 @@ function Aplicacion() {
                   <Route path="/espacios/:espacioId/reclamar" element={<Reclamar />} />
                   <Route path="/nodos/:nodoId" element={<Nodo />} />
                   <Route path="/alertas" element={<Alertas />} />
+                  <Route path="/calibracion" element={<Calibracion />} />
                   <Route path="/ajustes" element={<Ajustes />} />
                   <Route path="/invitacion" element={<Invitacion />} />
                 </Route>

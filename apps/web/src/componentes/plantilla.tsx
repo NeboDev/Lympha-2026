@@ -2,12 +2,21 @@ import type { ComponentType } from "react";
 import { Link, NavLink, Outlet } from "react-router";
 import { useYo } from "../api/consultas.ts";
 import { useSesion } from "../sesion/contexto.tsx";
-import { IcoAjustes, IcoCampana, IcoInicio, IcoSalir, Marca, type PropsIcono } from "./Iconos.tsx";
+import {
+  IcoAjustes,
+  IcoCalibrar,
+  IcoCampana,
+  IcoInicio,
+  IcoSalir,
+  Marca,
+  type PropsIcono,
+} from "./Iconos.tsx";
 
 const PESTANAS: { a: string; texto: string; Icono: ComponentType<PropsIcono>; exacta?: boolean }[] =
   [
     { a: "/", texto: "Inicio", Icono: IcoInicio, exacta: true },
     { a: "/alertas", texto: "Alertas", Icono: IcoCampana },
+    { a: "/calibracion", texto: "Calibración", Icono: IcoCalibrar },
     { a: "/ajustes", texto: "Ajustes", Icono: IcoAjustes },
   ];
 
@@ -34,7 +43,7 @@ export function Plantilla() {
           aria-label="Principal"
           className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-surface pb-[env(safe-area-inset-bottom)] lg:static lg:border-0 lg:bg-transparent lg:p-0"
         >
-          <ul className="m-0 grid list-none grid-cols-3 p-0 lg:grid-cols-1 lg:gap-1">
+          <ul className="m-0 grid list-none grid-cols-4 p-0 lg:grid-cols-1 lg:gap-1">
             {PESTANAS.map(({ a, texto, Icono, exacta }) => (
               <li key={a}>
                 <NavLink

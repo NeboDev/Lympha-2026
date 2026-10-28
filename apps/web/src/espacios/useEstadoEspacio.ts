@@ -46,6 +46,11 @@ export function useEstadoEspacio(espacioId: string) {
       } else if (m.evento === "conexion") {
         const r = eventoConexion.safeParse(dato);
         if (r.success) setSse((previo) => conConexion(previo, r.data, ahora));
+      } else if (m.evento === "calibracion") {
+        // alguien calibró, revirtió o restableció un sensor: el historial y el estado de calibración cambiaron
+        void consultas.invalidateQueries({ queryKey: ["calibraciones"] });
+        void consultas.invalidateQueries({ queryKey: ["espacio", espacioId] });
+        void consultas.invalidateQueries({ queryKey: ["nodo"] });
       } else if (m.evento === "alarma") {
         // una alarma se abrió, escaló, mejoró, se atendió o se resolvió: las alertas de este espacio ya no están al día
         void consultas.invalidateQueries({ queryKey: ["alarmas", espacioId] });
