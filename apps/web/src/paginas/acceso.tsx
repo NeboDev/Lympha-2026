@@ -1,6 +1,6 @@
 import { type FormEvent, useState } from "react";
 import { Navigate, useLocation } from "react-router";
-import { Marca } from "../componentes/Iconos.tsx";
+import { IcoGoogle, Marca } from "../componentes/Iconos.tsx";
 import { useSesion } from "../sesion/contexto.tsx";
 import { ErrorAcceso } from "../sesion/servicio.ts";
 
@@ -111,7 +111,7 @@ export function Acceso() {
           disabled={enCurso}
           onClick={() => void intentar(sesion.entrarConGoogle)}
         >
-          Continuar con Google
+          <IcoGoogle /> Continuar con Google
         </button>
 
         <p className="text-center">
