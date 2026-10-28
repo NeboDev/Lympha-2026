@@ -29,3 +29,7 @@ pnpm factory grabar <loteId> <deviceId> --puerto COM5 \
 - `lotes/<loteId>/nvs_keys.bin` es la llave de cifrado de NVS del lote (0600). Sin ella los nodos del lote no pueden leer su identidad: respaldarla donde se respalda `identidades.json`. Con el ESP32 clásico y sin flash encryption, la llave grabada en `nvs_keys` está en claro en la flash, así que el cifrado de NVS solo protege de lecturas casuales hasta que se active flash encryption (producción).
 - Las etiquetas contienen el código de reclamo y la clave del AP del portal cautivo en claro (0600, no se versionan). El segundo QR es el estándar de WiFi (`WIFI:T:WPA;S:Lympha-xxxx;P:<clave>;;`): el teléfono se une solo al AP del nodo. Un lote fabricado antes de este cambio puede reimprimir sus etiquetas con `pnpm factory etiquetas <loteId>` (usa `identidades.json`).
 - `diagnostico` (autodiagnóstico de sensores, Wi-Fi y broker) aún no existe: depende del firmware y de una placa.
+
+## Desde el panel de la PWA
+
+Un administrador de plataforma (`pnpm admin alta correo`) puede crear lotes de hasta 50 nodos desde **Administración** en la PWA: la respuesta trae las etiquetas listas para imprimir (hoja A4 o 80 × 44 mm) y un ZIP con `manifiesto.json` e `identidades.json` en el mismo formato que `pnpm factory lote`. Extráelo en `tools/factory/lotes/<loteId>/` para usar `imagenes` y `grabar`. Los códigos se muestran una sola vez; ver `docs/decisiones.md`, «Panel de administración».

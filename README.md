@@ -80,6 +80,7 @@ Se despliega lo **commiteado** (la imagen usa el árbol de trabajo). Está escri
 | `pnpm migrate` | Aplica las migraciones (`DATABASE_URL_MIGRATE`) |
 | `pnpm db:seed` | Semillas de desarrollo: usuario, espacio, nodo y su cliente MQTT |
 | `pnpm factory lote --cantidad N` | Fábrica: lote, identidades y clientes MQTT (`revocar-nodo`, `revocar-lote`; `--dev` reclama) |
+| `pnpm admin alta correo` | Da de alta a un administrador de plataforma (`baja`, `listar`); la persona debe haber iniciado sesión una vez |
 | `pnpm dev:token correo` | ID token del emulador de Firebase Auth |
 | `pnpm certs` | Crea o renueva la CA propia y el certificado de Mosquitto (`CERT_SANS`) |
 | `bash infra/test/carga-local.sh --duracion 5m` | Carga con 100 nodos y reinicios forzados; informe en `infra/test/resultados/` |
