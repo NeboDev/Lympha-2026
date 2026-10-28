@@ -14,6 +14,7 @@ WORKDIR /app
 FROM base AS manifiestos
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY packages/contracts/package.json packages/contracts/
+COPY packages/calibracion/package.json packages/calibracion/
 COPY packages/wqi/package.json packages/wqi/
 COPY apps/server/package.json apps/server/
 # La PWA no entra en la imagen del servidor, pero su manifiesto debe estar para que --frozen-lockfile cuadre.
@@ -29,6 +30,7 @@ FROM manifiestos AS dev
 RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
     pnpm install --frozen-lockfile --ignore-scripts --filter "@lympha/server..."
 COPY packages/contracts/ packages/contracts/
+COPY packages/calibracion/ packages/calibracion/
 COPY packages/wqi/ packages/wqi/
 COPY apps/server/ apps/server/
 WORKDIR /app/apps/server
@@ -47,6 +49,7 @@ RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack 
 WORKDIR /app
 COPY --from=deps-prod /app /app
 COPY packages/contracts/ packages/contracts/
+COPY packages/calibracion/ packages/calibracion/
 COPY packages/wqi/ packages/wqi/
 COPY apps/server/src/ apps/server/src/
 COPY apps/server/migrations/ apps/server/migrations/

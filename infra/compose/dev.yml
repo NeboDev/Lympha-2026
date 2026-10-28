@@ -16,6 +16,7 @@ x-dev-servidor: &dev-servidor
       - { path: ../../apps/server/migrations, target: /app/apps/server/migrations, action: sync }
       - { path: ../../packages/contracts/src, target: /app/packages/contracts/src, action: sync+restart }
       - { path: ../../packages/wqi/src, target: /app/packages/wqi/src, action: sync+restart }
+      - { path: ../../packages/calibracion/src, target: /app/packages/calibracion/src, action: sync+restart }
       - { path: ../../apps/server/package.json, action: rebuild }
 
 services:
