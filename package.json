@@ -21,6 +21,7 @@
     "migrate": "pnpm --filter @lympha/server migrate",
     "db:seed": "pnpm --filter @lympha/server db:seed",
     "factory": "node --env-file=infra/compose/dev.env --env-file=infra/compose/host.env apps/server/src/cli/fabrica.ts",
+    "dev:emulador": "docker compose --env-file .env --profile emulador -f infra/compose/base.yml -f infra/compose/dev.yml up --build --watch",
     "dev:telegram": "node --env-file=infra/compose/dev.env --env-file=infra/compose/host.env apps/server/src/cli/probar-telegram.ts",
     "dev:token": "node --env-file=infra/compose/dev.env --env-file=infra/compose/host.env apps/server/src/cli/dev-token.ts",
     "ota": "node --env-file=infra/compose/dev.env --env-file=infra/compose/host.env --env-file-if-exists=.env apps/server/src/cli/ota.ts",

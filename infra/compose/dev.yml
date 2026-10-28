@@ -54,6 +54,7 @@ services:
       context: ../firebase
     image: lympha-firebase-auth:dev
     pull_policy: never
+    profiles: [emulador]
     ports: ["127.0.0.1:9099:9099"]
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:9099/').then(()=>process.exit(0)).catch(()=>process.exit(1))"]
@@ -82,7 +83,7 @@ services:
   api:
     <<: *dev-servidor
     depends_on:
-      firebase-auth: { condition: service_healthy }
+      firebase-auth: { condition: service_healthy, required: false }
     environment:
       VALKEY_URL: redis://api:dev-valkey-api@valkey:6379
       # FIREBASE_USE_EMULATOR=true (por defecto) usa el emulador; false verifica tokens del proyecto real lympha-dev.
