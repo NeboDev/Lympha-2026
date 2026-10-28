@@ -12,6 +12,7 @@ import { useReducer, useState } from "react";
 import { useAccionesCalibracion, useLecturasVivas } from "../api/consultas-calibracion.ts";
 import { mensajeDeError } from "../api/mensajes.ts";
 import { IcoCheck, IcoReloj } from "../componentes/Iconos.tsx";
+import { AnimacionPaso } from "./AnimacionPaso.tsx";
 import { estadoInicial, minimoDe, pasosDe, puedeTerminar, reducirAsistente } from "./asistente.ts";
 import {
   anclaDe,
@@ -140,6 +141,14 @@ export function Asistente({
             {paso?.titulo}
           </h2>
         </div>
+
+        <AnimacionPaso
+          parametro={parametro}
+          referencia={referencia}
+          midiendo={estado.momento === "midiendo"}
+          progreso={est.disponibles / est.necesarias}
+          estable={estado.momento === "midiendo" && est.estable}
+        />
 
         {estado.momento === "preparar" ? (
           <>

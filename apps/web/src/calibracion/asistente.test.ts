@@ -125,3 +125,15 @@ describe("vistaPrevia y formato", () => {
     expect(numeroCal(Number.NaN)).toBe("—");
   });
 });
+
+describe("tipoSolucion", () => {
+  it("elige el color del patrón según el parámetro y el valor real", async () => {
+    const { tipoSolucion } = await import("./utilidades.ts");
+    expect(tipoSolucion("ph", 4.01)).toBe("ph4");
+    expect(tipoSolucion("ph", 7)).toBe("ph7");
+    expect(tipoSolucion("ph", 10)).toBe("ph10");
+    expect(tipoSolucion("conductividad", 0)).toBe("destilada");
+    expect(tipoSolucion("tds", 706)).toBe("conductividad");
+    expect(tipoSolucion("turbidez", 100)).toBe("turbidez");
+  });
+});

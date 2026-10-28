@@ -97,3 +97,15 @@ export function numeroCal(valor: number): string {
 
 export const resumenVencido = (r: ResumenCalibracion | undefined): boolean =>
   r?.estado === "vencida";
+
+export type TipoSolucion = "ph4" | "ph7" | "ph10" | "destilada" | "conductividad" | "turbidez";
+
+/** Qué solución es, para dibujarla del color que tiene en el frasco (pH: la más cercana de 4, 7 y 10). */
+export function tipoSolucion(parametro: ParametroCalibrable, referencia: number): TipoSolucion {
+  if (parametro === "ph") {
+    if (referencia < 5.5) return "ph4";
+    return referencia > 8.5 ? "ph10" : "ph7";
+  }
+  if (!(referencia > 0)) return "destilada";
+  return parametro === "turbidez" ? "turbidez" : "conductividad";
+}

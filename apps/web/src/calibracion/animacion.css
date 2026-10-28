@@ -1,0 +1,228 @@
+/*
+ * Animación del asistente de calibración. Los colores de las soluciones son ADICIONALES a la paleta de la marca:
+ * imitan el color real de cada patrón (buffers de pH con su indicador, agua destilada, patrón de conductividad,
+ * patrón turbio). Son ilustración, no estado: el significado siempre va también en el texto de al lado.
+ */
+:root {
+  --cal-ph4: #e5674a;
+  --cal-ph7: #5fb877;
+  --cal-ph10: #6b7fe0;
+  --cal-destilada: #9ed3ec;
+  --cal-conductividad: #e3b04b;
+  --cal-turbidez: #bfa57c;
+  --cal-sonda: #4b5563;
+  --cal-sonda-punta: #c7ccd3;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --cal-ph4: #f0866c;
+    --cal-ph7: #7acb90;
+    --cal-ph10: #8a9bf0;
+    --cal-destilada: #7cbbd8;
+    --cal-conductividad: #efc268;
+    --cal-turbidez: #d0b88f;
+    --cal-sonda: #aab2bd;
+    --cal-sonda-punta: #e5e8ec;
+  }
+}
+
+.cal-anim {
+  display: block;
+  width: 100%;
+  max-width: 260px;
+  margin-inline: auto;
+}
+.cal-vidrio {
+  fill: none;
+  stroke: var(--line-strong);
+  stroke-width: 3;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.cal-liquido {
+  fill: var(--liquido);
+  opacity: 0.88;
+  transition: fill 0.5s ease;
+}
+.cal-onda {
+  animation: cal-onda 2.4s linear infinite;
+}
+.cal-sonda-cuerpo {
+  fill: var(--cal-sonda);
+}
+.cal-sonda-punta {
+  fill: var(--cal-sonda-punta);
+  stroke: var(--cal-sonda);
+  stroke-width: 1.5;
+}
+.cal-sonda-cable {
+  fill: none;
+  stroke: var(--cal-sonda);
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+/* La sonda flota arriba mientras se prepara y baja a la solución al medir. */
+.cal-sonda {
+  transform: translateY(-46px);
+  transition: transform 0.9s cubic-bezier(0.3, 0.7, 0.3, 1);
+  animation: cal-flota 2.6s ease-in-out infinite;
+}
+.cal-medir .cal-sonda {
+  transform: translateY(0);
+  animation: none;
+}
+
+/* Gotas del enjuague (solo al preparar). */
+.cal-gota {
+  fill: var(--cal-destilada);
+  opacity: 0;
+  animation: cal-gota 1.6s ease-in infinite;
+}
+.cal-gota:nth-of-type(2) {
+  animation-delay: 0.5s;
+}
+.cal-gota:nth-of-type(3) {
+  animation-delay: 1s;
+}
+.cal-medir .cal-gota {
+  display: none;
+}
+
+/* Ondas en la superficie mientras mide. */
+.cal-onda-anillo {
+  fill: none;
+  stroke: var(--text-2);
+  stroke-width: 1.5;
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.cal-medir .cal-onda-anillo {
+  animation: cal-anillo 2s ease-out infinite;
+}
+.cal-medir .cal-onda-anillo + .cal-onda-anillo {
+  animation-delay: 1s;
+}
+.cal-estable .cal-onda-anillo {
+  animation: none;
+}
+
+/* Partículas de la solución turbia. */
+.cal-particula {
+  fill: #fff;
+  opacity: 0.55;
+  animation: cal-particula 5s ease-in-out infinite;
+}
+.cal-particula:nth-of-type(2n) {
+  animation-duration: 6.5s;
+  animation-delay: -2s;
+}
+.cal-particula:nth-of-type(3n) {
+  animation-duration: 4.2s;
+  animation-delay: -3s;
+}
+
+/* Anillo de avance de la estabilización (arriba a la derecha). */
+.cal-aro-fondo {
+  fill: var(--surface);
+  stroke: var(--line);
+  stroke-width: 5;
+}
+.cal-aro {
+  fill: none;
+  stroke: var(--text-2);
+  stroke-width: 5;
+  stroke-linecap: round;
+  transform: rotate(-90deg);
+  transform-origin: 232px 34px;
+  transition:
+    stroke-dashoffset 0.6s ease,
+    stroke 0.4s ease;
+}
+.cal-estable .cal-aro {
+  stroke: var(--good);
+}
+.cal-palomita {
+  fill: none;
+  stroke: var(--good);
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 30;
+  stroke-dashoffset: 30;
+}
+.cal-estable .cal-palomita {
+  animation: cal-trazo 0.5s ease-out 0.1s forwards;
+}
+.cal-estable .cal-aro-fondo {
+  animation: cal-pulso 0.7s ease-out 1;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+@keyframes cal-onda {
+  to {
+    transform: translateX(-40px);
+  }
+}
+@keyframes cal-flota {
+  50% {
+    transform: translateY(-54px);
+  }
+}
+@keyframes cal-gota {
+  0% {
+    opacity: 0;
+    transform: translateY(0);
+  }
+  20% {
+    opacity: 0.9;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(38px);
+  }
+}
+@keyframes cal-anillo {
+  0% {
+    opacity: 0.7;
+    transform: scale(0.3);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.6);
+  }
+}
+@keyframes cal-particula {
+  50% {
+    transform: translate(6px, -10px);
+  }
+}
+@keyframes cal-trazo {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes cal-pulso {
+  50% {
+    transform: scale(1.18);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cal-onda,
+  .cal-sonda,
+  .cal-gota,
+  .cal-onda-anillo,
+  .cal-particula,
+  .cal-estable .cal-aro-fondo {
+    animation: none !important;
+  }
+  .cal-sonda,
+  .cal-aro,
+  .cal-liquido {
+    transition: none;
+  }
+}
