@@ -1,5 +1,6 @@
 import { type FormEvent, useState } from "react";
 import { Navigate, useLocation } from "react-router";
+import { FondoOlas } from "../componentes/FondoOlas.tsx";
 import { IcoGoogle, Marca } from "../componentes/Iconos.tsx";
 import { useSesion } from "../sesion/contexto.tsx";
 import { ErrorAcceso } from "../sesion/servicio.ts";
@@ -56,6 +57,7 @@ export function Acceso() {
   const creando = modo === "crear";
   return (
     <main className="mx-auto grid min-h-dvh w-full max-w-md content-center gap-5 px-4 py-8">
+      <FondoOlas />
       <div className="grid justify-items-center gap-2 text-center">
         <h1 className="m-0">
           <Marca variante="logo" ancho={200} />
