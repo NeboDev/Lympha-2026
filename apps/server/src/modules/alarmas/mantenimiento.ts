@@ -7,7 +7,7 @@ import { COLA_MANTENIMIENTO, crearCola } from "../../platform/queues.ts";
 import type { Redis } from "../../platform/valkey.ts";
 import { encolarAvisoAUsuario, encolarAvisos } from "../notificaciones/index.ts";
 import { nombreNodo, textoAviso } from "./plantillas.ts";
-import { minutosSinConexion } from "./reglas.ts";
+import { minutosSinConexion, RECORDATORIO_H_CRITICA, RECORDATORIO_H_DEFECTO } from "./reglas.ts";
 
 /**
  * Barrido de mantenimiento de las alarmas. Un trabajo repetible de BullMQ (cola `mantenimiento`) lo dispara cada
@@ -19,7 +19,10 @@ import { minutosSinConexion } from "./reglas.ts";
  *  2. Reconexión: cierra las alarmas `sin_conexion` de nodos que ya están conectados. El camino normal es
  *     inmediato (`resolverSinConexion`, desde el evento `online`); este paso cubre un evento perdido.
  *  3. Recordatorios (RF-30): mientras una alarma siga activa, repite el aviso cada `recordatorio_h` horas de
- *     cada usuario (su preferencia; 6 por defecto). Una alarma atendida deja de recordar.
+ *     cada usuario (su preferencia; 6 por defecto, 2 para una alarma crítica si no eligió otro valor). Quien
+ *     quiere el aviso pero todavía no recibió ninguno de esa alarma (vinculó Telegram o entró al espacio
+ *     después de que se abrió) lo recibe en el siguiente barrido, sin esperar las horas. Una alarma atendida
+ *     deja de recordar.
  */
 
 export interface OpcionesBarrido {
@@ -32,7 +35,6 @@ export interface ResultadoBarrido {
   avisos: number;
 }
 
-const RECORDATORIO_H_DEFECTO = 6;
 const LIMITE_POR_PASO = 200;
 
 interface Nombres extends Record<string, unknown> {
@@ -269,8 +271,14 @@ async function recordar(bd: BdSistema, ahoraMs: number): Promise<ResultadoBarrid
         SELECT max(s.creado_en) AS ultimo FROM app.notificaciones_salida s
         WHERE s.alarma_id = a.id AND s.usuario_id = m.usuario_id AND s.estado <> 'descartada') ult ON true
       WHERE a.estado = 'activa'
-        AND coalesce(ult.ultimo, a.abierta_en)
-              <= ${ahora}::timestamptz - make_interval(hours => coalesce(pref.recordatorio_h, ${RECORDATORIO_H_DEFECTO})::int)
+        AND (
+          ult.ultimo IS NULL
+          OR ult.ultimo <= ${ahora}::timestamptz - make_interval(hours => (
+            CASE WHEN a.tipo = 'nivel' AND a.severidad = 'critica'
+                      AND coalesce(pref.recordatorio_h::int, ${RECORDATORIO_H_DEFECTO}::int) = ${RECORDATORIO_H_DEFECTO}::int
+                 THEN ${RECORDATORIO_H_CRITICA}::int
+                 ELSE coalesce(pref.recordatorio_h::int, ${RECORDATORIO_H_DEFECTO}::int) END))
+        )
         AND app.quiere_aviso(m.usuario_id, a.nodo_id,
               CASE WHEN a.tipo = 'nivel' THEN ARRAY[a.severidad] ELSE NULL END)
       LIMIT ${LIMITE_POR_PASO}`);

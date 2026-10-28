@@ -73,6 +73,29 @@ export function minutosSinConexion(reglas: unknown): number {
   return SIN_CONEXION_MIN_DEFECTO;
 }
 
+/** Horas entre recordatorios si el usuario no eligió otro valor (RF-30). */
+export const RECORDATORIO_H_DEFECTO = 6;
+/** Horas entre recordatorios de una alarma de nivel crítico cuando el usuario sigue con el valor por defecto. */
+export const RECORDATORIO_H_CRITICA = 2;
+
+/**
+ * Horas entre recordatorios de una alarma. `configuradoH` es lo que guardan las preferencias del usuario (`null` si
+ * nunca las guardó). Una alarma de nivel crítico recuerda más seguido, pero solo a quien no eligió otro intervalo:
+ * un valor distinto del predeterminado es una decisión suya y se respeta. Quien eligió justo el predeterminado no
+ * se distingue de quien no eligió nada. El barrido aplica esta misma regla dentro de su consulta SQL
+ * (`recordar` en mantenimiento.ts): si cambia una, cambia la otra.
+ */
+export function horasRecordatorio(
+  configuradoH: number | null,
+  tipo: "nivel" | "sin_conexion" | "sensor",
+  severidad: "regular" | "mala" | "critica",
+): number {
+  const horas = configuradoH ?? RECORDATORIO_H_DEFECTO;
+  return tipo === "nivel" && severidad === "critica" && horas === RECORDATORIO_H_DEFECTO
+    ? RECORDATORIO_H_CRITICA
+    : horas;
+}
+
 /** ¿Toca un recordatorio? Cuenta desde el último aviso de esa alarma a ese usuario (RF-30). */
 export function debeRecordar(
   ultimoAvisoMs: number,

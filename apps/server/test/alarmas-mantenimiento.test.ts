@@ -278,6 +278,72 @@ describe("recordatorios (RF-30)", () => {
     expect((await eventos()).filter((e) => e === "recordatorio:beto")).toHaveLength(1);
   });
 
+  const estadoCritica = (nodo: string, ts: number): EstadoConfirmado => ({
+    ...estadoMala(nodo, ts),
+    nivel: "critica",
+    wqi: 10,
+  });
+
+  it("una alarma crítica recuerda cada 2 h a quien no eligió otro intervalo, y respeta al que sí", async () => {
+    const nodo = nodoN(14);
+    const t0 = Date.now();
+    // Beto eligió 12 h: ese valor es suyo. Ana (2 h) y Beto ya tenían preferencia distinta de las 6 h por defecto.
+    await owner.query(
+      `INSERT INTO app.preferencias_notificacion (usuario_id, nodo_id, recordatorio_h)
+       VALUES ('${ID.beto}', NULL, 12)
+       ON CONFLICT (usuario_id, nodo_id) DO UPDATE SET recordatorio_h = 12`,
+    );
+    try {
+      await conSistema(bd, (tx) => aplicarCiclo(tx, [estadoCritica(nodo, t0)], t0 + 1000));
+      const [alarma] = await alarmas(nodo, "nivel");
+      const r = await barrer(bd, t0 + 2 * HORA + MIN);
+      expect(r.avisos).toBe(1);
+      expect((await avisosDe(alarma?.id as string)).map((a) => `${a.evento}:${a.usuario}`)).toEqual(
+        ["abierta:ana", "abierta:beto", "recordatorio:ana"],
+      );
+    } finally {
+      await owner.query(
+        "DELETE FROM app.preferencias_notificacion WHERE usuario_id = $1 AND nodo_id IS NULL",
+        [ID.beto],
+      );
+    }
+  });
+
+  it("una alarma crítica recuerda a las 2 h a quien tiene el intervalo por defecto (6 h)", async () => {
+    const nodo = nodoN(15);
+    const t0 = Date.now();
+    await conSistema(bd, (tx) => aplicarCiclo(tx, [estadoCritica(nodo, t0)], t0 + 1000));
+    const [alarma] = await alarmas(nodo, "nivel");
+    expect((await barrer(bd, t0 + 1 * HORA)).avisos).toBe(0);
+    expect((await barrer(bd, t0 + 2 * HORA + MIN)).avisos).toBe(2); // Ana (2 h) y Beto (por defecto → 2 h)
+    expect((await avisosDe(alarma?.id as string)).filter((a) => a.usuario === "beto")).toHaveLength(
+      2,
+    );
+  });
+
+  it("quien vincula Telegram con una alarma ya abierta la recibe en el siguiente barrido, una sola vez", async () => {
+    const nodo = nodoN(16);
+    const t0 = Date.now();
+    await conSistema(bd, (tx) => aplicarCiclo(tx, [estadoCritica(nodo, t0)], t0 + 1000));
+    const [alarma] = await alarmas(nodo, "nivel");
+    const id = alarma?.id as string;
+    expect((await avisosDe(id)).map((a) => a.usuario)).toEqual(["ana", "beto"]);
+
+    await owner.query("INSERT INTO app.vinculos_telegram (usuario_id, chat_id) VALUES ($1, 444)", [
+      ID.dani,
+    ]);
+    try {
+      // Carla (sin Telegram) no recibe nada; Dani recibe un recordatorio sin esperar las horas
+      expect((await barrer(bd, t0 + 2 * MIN)).avisos).toBe(1);
+      const nuevos = (await avisosDe(id)).filter((a) => a.evento === "recordatorio");
+      expect(nuevos.map((a) => a.usuario)).toEqual(["otro"]);
+      expect(nuevos[0]?.texto).toContain("Recordatorio: la calidad sigue crítica");
+      expect((await barrer(bd, t0 + 3 * MIN)).avisos).toBe(0);
+    } finally {
+      await owner.query("DELETE FROM app.vinculos_telegram WHERE usuario_id = $1", [ID.dani]);
+    }
+  });
+
   it("una alarma atendida deja de recordar", async () => {
     const nodo = nodoN(10);
     const t0 = Date.now();

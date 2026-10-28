@@ -4,6 +4,7 @@ import {
   decidirNivel,
   decidirSensor,
   esAvisable,
+  horasRecordatorio,
   minutosSinConexion,
   SIN_CONEXION_MIN_DEFECTO,
 } from "./reglas.ts";
@@ -76,6 +77,16 @@ describe("tiempos", () => {
     expect(esAvisable(ahora - 29 * 60_000, ahora)).toBe(true);
     expect(esAvisable(ahora - 31 * 60_000, ahora)).toBe(false);
     expect(esAvisable(ahora - 3 * 3_600_000, ahora, 240)).toBe(true);
+  });
+
+  it("horas de recordatorio: la crítica baja a 2 h solo si el usuario sigue en el valor por defecto", () => {
+    expect(horasRecordatorio(null, "nivel", "critica")).toBe(2);
+    expect(horasRecordatorio(6, "nivel", "critica")).toBe(2);
+    expect(horasRecordatorio(12, "nivel", "critica")).toBe(12);
+    expect(horasRecordatorio(1, "nivel", "critica")).toBe(1);
+    expect(horasRecordatorio(null, "nivel", "mala")).toBe(6);
+    expect(horasRecordatorio(null, "sin_conexion", "regular")).toBe(6);
+    expect(horasRecordatorio(null, "sensor", "critica")).toBe(6);
   });
 
   it("recordatorio: solo al cumplirse las horas desde el último aviso", () => {
