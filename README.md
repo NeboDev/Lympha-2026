@@ -91,10 +91,53 @@ Se despliega lo **commiteado** (la imagen usa el árbol de trabajo). Está escri
 ```
 apps/server   un paquete, una imagen, cuatro procesos: api · ingest · worker · notifier
 apps/web      PWA (vacía hasta H4)
-packages/     contracts (Zod: MQTT, API y eventos SSE) · wqi (motor WQI puro, H2)
+packages/     contracts (Zod: MQTT, API y eventos SSE) · wqi (motor WQI puro, H2) · calibracion (regresión y estabilidad, puro)
 tools/        simulator · factory (lotes generados; el CLI está en apps/server)
 infra/        compose · caddy · mosquitto · postgres · valkey · bootstrap · secrets · deploy.sh
 ```
+
+## Autocalibración
+
+Pestaña **Calibración** de la PWA (`/calibracion`): corrige cada sensor con una recta `valor = pendiente · crudo + desfase`
+calculada con soluciones patrón. Decisiones y alternativas: [`docs/DECISIONES_AUTOCALIBRACION.md`](docs/DECISIONES_AUTOCALIBRACION.md).
+
+**Flujo.** Elegir nodo y parámetro (pH, conductividad, TDS o turbidez; la temperatura no se calibra) → por cada solución
+patrón, cambiar la sonda, confirmar el valor real del frasco y esperar a que la lectura se estabilice (las últimas 8 lecturas
+con poca variación) → el asistente captura el promedio → se calcula la recta por mínimos cuadrados y se muestran pendiente,
+desfase, R² y el antes/después de cada punto → confirmar o descartar. La calibración se aplica a las lecturas **nuevas**; el valor
+sin calibrar se conserva siempre.
+
+| Parámetro | Soluciones (mínimo 2 puntos) |
+| --- | --- |
+| pH | buffers 7.00 y 4.00; 10.00 opcional |
+| Conductividad | agua destilada (0) y 1413 µS/cm |
+| TDS | agua destilada (0) y 706 mg/L (1413 µS/cm × 0.5) |
+| Turbidez | agua destilada (0) y un patrón conocido (100 NTU por omisión) |
+
+**Dónde se aplica.** En el worker, antes de guardar y de evaluar el WQI; no hay que reflashear el nodo ni tocar el broker.
+`ts.lecturas.ph` (etc.) guarda el valor calibrado y `ts.lecturas.crudo` (jsonb) el valor sin calibrar de lo que se corrigió.
+Los coeficientes se cachean en el worker y se invalidan por Valkey (`invalidar:calibracion`) al cambiarlos.
+
+**Permisos.** El propietario del espacio calibra, revierte y restablece; los miembros solo leen.
+
+**Endpoints** (todos bajo Bearer de Firebase):
+
+| Método y ruta | Quién | Qué hace |
+| --- | --- | --- |
+| `GET /api/calibraciones?nodo_id=&parametro=&limite=` | miembro | Historial (la más reciente primero) |
+| `POST /api/calibraciones` | propietario | `{nodo_id, parametro, puntos:[{crudo, referencia}]}`; el servidor calcula la recta (422 si no hay recta válida) |
+| `POST /api/calibraciones/restablecer` | propietario | Deja la identidad (pendiente 1, desfase 0) en un parámetro |
+| `POST /api/calibraciones/:id/activar` | propietario | Vuelve a una calibración del historial |
+
+**Eventos.** `event: calibracion` en `GET /api/espacios/:espacioId/eventos` (SSE) con `calibracion_id`, `nodo_id`, `parametro`,
+`cambio` (`registrada`, `revertida`, `restablecida`), `pendiente` y `desfase`.
+
+**Tabla.** `app.calibraciones_sensor` (migración `0014`): `nodo_id`, `espacio_id`, `parametro`, `pendiente`, `desfase`, `r2`,
+`puntos` (jsonb `{crudo, referencia}`), `origen` (`guiada` | `identidad`), `activa` (una sola por nodo y parámetro, índice parcial
+único), `creado_por`, `creado_en`. El plazo para marcar «calibración vencida» es `app.perfiles_uso.calibracion_vence_dias`
+(90 por omisión; se cambia con un `UPDATE`). No hay variables de entorno nuevas.
+
+**Lo que falta.** No se ha probado con un sensor y soluciones patrón reales ni el asistente en un navegador real.
 
 ## Despliegue
 
