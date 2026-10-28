@@ -646,3 +646,43 @@
     color: var(--on-brand);
   }
 }
+
+/* Impresión de etiquetas (panel de administración). La zona cuelga de <body>; en pantalla no se ve y al imprimir
+   se oculta toda la app. Cada etiqueta mide exactamente 80 × 44 mm. */
+.zona-impresion {
+  display: none;
+}
+.etiqueta-impresa {
+  display: block;
+  width: 80mm;
+  height: 44mm;
+}
+@media print {
+  body.imprimiendo {
+    background: #fff;
+  }
+  body.imprimiendo #raiz {
+    display: none !important;
+  }
+  body.imprimiendo .zona-impresion {
+    display: grid;
+  }
+  .zona-impresion.modo-hoja {
+    grid-template-columns: repeat(2, 80mm);
+    gap: 2mm 6mm;
+    justify-content: start;
+  }
+  .zona-impresion.modo-hoja .etiqueta-impresa {
+    break-inside: avoid;
+    outline: 0.2mm dashed #999;
+  }
+  .zona-impresion.modo-rollo {
+    gap: 0;
+  }
+  .zona-impresion.modo-rollo .etiqueta-impresa {
+    break-after: page;
+  }
+  .zona-impresion.modo-rollo .etiqueta-impresa:last-child {
+    break-after: auto;
+  }
+}

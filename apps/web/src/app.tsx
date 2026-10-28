@@ -6,6 +6,7 @@ import { ContextoApi } from "./api/contexto.ts";
 import { Plantilla } from "./componentes/plantilla.tsx";
 import { API_URL, FIREBASE, PROBLEMAS_CONFIG } from "./config.ts";
 import { Acceso } from "./paginas/acceso.tsx";
+import { AdminLotes, AdminNodo, AdminNodos, RutaAdmin } from "./paginas/admin.tsx";
 import { Ajustes } from "./paginas/ajustes.tsx";
 import { Alertas } from "./paginas/alertas.tsx";
 import { Calibracion } from "./paginas/calibracion.tsx";
@@ -73,6 +74,11 @@ function Aplicacion() {
                   <Route path="/alertas" element={<Alertas />} />
                   <Route path="/calibracion" element={<Calibracion />} />
                   <Route path="/ajustes" element={<Ajustes />} />
+                  <Route path="/admin" element={<RutaAdmin />}>
+                    <Route index element={<AdminLotes />} />
+                    <Route path="nodos" element={<AdminNodos />} />
+                    <Route path="nodos/:nodoId" element={<AdminNodo />} />
+                  </Route>
                   <Route path="/invitacion" element={<Invitacion />} />
                 </Route>
               </Route>

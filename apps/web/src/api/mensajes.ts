@@ -17,6 +17,10 @@ const POR_CODIGO: Record<string, string> = {
   valor_invalido: "Alguno de los valores capturados no es un número válido.",
   pendiente_no_positiva:
     "El sensor responde al revés de lo esperado. Revisa la sonda y los valores de las soluciones.",
+  regeneracion_invalida:
+    "Solo se regenera la etiqueta de un nodo sin reclamar y de un lote vigente. Si ya está reclamado, desvincúlalo primero.",
+  servicio_no_disponible:
+    "El servidor no puede hacer esto ahora (falta el acceso de administración al broker). No se cambió nada.",
   prohibido: "No tienes permiso para hacer esto.",
   no_encontrado: "No encontramos lo que buscas.",
   no_autenticado: "Tu sesión no es válida. Vuelve a entrar.",

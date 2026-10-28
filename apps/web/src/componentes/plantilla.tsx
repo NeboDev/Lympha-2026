@@ -7,18 +7,20 @@ import {
   IcoCalibrar,
   IcoCampana,
   IcoInicio,
+  IcoQr,
   IcoSalir,
   Marca,
   type PropsIcono,
 } from "./Iconos.tsx";
 
-const PESTANAS: { a: string; texto: string; Icono: ComponentType<PropsIcono>; exacta?: boolean }[] =
-  [
-    { a: "/", texto: "Inicio", Icono: IcoInicio, exacta: true },
-    { a: "/alertas", texto: "Alertas", Icono: IcoCampana },
-    { a: "/calibracion", texto: "Calibración", Icono: IcoCalibrar },
-    { a: "/ajustes", texto: "Ajustes", Icono: IcoAjustes },
-  ];
+type Pestana = { a: string; texto: string; Icono: ComponentType<PropsIcono>; exacta?: boolean };
+
+const PESTANAS: Pestana[] = [
+  { a: "/", texto: "Inicio", Icono: IcoInicio, exacta: true },
+  { a: "/alertas", texto: "Alertas", Icono: IcoCampana },
+  { a: "/calibracion", texto: "Calibración", Icono: IcoCalibrar },
+  { a: "/ajustes", texto: "Ajustes", Icono: IcoAjustes },
+];
 
 /**
  * Marco de las pantallas con sesión. En el teléfono: barra superior con la marca y la persona, y las pestañas
@@ -28,6 +30,10 @@ export function Plantilla() {
   const sesion = useSesion();
   const yo = useYo();
   const nombre = yo.data?.nombre ?? yo.data?.email ?? "";
+  // «Administración» solo aparece si la API dice que esta persona es admin de plataforma.
+  const pestanas: Pestana[] = yo.data?.es_admin
+    ? [...PESTANAS, { a: "/admin", texto: "Admin", Icono: IcoQr }]
+    : PESTANAS;
   return (
     <div className="min-h-dvh lg:pl-64">
       <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-line bg-surface px-4 py-2 lg:fixed lg:inset-y-0 lg:left-0 lg:w-64 lg:flex-col lg:items-stretch lg:gap-6 lg:border-r lg:border-b-0 lg:px-4 lg:py-6">
@@ -43,8 +49,10 @@ export function Plantilla() {
           aria-label="Principal"
           className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-surface pb-[env(safe-area-inset-bottom)] lg:static lg:border-0 lg:bg-transparent lg:p-0"
         >
-          <ul className="m-0 grid list-none grid-cols-4 p-0 lg:grid-cols-1 lg:gap-1">
-            {PESTANAS.map(({ a, texto, Icono, exacta }) => (
+          <ul
+            className={`m-0 grid list-none p-0 lg:grid-cols-1 lg:gap-1 ${pestanas.length > 4 ? "grid-cols-5" : "grid-cols-4"}`}
+          >
+            {pestanas.map(({ a, texto, Icono, exacta }) => (
               <li key={a}>
                 <NavLink
                   to={a}
