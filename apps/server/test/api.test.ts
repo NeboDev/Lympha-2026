@@ -1264,13 +1264,18 @@ describe("API de H1", () => {
   });
 
   it("toda prueba de acceso cruzado citada en rutas-cubiertas.ts existe en este archivo", () => {
-    const fuente = readFileSync(join(import.meta.dirname, "api.test.ts"), "utf8");
+    const fuentes = new Map(
+      ["api.test.ts", "admin.test.ts"].map((f) => [
+        `test/${f}`,
+        readFileSync(join(import.meta.dirname, f), "utf8"),
+      ]),
+    );
     const citadas = Object.values(RUTAS_CUBIERTAS)
       .filter((c) => c !== "publica")
       .map((c) => (c as { aislamiento: string }).aislamiento);
     const sinPrueba = citadas.filter((c) => {
       const [archivo, nombre] = c.split(" › ");
-      return archivo !== "test/api.test.ts" || !fuente.includes(`it("${nombre}"`);
+      return !fuentes.get(archivo ?? "")?.includes(`it("${nombre}"`);
     });
     expect(sinPrueba).toEqual([]);
   });

@@ -95,6 +95,14 @@ const esquemas = {
       MQTT_CONTROL_USER: z.string().min(1),
       MQTT_CONTROL_PASSWORD: secreto,
       CLAIM_PEPPER: secreto,
+      /**
+       * Credencial de administración de Dynamic Security. OPCIONAL y solo para el panel de administración
+       * (alta de lotes, regenerar etiquetas, revocar): la API abre una conexión por operación y la cierra. Sin ellas,
+       * el panel lista pero esas acciones responden 503. Ensancha lo que una API comprometida puede hacer: ver
+       * `docs/decisiones.md`, «Panel de administración».
+       */
+      MQTT_ADMIN_USER: opcional(z.string().min(1)),
+      MQTT_ADMIN_PASSWORD: opcional(secreto),
       /** Proyecto de Firebase cuyos tokens se aceptan (lympha-dev en local). */
       FIREBASE_PROJECT_ID: z.string().min(1),
       /**
@@ -123,6 +131,9 @@ const esquemas = {
     .superRefine((c, ctx) => {
       const problema = (path: string, message: string) =>
         ctx.addIssue({ code: z.ZodIssueCode.custom, path: [path], message });
+      if (Boolean(c.MQTT_ADMIN_USER) !== Boolean(c.MQTT_ADMIN_PASSWORD)) {
+        problema("MQTT_ADMIN_USER", "MQTT_ADMIN_USER y MQTT_ADMIN_PASSWORD van juntas o ninguna");
+      }
       if (c.FIREBASE_USE_EMULATOR && c.APP_ENV !== "local") {
         problema("FIREBASE_USE_EMULATOR", "solo se permite con APP_ENV=local");
       }
@@ -188,6 +199,10 @@ const esquemas = {
     METRICS_PORT: puertoMetricas,
   }),
   migrate: comun.extend({
+    DATABASE_URL_MIGRATE: urlPostgres,
+  }),
+  /** CLI de administradores de plataforma (rol lympha_owner): la única forma de poblar app.admins_plataforma. */
+  admin: comun.extend({
     DATABASE_URL_MIGRATE: urlPostgres,
   }),
   seed: comun.extend({

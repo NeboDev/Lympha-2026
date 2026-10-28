@@ -17,8 +17,14 @@ export const rutasIdentidad: FastifyPluginAsync<DepsIdentidad> = async (app, dep
 
   r.get("/api/yo", { ...opciones, schema: { response: { 200: usuarioApi } } }, async (req) => {
     const fila = await conUsuario(deps.bd, usuarioDe(req), async (tx) => {
-      const res = await tx.execute<{ id: string; email: string; nombre: string | null }>(
-        sql`SELECT id, email::text AS email, nombre FROM app.usuarios WHERE id = app.usuario_actual()`,
+      const res = await tx.execute<{
+        id: string;
+        email: string;
+        nombre: string | null;
+        es_admin: boolean;
+      }>(
+        sql`SELECT id, email::text AS email, nombre, app.es_admin_plataforma() AS es_admin
+            FROM app.usuarios WHERE id = app.usuario_actual()`,
       );
       return res.rows[0];
     });
@@ -31,9 +37,15 @@ export const rutasIdentidad: FastifyPluginAsync<DepsIdentidad> = async (app, dep
     { ...opciones, schema: { body: actualizarUsuarioBody, response: { 200: usuarioApi } } },
     async (req) => {
       const fila = await conUsuario(deps.bd, usuarioDe(req), async (tx) => {
-        const res = await tx.execute<{ id: string; email: string; nombre: string | null }>(
+        const res = await tx.execute<{
+          id: string;
+          email: string;
+          nombre: string | null;
+          es_admin: boolean;
+        }>(
           sql`UPDATE app.usuarios SET nombre = ${req.body.nombre}
-              WHERE id = app.usuario_actual() RETURNING id, email::text AS email, nombre`,
+              WHERE id = app.usuario_actual()
+              RETURNING id, email::text AS email, nombre, app.es_admin_plataforma() AS es_admin`,
         );
         return res.rows[0];
       });

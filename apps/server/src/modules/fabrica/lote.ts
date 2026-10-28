@@ -61,12 +61,7 @@ export async function fabricarLote(deps: DepsFabrica, op: OpcionesLote): Promise
     "SELECT app.uuid_v7() AS id FROM generate_series(1, $1)",
     [op.cantidad],
   );
-  const nodos: NodoFabricado[] = ids.rows.map((f) => ({
-    deviceId: f.id,
-    mqttPassword: generarPasswordMqtt(),
-    apKey: generarClaveAp(),
-    codigoReclamo: formatearCodigoReclamo(generarCodigoReclamo()),
-  }));
+  const nodos: NodoFabricado[] = ids.rows.map((f) => identidadNueva(f.id));
 
   // 2. Postgres: lote + nodos en estado "fabricado" (o ya reclamados en desarrollo). Solo el hash del código.
   let loteId = "";
@@ -107,10 +102,40 @@ export async function fabricarLote(deps: DepsFabrica, op: OpcionesLote): Promise
   }
 
   // 3. Dynamic Security: grupo del lote y un cliente por nodo (usuario = client id = deviceId).
+  try {
+    await altaEnBroker(deps.dynsec, loteId, nodos);
+  } catch (error) {
+    // Compensación: el lote no llegó a existir del todo, así que no queda a medias en ningún lado.
+    await deshacerLoteEnBd(deps, loteId).catch(() => undefined);
+    throw error;
+  }
+
+  return { loteId, creadoEn, nodos };
+}
+
+/** Identidad nueva (contraseña MQTT, clave del AP y código de reclamo) para un nodo ya con `deviceId`. */
+export function identidadNueva(deviceId: string): NodoFabricado {
+  return {
+    deviceId,
+    mqttPassword: generarPasswordMqtt(),
+    apKey: generarClaveAp(),
+    codigoReclamo: formatearCodigoReclamo(generarCodigoReclamo()),
+  };
+}
+
+/**
+ * Dynamic Security: grupo del lote y un cliente por nodo. Si el broker rechaza alguno, deshace lo que sí creó
+ * (clientes y grupo) y vuelve a lanzar el error; la base la compensa quien llama. Lo usan el CLI y el panel.
+ */
+export async function altaEnBroker(
+  dynsec: ClienteDynsec,
+  loteId: string,
+  nodos: NodoFabricado[],
+): Promise<void> {
   const grupo = `lote:${loteId}`;
   const creados: string[] = [];
   try {
-    await deps.dynsec.asegurarGrupo(grupo);
+    await dynsec.asegurarGrupo(grupo);
     for (let i = 0; i < nodos.length; i += POR_PETICION) {
       const trozo = nodos.slice(i, i + POR_PETICION);
       const comandos: Comando[] = trozo.map((n) => ({
@@ -121,7 +146,7 @@ export async function fabricarLote(deps: DepsFabrica, op: OpcionesLote): Promise
         roles: [{ rolename: "nodo" }],
         groups: [{ groupname: grupo }],
       }));
-      const respuestas = await deps.dynsec.ejecutar(comandos, 15_000);
+      const respuestas = await dynsec.ejecutar(comandos, 15_000);
       respuestas.forEach((r, j) => {
         const nodo = trozo[j];
         if (nodo && !r.error) creados.push(nodo.deviceId);
@@ -134,23 +159,23 @@ export async function fabricarLote(deps: DepsFabrica, op: OpcionesLote): Promise
       }
     }
   } catch (error) {
-    // Compensación: el lote no llegó a existir del todo, así que no queda a medias en ningún lado.
-    await deshacerLote(deps, loteId, creados, grupo).catch(() => undefined);
+    await deshacerBroker(dynsec, creados, grupo).catch(() => undefined);
     throw error;
   }
-
-  return { loteId, creadoEn, nodos };
 }
 
-async function deshacerLote(deps: DepsFabrica, loteId: string, clientes: string[], grupo: string) {
+async function deshacerBroker(dynsec: ClienteDynsec, clientes: string[], grupo: string) {
   for (const username of clientes) {
-    await deps.dynsec
+    await dynsec
       .comando({ command: "deleteClient", username }, /not found/i)
       .catch(() => undefined);
   }
-  await deps.dynsec
+  await dynsec
     .comando({ command: "deleteGroup", groupname: grupo }, /not found/i)
     .catch(() => undefined);
+}
+
+async function deshacerLoteEnBd(deps: DepsFabrica, loteId: string) {
   await deps.db.query(
     "DELETE FROM app.estado_nodo WHERE nodo_id IN (SELECT id FROM app.nodos WHERE lote_id = $1)",
     [loteId],
@@ -159,9 +184,48 @@ async function deshacerLote(deps: DepsFabrica, loteId: string, clientes: string[
   await deps.db.query("DELETE FROM app.lotes WHERE id = $1", [loteId]);
 }
 
+/** El broker desconecta al nodo y rechaza sus conexiones. Idempotente (un cliente inexistente no es error). */
+export async function desactivarNodoEnBroker(
+  dynsec: ClienteDynsec,
+  deviceId: string,
+): Promise<void> {
+  await dynsec.comando({ command: "disableClient", username: deviceId }, /not found/i);
+}
+
+/**
+ * Todo un lote en el broker (RNF-03). Mosquitto evalúa primero los roles del propio cliente y después los de sus
+ * grupos, así que el rol `revocado` del grupo NO anula el rol `nodo` de cada cliente (verificado contra
+ * Mosquitto 2.1.2). Por eso, además del rol en el grupo, se desactiva cada cliente del lote.
+ */
+export async function desactivarLoteEnBroker(
+  dynsec: ClienteDynsec,
+  loteId: string,
+  deviceIds: string[],
+): Promise<void> {
+  await dynsec.comando(
+    {
+      command: "addGroupRole",
+      groupname: `lote:${loteId}`,
+      rolename: "revocado",
+      priority: PRIORIDAD_REVOCADO,
+    },
+    /already|internal error/i,
+  );
+  for (let i = 0; i < deviceIds.length; i += POR_PETICION) {
+    const respuestas = await dynsec.ejecutar(
+      deviceIds
+        .slice(i, i + POR_PETICION)
+        .map((id) => ({ command: "disableClient", username: id })),
+      15_000,
+    );
+    const fallo = respuestas.find((r) => r.error && !/not found/i.test(r.error));
+    if (fallo) throw new Error(`Dynamic Security no pudo desactivar un cliente: ${fallo.error}`);
+  }
+}
+
 /** Un nodo: el broker lo desconecta y rechaza sus conexiones; en la base queda revocado y sin espacio. */
 export async function revocarNodo(deps: DepsFabrica, deviceId: string): Promise<void> {
-  await deps.dynsec.comando({ command: "disableClient", username: deviceId }, /not found/i);
+  await desactivarNodoEnBroker(deps.dynsec, deviceId);
   await deps.db.query("BEGIN");
   try {
     const r = await deps.db.query<{ espacio_id: string | null }>(
@@ -201,26 +265,10 @@ export async function revocarNodo(deps: DepsFabrica, deviceId: string): Promise<
 export async function revocarLote(deps: DepsFabrica, loteId: string): Promise<number> {
   const existe = await deps.db.query("SELECT 1 FROM app.lotes WHERE id = $1", [loteId]);
   if (existe.rowCount === 0) throw new Error("el lote no existe");
-  await deps.dynsec.comando(
-    {
-      command: "addGroupRole",
-      groupname: `lote:${loteId}`,
-      rolename: "revocado",
-      priority: PRIORIDAD_REVOCADO,
-    },
-    /already|internal error/i,
-  );
   const ids = (
     await deps.db.query<{ id: string }>("SELECT id FROM app.nodos WHERE lote_id = $1", [loteId])
-  ).rows;
-  for (let i = 0; i < ids.length; i += POR_PETICION) {
-    const respuestas = await deps.dynsec.ejecutar(
-      ids.slice(i, i + POR_PETICION).map((f) => ({ command: "disableClient", username: f.id })),
-      15_000,
-    );
-    const fallo = respuestas.find((r) => r.error && !/not found/i.test(r.error));
-    if (fallo) throw new Error(`Dynamic Security no pudo desactivar un cliente: ${fallo.error}`);
-  }
+  ).rows.map((f) => f.id);
+  await desactivarLoteEnBroker(deps.dynsec, loteId, ids);
   await deps.db.query("BEGIN");
   try {
     const lote = await deps.db.query(

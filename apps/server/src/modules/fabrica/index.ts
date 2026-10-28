@@ -25,8 +25,12 @@ export {
   generarPasswordMqtt,
 } from "./identidad.ts";
 export {
+  altaEnBroker,
   type DepsFabrica,
+  desactivarLoteEnBroker,
+  desactivarNodoEnBroker,
   fabricarLote,
+  identidadNueva,
   type LoteFabricado,
   MAX_POR_LOTE,
   type NodoFabricado,

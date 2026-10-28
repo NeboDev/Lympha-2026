@@ -13,6 +13,8 @@
 export type Cobertura = "publica" | { aislamiento: string };
 
 const API = "test/api.test.ts";
+const ADMIN = "test/admin.test.ts";
+const admin = (nombre: string): Cobertura => ({ aislamiento: `${ADMIN} › ${nombre}` });
 const ajeno = (nombre: string): Cobertura => ({ aislamiento: `${API} › ${nombre}` });
 
 export const RUTAS_CUBIERTAS: Record<string, Cobertura> = {
@@ -85,6 +87,33 @@ export const RUTAS_CUBIERTAS: Record<string, Cobertura> = {
   ),
   "POST /api/alarmas/:alarmaId/atender": ajeno(
     "alarmas: un ajeno recibe 404 al listar y al atender",
+  ),
+
+  // Panel de administración: solo `app.admins_plataforma`; para cualquier otro (usuario normal, propietario de
+  // espacio, sin sesión) responden 404 idéntico a una ruta inexistente. Prueba: test/admin.test.ts.
+  "GET /api/admin/lotes": admin(
+    "admin: sin ser admin de plataforma toda ruta responde 404 idéntico",
+  ),
+  "POST /api/admin/lotes": admin(
+    "admin: sin ser admin de plataforma toda ruta responde 404 idéntico",
+  ),
+  "POST /api/admin/lotes/:loteId/revocar": admin(
+    "admin: sin ser admin de plataforma toda ruta responde 404 idéntico",
+  ),
+  "GET /api/admin/nodos": admin(
+    "admin: sin ser admin de plataforma toda ruta responde 404 idéntico",
+  ),
+  "GET /api/admin/nodos/:nodoId": admin(
+    "admin: sin ser admin de plataforma toda ruta responde 404 idéntico",
+  ),
+  "GET /api/admin/nodos/:nodoId/pertenece-a": admin(
+    "admin: sin ser admin de plataforma toda ruta responde 404 idéntico",
+  ),
+  "POST /api/admin/nodos/:nodoId/regenerar-etiqueta": admin(
+    "admin: sin ser admin de plataforma toda ruta responde 404 idéntico",
+  ),
+  "POST /api/admin/nodos/:nodoId/revocar": admin(
+    "admin: sin ser admin de plataforma toda ruta responde 404 idéntico",
   ),
 
   // Autocalibración: leer es de cualquier miembro; guardar, revertir y restablecer, del propietario.

@@ -1,4 +1,5 @@
 import type { FastifyInstance } from "fastify";
+import { type ConBrokerAdmin, crearConBrokerAdmin, rutasAdmin } from "../modules/admin/index.ts";
 import { rutasAlarmas } from "../modules/alarmas/index.ts";
 import { rutasCalibracion } from "../modules/calibracion/index.ts";
 import { rutasCalidad } from "../modules/calidad/index.ts";
@@ -49,6 +50,8 @@ export interface DepsRutas {
   appEnv: "local" | "staging" | "production";
   verificador: VerificadorToken;
   claimPepper: string;
+  /** Acceso puntual al administrador del broker, solo para el panel de administración; ausente = esas acciones dan 503. */
+  conBrokerAdmin?: ConBrokerAdmin;
   /** Webhook de Telegram: solo existe si Telegram está en modo webhook. */
   telegram?: { secreto: string; manejar: ManejadorActualizacion };
   /** Nombre de usuario del bot para armar el enlace de vinculación; ausente si no hay bot configurado. */
@@ -65,6 +68,12 @@ export async function registrarRutas(app: FastifyInstance, deps: DepsRutas, _log
     version: deps.version,
   });
   await app.register(rutasIdentidad, { bd: deps.bd, autenticar });
+  await app.register(rutasAdmin, {
+    bd: deps.bd,
+    autenticar,
+    claimPepper: deps.claimPepper,
+    conBroker: deps.conBrokerAdmin,
+  });
   await app.register(rutasEspacios, { bd: deps.bd, autenticar });
   await app.register(rutasDispositivos, {
     bd: deps.bd,
@@ -158,6 +167,16 @@ export async function crearApi(
       appEnv: config.APP_ENV,
       verificador,
       claimPepper: config.CLAIM_PEPPER,
+      ...(config.MQTT_ADMIN_USER && config.MQTT_ADMIN_PASSWORD
+        ? {
+            conBrokerAdmin: crearConBrokerAdmin({
+              url: config.MQTT_URL,
+              usuario: config.MQTT_ADMIN_USER,
+              password: config.MQTT_ADMIN_PASSWORD,
+              caFile: config.MQTT_CA_FILE,
+            }),
+          }
+        : {}),
       ...(obtenerNombreBot ? { nombreBot: obtenerNombreBot } : {}),
       ...(modo === "webhook" && config.TELEGRAM_WEBHOOK_SECRET
         ? { telegram: { secreto: config.TELEGRAM_WEBHOOK_SECRET, manejar } }

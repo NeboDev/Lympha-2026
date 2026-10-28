@@ -59,6 +59,8 @@ export const usuarioApi = z.object({
   id: uuid,
   email: z.string(),
   nombre: z.string().nullable(),
+  /** Administrador de plataforma (panel de etiquetas y boyas); no depende de ningún espacio. */
+  es_admin: z.boolean().default(false),
 });
 export type UsuarioApi = z.infer<typeof usuarioApi>;
 

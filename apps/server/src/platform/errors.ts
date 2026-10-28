@@ -66,6 +66,13 @@ export class InvitacionInvalida extends ErrorDominio {
   }
 }
 
+/** Una dependencia que la operación necesita (p. ej. el broker de administración) no está disponible. */
+export class ServicioNoDisponible extends ErrorDominio {
+  constructor(mensaje = "Servicio no disponible por ahora") {
+    super("servicio_no_disponible", mensaje, 503);
+  }
+}
+
 export function esErrorDominio(error: unknown): error is ErrorDominio {
   return error instanceof ErrorDominio;
 }
@@ -104,6 +111,15 @@ export function traducirErrorPg(error: unknown): ErrorDominio | null {
           "Transfiere la propiedad de tus espacios compartidos antes de continuar",
           "transferir_primero",
         );
+      case "no_encontrado":
+        return new NoEncontrado();
+      case "regeneracion_invalida":
+        return new Conflicto(
+          "Solo se regenera un nodo aún sin reclamar y de un lote vigente; si ya está reclamado, desvincúlalo primero",
+          "regeneracion_invalida",
+        );
+      case "lote_invalido":
+        return new Invalido("Lote inválido");
       case "transferencia_invalida":
         return new Invalido("El destino debe ser otro miembro del espacio");
       default:
