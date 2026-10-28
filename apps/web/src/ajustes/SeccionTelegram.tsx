@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useAccionesTelegram, useTelegram } from "../api/consultas.ts";
 import { mensajeDeError } from "../api/mensajes.ts";
-import { IcoCheck, IcoEnviar } from "../componentes/Iconos.tsx";
+import { IcoCheck, IcoEnviar, IcoX } from "../componentes/Iconos.tsx";
 
 /** Solo se enlaza a Telegram: el enlace viene de la API, pero se revisa antes de ponerlo en un `href`. */
 const esEnlaceDeTelegram = (url: string) => url.startsWith("https://t.me/");
@@ -67,7 +67,7 @@ export function SeccionTelegram() {
               }
             }}
           >
-            Desvincular Telegram
+            <IcoX tamano={18} /> Desvincular Telegram
           </button>
           {desvincular.isError && <p role="alert">{mensajeDeError(desvincular.error)}</p>}
         </>
@@ -107,7 +107,7 @@ export function SeccionTelegram() {
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  Abrir Telegram
+                  <IcoEnviar tamano={18} /> Abrir Telegram
                 </a>
               ) : (
                 <p role="alert">No pudimos preparar el enlace. Inténtalo de nuevo.</p>

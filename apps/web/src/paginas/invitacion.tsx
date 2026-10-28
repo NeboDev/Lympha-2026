@@ -2,7 +2,7 @@ import { type FormEvent, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
 import { useAccionesEspacio } from "../api/consultas.ts";
 import { mensajeDeError } from "../api/mensajes.ts";
-import { Gota } from "../componentes/Iconos.tsx";
+import { Marca } from "../componentes/Iconos.tsx";
 
 /** El token puede venir en el fragmento del enlace (`/invitacion#<token>`) o pegarse (solo o dentro del enlace). */
 function extraerToken(texto: string): string {
@@ -32,7 +32,7 @@ export function Invitacion() {
   return (
     <main className="mx-auto grid min-h-dvh w-full max-w-md content-center gap-5 px-4 py-8">
       <div className="grid justify-items-center gap-2 text-center">
-        <Gota tamano={56} />
+        <Marca ancho={96} />
         <h1>Unirte a un espacio</h1>
       </div>
       <div className="tarjeta grid gap-4 p-5">

@@ -1,4 +1,4 @@
-import type { ComponentType } from "react";
+import type { ComponentType, ReactNode } from "react";
 import type { EstadoVisible } from "../espacios/estado.ts";
 import {
   IcoAlerta,
@@ -24,6 +24,24 @@ export const ICONO_ESTADO: Record<EstadoVisible, ComponentType<PropsIcono>> = {
   deshabilitado: IcoMenos,
   sin_vincular: IcoMenos,
 };
+
+/** Estado vacío: un símbolo que dice de qué se trata y el texto; no lleva acción (si hace falta, va debajo). */
+export function Vacio({
+  icono: Icono,
+  children,
+  className = "",
+}: {
+  icono: ComponentType<PropsIcono>;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <p className={`tarjeta m-0 flex items-center gap-3 p-5 text-text-2 ${className}`}>
+      <Icono tamano={22} className="shrink-0" />
+      <span>{children}</span>
+    </p>
+  );
+}
 
 /** Chip de estado: relleno de semáforo, texto oscuro, símbolo y palabra. */
 export function Insignia({

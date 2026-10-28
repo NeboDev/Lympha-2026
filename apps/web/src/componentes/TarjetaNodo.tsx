@@ -3,7 +3,7 @@ import { Link } from "react-router";
 import type { EstadoVisible, NodoVista } from "../espacios/estado.ts";
 import { haceCuanto, horaYDia } from "../espacios/tiempo.ts";
 import { Anillo, Insignia } from "./estados.tsx";
-import { IcoFoco, IcoReloj } from "./Iconos.tsx";
+import { IcoFoco, IcoReloj, IcoSinRed } from "./Iconos.tsx";
 
 /** Texto y símbolo de cada estado: el color nunca es lo único que lo distingue (accesibilidad). */
 const ESTADOS: Record<EstadoVisible, { etiqueta: string; simbolo: string }> = {
@@ -126,6 +126,7 @@ export function AvisoFlujo({
   if (flujo === "reconectando") {
     return (
       <p role="status" className="aviso">
+        <IcoSinRed tamano={16} className="mr-1.5 inline align-[-3px]" />
         Reconectando… lo que ves puede no estar al día.
       </p>
     );

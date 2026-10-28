@@ -10,6 +10,7 @@ import {
   usePreferencias,
 } from "../api/consultas.ts";
 import { mensajeDeError } from "../api/mensajes.ts";
+import { IcoCirculoCheck } from "../componentes/Iconos.tsx";
 
 /** Los nodos de un espacio, cada uno con su preferencia propia o la general. */
 function NodosDeEspacio({
@@ -119,7 +120,11 @@ export function Ajustes() {
                 guardar.mutate(p, { onSuccess: () => setGuardado(true) });
               }}
             />
-            {guardado && !guardar.isPending && <p role="status">Ajustes guardados.</p>}
+            {guardado && !guardar.isPending && (
+              <p role="status" className="flex items-center gap-2 font-semibold">
+                <IcoCirculoCheck tamano={18} /> Ajustes guardados.
+              </p>
+            )}
 
             <h2 className="m-0 mt-4">Por nodo</h2>
             <p className="detalle m-0">

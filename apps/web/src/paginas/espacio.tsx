@@ -3,8 +3,19 @@ import { type FormEvent, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { useAccionesEspacio, useYo } from "../api/consultas.ts";
 import { mensajeDeError } from "../api/mensajes.ts";
+import { Vacio } from "../componentes/estados.tsx";
 import { etiquetaRol, etiquetaTipo, TIPOS_ESPACIO } from "../componentes/etiquetas.ts";
-import { IcoAtras, IcoCopiar, IcoMas, IcoPersona } from "../componentes/Iconos.tsx";
+import {
+  IcoAtras,
+  IcoCopiar,
+  IcoEnlace,
+  IcoLapiz,
+  IcoMas,
+  IcoNodo,
+  IcoPapelera,
+  IcoPersona,
+  IcoSalir,
+} from "../componentes/Iconos.tsx";
 import { ordenarPorUrgencia, ResumenEspacio } from "../componentes/ResumenEspacio.tsx";
 import { AvisoFlujo, TarjetaNodo } from "../componentes/TarjetaNodo.tsx";
 import { useAhora, useEstadoEspacio } from "../espacios/useEstadoEspacio.ts";
@@ -122,7 +133,7 @@ export function Espacio() {
                 setEditando(true);
               }}
             >
-              Editar nombre y tipo
+              <IcoLapiz tamano={18} /> Editar nombre y tipo
             </button>
           )}
         </header>
@@ -142,7 +153,7 @@ export function Espacio() {
         <AvisoFlujo flujo={flujo} />
         <ResumenEspacio nombre={espacio.nombre} nodos={nodosVivos} />
         {nodosVivos.length === 0 && (
-          <p className="tarjeta m-0 p-5">Todavía no hay nodos en este espacio.</p>
+          <Vacio icono={IcoNodo}>Todavía no hay nodos en este espacio.</Vacio>
         )}
         <div className="rejilla">
           {ordenarPorUrgencia(nodosVivos).map((n) => (
@@ -204,7 +215,7 @@ export function Espacio() {
                         }
                       }}
                     >
-                      Quitar
+                      <IcoPapelera tamano={16} /> Quitar
                     </button>
                   </div>
                 )}
@@ -230,7 +241,7 @@ export function Espacio() {
               }
             }}
           >
-            Salir del espacio
+            <IcoSalir tamano={18} /> Salir del espacio
           </button>
         )}
       </section>
@@ -252,7 +263,7 @@ export function Espacio() {
               acciones.invitar.mutate(espacioId);
             }}
           >
-            Crear invitación
+            <IcoEnlace tamano={18} /> Crear invitación
           </button>
           {acciones.invitar.isError && <p role="alert">{mensajeDeError(acciones.invitar.error)}</p>}
           {enlaceInvitacion && acciones.invitar.data && (

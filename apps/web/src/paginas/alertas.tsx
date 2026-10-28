@@ -4,9 +4,16 @@ import { Link } from "react-router";
 import { ETIQUETA_ESTADO, ETIQUETA_SEVERIDAD, lineaDeEstado, titulo } from "../alertas/textos.ts";
 import { useAlarmas, useAtenderAlarma, useEspacios } from "../api/consultas.ts";
 import { mensajeDeError } from "../api/mensajes.ts";
-import { ICONO_ESTADO } from "../componentes/estados.tsx";
+import { ICONO_ESTADO, Vacio } from "../componentes/estados.tsx";
 import { etiquetaTipo } from "../componentes/etiquetas.ts";
-import { IcoAdelante, IcoCheck, IcoLlave, IcoSinRed } from "../componentes/Iconos.tsx";
+import {
+  IcoAdelante,
+  IcoCampana,
+  IcoCheck,
+  IcoCirculoCheck,
+  IcoLlave,
+  IcoSinRed,
+} from "../componentes/Iconos.tsx";
 import { useEstadoEspacio } from "../espacios/useEstadoEspacio.ts";
 
 /** Color del borde: el nivel en las de calidad; el de «revisar» en las de sensor; gris en las de conexión. */
@@ -64,7 +71,7 @@ function Alerta({
           disabled={atendiendo}
           onClick={alAtender}
         >
-          Marcar como atendida
+          <IcoCirculoCheck tamano={18} /> Marcar como atendida
         </button>
       )}
     </li>
@@ -105,9 +112,9 @@ function AlertasDeEspacio({
       {alarmas.isError && <p role="alert">{mensajeDeError(alarmas.error)}</p>}
       {atender.isError && <p role="alert">{mensajeDeError(atender.error)}</p>}
       {alarmas.data && alarmas.data.alarmas.length === 0 && (
-        <p className="tarjeta m-0 p-5 text-text-2">
+        <Vacio icono={filtro === "abiertas" ? IcoCirculoCheck : IcoCampana}>
           {filtro === "abiertas" ? "Sin alertas abiertas por ahora." : "Todavía no hay alertas."}
-        </p>
+        </Vacio>
       )}
       <ul className="alertas m-0 grid list-none gap-3 p-0">
         {alarmas.data?.alarmas.map((a) => (

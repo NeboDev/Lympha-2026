@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { IcoX } from "../componentes/Iconos.tsx";
 
 /** `BarcodeDetector` aún no está en los tipos de DOM de TypeScript. */
 interface DetectorDeCodigos {
@@ -71,7 +72,7 @@ export function EscanerQr({
         <video ref={video} muted playsInline aria-label="Vista de la cámara para leer el QR" />
       )}
       <button type="button" className="secundario" onClick={alCerrar}>
-        Cerrar la cámara
+        <IcoX tamano={18} /> Cerrar la cámara
       </button>
     </div>
   );

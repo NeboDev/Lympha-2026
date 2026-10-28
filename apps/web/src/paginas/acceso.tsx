@@ -1,6 +1,6 @@
 import { type FormEvent, useState } from "react";
 import { Navigate, useLocation } from "react-router";
-import { Gota } from "../componentes/Iconos.tsx";
+import { Marca } from "../componentes/Iconos.tsx";
 import { useSesion } from "../sesion/contexto.tsx";
 import { ErrorAcceso } from "../sesion/servicio.ts";
 
@@ -57,8 +57,9 @@ export function Acceso() {
   return (
     <main className="mx-auto grid min-h-dvh w-full max-w-md content-center gap-5 px-4 py-8">
       <div className="grid justify-items-center gap-2 text-center">
-        <Gota tamano={56} />
-        <h1>Lympha</h1>
+        <h1 className="m-0">
+          <Marca variante="logo" ancho={200} />
+        </h1>
         <p className="text-text-2">
           {creando ? "Crea tu cuenta" : "Entra para ver el agua de tu espacio"}
         </p>

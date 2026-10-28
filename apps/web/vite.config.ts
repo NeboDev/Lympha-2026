@@ -3,7 +3,7 @@ import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 import { VitePWA } from "vite-plugin-pwa";
 
-const COLOR = "#497be5";
+const COLOR = "#fdfcfc";
 
 // Puerto 5173: es el origen que CORS_ORIGINS permite por defecto en desarrollo (infra/compose/dev.yml);
 // 4173 es el de `vite preview` (el build con el service worker).
@@ -15,7 +15,7 @@ export default defineConfig({
       // «prompt»: una versión nueva no recarga la pantalla de golpe (podría haber un formulario a medias);
       // la persona decide cuándo actualizar (ver src/pwa/AvisosPWA.tsx).
       registerType: "prompt",
-      includeAssets: ["favicon.svg", "apple-touch-icon.png"],
+      includeAssets: ["favicon-64.png", "apple-touch-icon.png"],
       manifest: {
         id: "/",
         name: "Lympha",
@@ -27,7 +27,7 @@ export default defineConfig({
         display: "standalone",
         orientation: "portrait",
         theme_color: COLOR,
-        background_color: "#ffffff",
+        background_color: "#fdfcfc",
         icons: [
           { src: "icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
           { src: "icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },

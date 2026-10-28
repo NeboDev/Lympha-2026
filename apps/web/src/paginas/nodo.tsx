@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useParams } from "react-router";
 import { useHistorial, useLecturas, useNodo } from "../api/consultas.ts";
 import { mensajeDeError } from "../api/mensajes.ts";
-import { IcoAtras, IcoInfo } from "../componentes/Iconos.tsx";
+import { IcoAtras, IcoInfo, IcoReloj } from "../componentes/Iconos.tsx";
 import {
   type ClaveParametro,
   formatearValor,
@@ -132,7 +132,9 @@ export function Nodo() {
         {historial.data && (
           <>
             {historial.data.historial.length === 0 && (
-              <p className="m-0">Todavía no hay datos de este periodo.</p>
+              <p className="m-0 flex items-center gap-2 text-text-2">
+                <IcoReloj tamano={18} /> Todavía no hay datos de este periodo.
+              </p>
             )}
             <TiraDias celdas={celdas} elegido={celdaElegida?.dia ?? null} alElegir={setElegido} />
             {celdaElegida && <PanelDia celda={celdaElegida} />}

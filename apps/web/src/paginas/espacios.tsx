@@ -3,8 +3,9 @@ import { type FormEvent, useState } from "react";
 import { Link } from "react-router";
 import { useAccionesEspacio, useAlarmas, useEspacios } from "../api/consultas.ts";
 import { mensajeDeError } from "../api/mensajes.ts";
+import { Vacio } from "../componentes/estados.tsx";
 import { etiquetaRol, etiquetaTipo, TIPOS_ESPACIO } from "../componentes/etiquetas.ts";
-import { IcoAdelante, IcoCampana, IcoMas } from "../componentes/Iconos.tsx";
+import { IcoAdelante, IcoCampana, IcoInicio, IcoMas } from "../componentes/Iconos.tsx";
 import { ordenarPorUrgencia, ResumenEspacio } from "../componentes/ResumenEspacio.tsx";
 import { AvisoFlujo, TarjetaNodo } from "../componentes/TarjetaNodo.tsx";
 import { useAhora, useEstadoEspacio } from "../espacios/useEstadoEspacio.ts";
@@ -93,9 +94,9 @@ export function Espacios() {
       {espacios.isPending && <p role="status">Cargando…</p>}
       {espacios.isError && <p role="alert">{mensajeDeError(espacios.error)}</p>}
       {espacios.data && espacios.data.espacios.length === 0 && (
-        <p className="tarjeta m-0 p-5">
+        <Vacio icono={IcoInicio}>
           Aún no tienes espacios. Crea el primero, por ejemplo «Mi casa».
-        </p>
+        </Vacio>
       )}
       {espacios.data?.espacios.map((e) => (
         <SeccionEspacio key={e.id} espacio={e} />

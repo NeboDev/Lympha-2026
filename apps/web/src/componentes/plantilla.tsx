@@ -2,7 +2,7 @@ import type { ComponentType } from "react";
 import { Link, NavLink, Outlet } from "react-router";
 import { useYo } from "../api/consultas.ts";
 import { useSesion } from "../sesion/contexto.tsx";
-import { Gota, IcoAjustes, IcoCampana, IcoInicio, IcoSalir, type PropsIcono } from "./Iconos.tsx";
+import { IcoAjustes, IcoCampana, IcoInicio, IcoSalir, Marca, type PropsIcono } from "./Iconos.tsx";
 
 const PESTANAS: { a: string; texto: string; Icono: ComponentType<PropsIcono>; exacta?: boolean }[] =
   [
@@ -24,10 +24,10 @@ export function Plantilla() {
       <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-line bg-surface px-4 py-2 lg:fixed lg:inset-y-0 lg:left-0 lg:w-64 lg:flex-col lg:items-stretch lg:gap-6 lg:border-r lg:border-b-0 lg:px-4 lg:py-6">
         <Link
           to="/"
-          className="inline-flex min-h-11 items-center gap-2.5 text-xl font-extrabold tracking-tight text-text no-underline marca"
+          className="inline-flex min-h-11 items-center gap-2.5 text-xl font-medium tracking-tight text-text no-underline marca"
         >
-          <Gota />
-          Lympha
+          <Marca ancho={36} />
+          lympha
         </Link>
 
         <nav

@@ -1,4 +1,8 @@
 import type { ReactNode, SVGProps } from "react";
+import logo from "../assets/lympha-logo.png";
+import logoOscuro from "../assets/lympha-logo-oscuro.png";
+import simbolo from "../assets/lympha-simbolo.png";
+import simboloOscuro from "../assets/lympha-simbolo-oscuro.png";
 
 /**
  * Iconos de línea (24×24) copiados de Lucide (licencia ISC), solo los que usa la app: sin dependencia ni peso extra.
@@ -152,18 +156,52 @@ export const IcoNodo = crear(
   </>,
 );
 
-/** Isotipo de Lympha: una gota. */
-export function Gota({ tamano = 28 }: { tamano?: number }) {
+/**
+ * Marca de Lympha. «simbolo» es solo el isotipo (decorativo: el nombre va al lado en texto); «logo» es el símbolo con el
+ * nombre y sí lleva texto alternativo. Cada uno trae su variante para fondo oscuro, que sigue al tema del sistema.
+ */
+export function Marca({
+  variante = "simbolo",
+  ancho,
+}: {
+  variante?: "simbolo" | "logo";
+  ancho: number;
+}) {
+  const [claro, oscuro, proporcion] =
+    variante === "logo" ? [logo, logoOscuro, 786 / 960] : [simbolo, simboloOscuro, 534 / 640];
   return (
-    <svg width={tamano} height={tamano} viewBox="0 0 32 32" aria-hidden="true" focusable="false">
-      <rect width="32" height="32" rx="9" fill="var(--brand-fill)" />
-      <path
-        d="M16 6c4.600 5.600 7.500 9.100 7.500 12.500a7.500 7.500 0 0 1-15 0C8.500 15.100 11.400 11.600 16 6Z"
-        fill="#fff"
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcSet={oscuro} />
+      <img
+        src={claro}
+        alt={variante === "logo" ? "Lympha" : ""}
+        width={ancho}
+        height={Math.round(ancho * proporcion)}
+        decoding="async"
       />
-    </svg>
+    </picture>
   );
 }
+
+export const IcoLapiz = crear(
+  <>
+    <path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z" />
+    <path d="m15 5 4 4" />
+  </>,
+);
+export const IcoPapelera = crear(
+  <>
+    <path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+    <path d="M10 11v6M14 11v6" />
+  </>,
+);
+export const IcoEnlace = crear(
+  <>
+    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+    <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+  </>,
+);
+export const IcoX = crear(<path d="M18 6 6 18M6 6l12 12" />);
 
 export const IcoQr = crear(
   <>

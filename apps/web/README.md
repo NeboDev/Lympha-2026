@@ -13,5 +13,9 @@ PWA de Lympha (H4): React 19 + Vite + TanStack Query + React Router, instalable 
   la cuenta; `pnpm dev:token` usa `lympha-dev-1`). Contra el proyecto real, ver `.env.example`.
 - `VITE_API_URL` (ver `.env.example`) cambia la URL de la API; en desarrollo, por defecto `http://127.0.0.1:3000`.
 - Todo lo que empieza con `VITE_` llega al navegador: nunca pongas secretos.
-- Los iconos de `public/` los genera `node apps/web/scripts/generar-iconos.mjs`; solo hace falta si cambia el diseño.
+- Los logos (`src/assets/`) y los iconos de la PWA (`public/`) salen de los JPG de `docs/marca/` con `pwsh apps/web/scripts/procesar-logos.ps1` (PowerShell 7 en Windows); solo hace falta si cambia la marca. Referencia de estilo: `docs/marca/DESIGN.md`.
 - El service worker guarda únicamente el cascarón de la app: ninguna respuesta de la API se queda en el dispositivo.
+
+## Licencias de terceros (iconos y fuente)
+- **Iconos** (`src/componentes/Iconos.tsx`): trazados copiados de [Lucide](https://lucide.dev) (licencia ISC, uso comercial libre, sin atribución obligatoria más allá de conservar el aviso de la licencia: «Copyright (c) for portions of Lucide are held by Cole Bemis 2013-2022 as part of Feather (MIT); all other copyright (c) for Lucide are held by Lucide Contributors»). Todo el set es de línea de 24×24 con trazo de 2 px, así que cualquier icono nuevo debe salir de la misma familia. El símbolo de error de `[role="alert"]` (`--ico-error` en `estilos.css`) es el mismo `circle-alert`. No se usan iconos de Flaticon: sus iconos gratuitos exigen cuenta para descargar y atribución visible en la app, y mezclarían estilos con este set.
+- **Fuente** Inter (`public/fuentes/inter-latin.woff2`): SIL Open Font License 1.1, obtenida de `@fontsource-variable/inter` 5.2.8.
