@@ -46,7 +46,7 @@ services:
       certs: { condition: service_completed_successfully }
     ports:
       - "127.0.0.1:1883:1883"
-      - "127.0.0.1:8883:8883"
+      - "8883:8883" # abierto a la LAN para que un nodo de prueba llegue (TLS + Dynamic Security); el 1883 sigue local
 
   # Emulador de Firebase Auth (solo local): la API acepta sus tokens sin firma. Proyecto: lympha-dev.
   firebase-auth:
