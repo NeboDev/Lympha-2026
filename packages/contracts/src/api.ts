@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { resumenCalibracion } from "./calibracion.ts";
 
 const componente = z.enum(["ok", "error"]);
 
@@ -22,6 +23,8 @@ export const lecturaApi = z.object({
   conductividad: z.number().nullable(),
   turbidez: z.number().nullable(),
   tds: z.number().nullable(),
+  /** Valor sin calibrar de cada parámetro que se corrigió; ausente o nulo si la lectura no se corrigió. */
+  crudo: z.record(z.number()).nullable().optional(),
 });
 export type LecturaApi = z.infer<typeof lecturaApi>;
 
@@ -123,6 +126,8 @@ export const nodoApi = z.object({
   version_fw: z.string().nullable(),
   reclamado_en: z.string().datetime().nullable(),
   estado_actual: estadoNodoApi.nullable(),
+  /** Última calibración y si ya venció; aditivo (los clientes anteriores lo ignoran). */
+  calibracion: resumenCalibracion.optional(),
 });
 export type NodoApi = z.infer<typeof nodoApi>;
 

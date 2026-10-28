@@ -20,6 +20,8 @@ type FilaNodo = {
   accion: string | null;
   confianza: NonNullable<NodoApi["estado_actual"]>["confianza"] | null;
   ultimos_valores: Record<string, unknown> | null;
+  cal_ultima: Date | null;
+  cal_estado: NonNullable<NodoApi["calibracion"]>["estado"];
 };
 
 const iso = (d: Date | null) => (d ? new Date(d).toISOString() : null);
@@ -32,9 +34,21 @@ export async function consultarNodos(tx: Tx, donde: SQL): Promise<NodoApi[]> {
   const r = await tx.execute<FilaNodo>(sql`
     SELECT n.id, n.espacio_id, n.nombre, n.perfil_id, n.estado, n.version_fw, n.reclamado_en,
            e.conectado, e.cambio_conexion_en, e.ultima_lectura_en, e.nivel, e.wqi,
-           e.parametro_limitante, e.confianza, e.causa, e.accion, e.ultimos_valores
+           e.parametro_limitante, e.confianza, e.causa, e.accion, e.ultimos_valores,
+           cal.ultima AS cal_ultima,
+           CASE WHEN cal.mas_antigua IS NULL THEN 'sin_calibrar'
+                WHEN cal.mas_antigua < now() - make_interval(days => coalesce(p.calibracion_vence_dias, 90))
+                  THEN 'vencida'
+                ELSE 'vigente' END AS cal_estado
     FROM app.nodos n
     LEFT JOIN app.estado_nodo e ON e.nodo_id = n.id
+    LEFT JOIN app.perfiles_uso p ON p.id = n.perfil_id
+    -- calibraciones guiadas vigentes: la más reciente es «la última»; la más antigua decide si ya venció
+    LEFT JOIN LATERAL (
+      SELECT max(c.creado_en) AS ultima, min(c.creado_en) AS mas_antigua
+      FROM app.calibraciones_sensor c
+      WHERE c.nodo_id = n.id AND c.activa AND c.origen = 'guiada'
+    ) cal ON true
     WHERE ${donde}
     ORDER BY n.creado_en, n.id`);
   return r.rows.map((f) => ({
@@ -45,6 +59,7 @@ export async function consultarNodos(tx: Tx, donde: SQL): Promise<NodoApi[]> {
     estado: f.estado,
     version_fw: f.version_fw,
     reclamado_en: iso(f.reclamado_en),
+    calibracion: { ultima_en: iso(f.cal_ultima), estado: f.cal_estado },
     estado_actual:
       f.nivel === null || f.confianza === null
         ? null

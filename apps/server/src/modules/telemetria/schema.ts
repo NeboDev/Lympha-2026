@@ -12,6 +12,8 @@ export const lecturaTrabajo = z.object({
   conductividad: z.number().nullable(),
   turbidez: z.number().nullable(),
   tds: z.number().nullable(),
+  /** Valor sin calibrar de cada parámetro que el worker corrigió; `ingest` nunca lo pone. */
+  crudo: z.record(z.number()).optional(),
   /** Hora en que `ingest` aceptó el mensaje, en milisegundos Unix. */
   recibidoEn: z.number().int().positive(),
 });

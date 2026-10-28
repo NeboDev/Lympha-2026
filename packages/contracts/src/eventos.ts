@@ -58,18 +58,27 @@ export const eventoConexion = conexionNodo.extend({
 });
 export type EventoConexion = z.infer<typeof eventoConexion>;
 
-export const NOMBRES_EVENTO_ESPACIO = ["snapshot", "estado", "alarma", "conexion"] as const;
+export const NOMBRES_EVENTO_ESPACIO = [
+  "snapshot",
+  "estado",
+  "alarma",
+  "conexion",
+  "calibracion",
+] as const;
 
 /**
  * El canal `espacio:{id}` lleva tres clases de mensaje: el estado de calidad de un nodo (`event: estado`), un
  * cambio de alarma (`event: alarma`, ver `eventoAlarma`, trae `alarma_id`) y un cambio de conexión
- * (`event: conexion`, trae `conectado`). El estado de calidad no trae ninguna de las dos claves.
+ * (`event: conexion`, trae `conectado`) y un cambio de calibración (`event: calibracion`, trae `calibracion_id`). El estado de calidad no trae ninguna de las dos claves.
  */
-export function nombreEventoEspacio(mensaje: string): "estado" | "alarma" | "conexion" {
+export function nombreEventoEspacio(
+  mensaje: string,
+): "estado" | "alarma" | "conexion" | "calibracion" {
   try {
     const dato: unknown = JSON.parse(mensaje);
     if (typeof dato !== "object" || dato === null) return "estado";
     if ("alarma_id" in dato) return "alarma";
+    if ("calibracion_id" in dato) return "calibracion";
     return "conectado" in dato ? "conexion" : "estado";
   } catch {
     return "estado";

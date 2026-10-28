@@ -4,8 +4,10 @@ import type { FastifyInstance } from "fastify";
 import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { registrarRutas } from "../src/main/api.ts";
+import { calibrarFilas, crearCacheCalibracion } from "../src/modules/calibracion/index.ts";
 import { crearManejadorTelegram } from "../src/modules/notificaciones/index.ts";
-import { type BdApp, crearBdApp } from "../src/platform/db.ts";
+import { guardarLecturas, type LecturaTrabajo } from "../src/modules/telemetria/index.ts";
+import { type BdApp, crearBdApp, crearBdSistema } from "../src/platform/db.ts";
 import { crearServidorHttp } from "../src/platform/http.ts";
 import { crearLogger } from "../src/platform/logger.ts";
 import { migrar } from "../src/platform/migrar.ts";
@@ -1023,6 +1025,242 @@ describe("API de H1", () => {
       (await llamar(elena, "GET", `/api/espacios/${espacio}/alarmas?estado=atendida`)).cuerpo
         .alarmas[0].atendida_por.nombre,
     ).toBe("Carla");
+  });
+
+  it("calibración: un ajeno recibe 404, el miembro 403 y la recta se calcula en el servidor", async () => {
+    const ana = tokenDe("uid-ana-cal", "ana-cal@example.com", "Ana C");
+    const espacio = await crearEspacio(ana, "Calibrar");
+    await invitar(ana, espacio, usuarios.carla);
+    const nodo = await fabricarNodo(50);
+    expect(
+      (
+        await llamar(ana, "POST", "/api/nodos/reclamar", {
+          nodoId: nodo,
+          codigo: codigoN(50),
+          espacioId: espacio,
+        })
+      ).status,
+    ).toBe(200);
+    const puntos = [
+      { crudo: 6.8, referencia: 7 },
+      { crudo: 3.9, referencia: 4 },
+    ];
+
+    // un ajeno no distingue el nodo de uno inexistente, ni para leer ni para escribir
+    const ajenos = await Promise.all([
+      llamar(usuarios.beto, "GET", `/api/calibraciones?nodo_id=${nodo}`),
+      llamar(usuarios.beto, "POST", "/api/calibraciones", {
+        nodo_id: nodo,
+        parametro: "ph",
+        puntos,
+      }),
+      llamar(usuarios.beto, "POST", "/api/calibraciones/restablecer", {
+        nodo_id: nodo,
+        parametro: "ph",
+      }),
+    ]);
+    for (const r of ajenos) expect(r.status).toBe(404);
+    const inexistente = await llamar(
+      usuarios.beto,
+      "GET",
+      `/api/calibraciones?nodo_id=${INEXISTENTE}`,
+    );
+    expect(ajenos[0]?.cuerpo).toEqual(inexistente.cuerpo);
+
+    // el miembro lee pero no calibra
+    expect(
+      (await llamar(usuarios.carla, "GET", `/api/calibraciones?nodo_id=${nodo}`)).cuerpo,
+    ).toEqual({
+      calibraciones: [],
+    });
+    expect(
+      (
+        await llamar(usuarios.carla, "POST", "/api/calibraciones", {
+          nodo_id: nodo,
+          parametro: "ph",
+          puntos,
+        })
+      ).status,
+    ).toBe(403);
+    expect(
+      (
+        await llamar(usuarios.carla, "POST", "/api/calibraciones/restablecer", {
+          nodo_id: nodo,
+          parametro: "ph",
+        })
+      ).status,
+    ).toBe(403);
+
+    // el cliente no manda coeficientes ni puntos inservibles
+    expect(
+      (
+        await llamar(ana, "POST", "/api/calibraciones", {
+          nodo_id: nodo,
+          parametro: "ph",
+          puntos,
+          pendiente: 9,
+        })
+      ).status,
+    ).toBe(400);
+    expect(
+      (
+        await llamar(ana, "POST", "/api/calibraciones", {
+          nodo_id: nodo,
+          parametro: "temperatura",
+          puntos,
+        })
+      ).status,
+    ).toBe(400);
+    const repetidos = await llamar(ana, "POST", "/api/calibraciones", {
+      nodo_id: nodo,
+      parametro: "ph",
+      puntos: [
+        { crudo: 5, referencia: 4 },
+        { crudo: 5, referencia: 7 },
+      ],
+    });
+    expect(repetidos.status).toBe(422);
+    expect(repetidos.cuerpo.codigo).toBe("puntos_repetidos");
+
+    // el propietario calibra: la recta sale de los puntos
+    const sinCalibrar = await llamar(ana, "GET", `/api/nodos/${nodo}`);
+    expect(sinCalibrar.cuerpo.calibracion).toEqual({ ultima_en: null, estado: "sin_calibrar" });
+    const primera = await llamar(ana, "POST", "/api/calibraciones", {
+      nodo_id: nodo,
+      parametro: "ph",
+      puntos,
+    });
+    expect(primera.status).toBe(201);
+    expect(primera.cuerpo.pendiente).toBeCloseTo(3 / 2.9, 6);
+    expect(primera.cuerpo.activa).toBe(true);
+    expect(primera.cuerpo.r2).toBeCloseTo(1, 6);
+    const vigente = await llamar(usuarios.carla, "GET", `/api/nodos/${nodo}`);
+    expect(vigente.cuerpo.calibracion.estado).toBe("vigente");
+    expect(vigente.cuerpo.calibracion.ultima_en).toBe(primera.cuerpo.creado_en);
+
+    // una segunda deja inactiva a la primera (una sola activa por nodo y parámetro)
+    const segunda = await llamar(ana, "POST", "/api/calibraciones", {
+      nodo_id: nodo,
+      parametro: "ph",
+      puntos: [
+        { crudo: 7.1, referencia: 7 },
+        { crudo: 4.2, referencia: 4 },
+        { crudo: 10.3, referencia: 10 },
+      ],
+    });
+    expect(segunda.status).toBe(201);
+    const historial = (
+      await llamar(usuarios.carla, "GET", `/api/calibraciones?nodo_id=${nodo}&parametro=ph`)
+    ).cuerpo.calibraciones;
+    expect(historial.map((c: { activa: boolean }) => c.activa)).toEqual([true, false]);
+    expect(historial[0].id).toBe(segunda.cuerpo.id);
+
+    // revertir a la anterior: solo el propietario
+    const activar = `/api/calibraciones/${primera.cuerpo.id}/activar`;
+    expect((await llamar(usuarios.beto, "POST", activar)).status).toBe(404);
+    expect((await llamar(usuarios.carla, "POST", activar)).status).toBe(403);
+    const revertida = await llamar(ana, "POST", activar);
+    expect(revertida.status).toBe(200);
+    expect(revertida.cuerpo.activa).toBe(true);
+    expect(
+      (
+        await owner.query(
+          "SELECT count(*)::int AS n FROM app.calibraciones_sensor WHERE nodo_id = $1 AND activa",
+          [nodo],
+        )
+      ).rows[0].n,
+    ).toBe(1);
+
+    // restablecer deja la identidad y el nodo vuelve a verse sin calibrar
+    const identidad = await llamar(ana, "POST", "/api/calibraciones/restablecer", {
+      nodo_id: nodo,
+      parametro: "ph",
+    });
+    expect(identidad.status).toBe(201);
+    expect([identidad.cuerpo.pendiente, identidad.cuerpo.desfase, identidad.cuerpo.origen]).toEqual(
+      [1, 0, "identidad"],
+    );
+    expect((await llamar(ana, "GET", `/api/nodos/${nodo}`)).cuerpo.calibracion.estado).toBe(
+      "sin_calibrar",
+    );
+
+    // pasado el plazo del perfil, la calibración guiada vigente figura como vencida
+    await llamar(ana, "POST", activar);
+    await owner.query(
+      "UPDATE app.calibraciones_sensor SET creado_en = now() - interval '91 days' WHERE id = $1",
+      [primera.cuerpo.id],
+    );
+    expect((await llamar(ana, "GET", `/api/nodos/${nodo}`)).cuerpo.calibracion.estado).toBe(
+      "vencida",
+    );
+  });
+
+  it("calibración: el worker corrige las lecturas con la recta vigente y conserva el valor crudo", async () => {
+    const dani = tokenDe("uid-dani-cal", "dani-cal@example.com", "Dani C");
+    const espacio = await crearEspacio(dani, "Corregir");
+    const nodo = await fabricarNodo(51);
+    await llamar(dani, "POST", "/api/nodos/reclamar", {
+      nodoId: nodo,
+      codigo: codigoN(51),
+      espacioId: espacio,
+    });
+    await llamar(dani, "POST", "/api/calibraciones", {
+      nodo_id: nodo,
+      parametro: "ph",
+      puntos: [
+        { crudo: 6, referencia: 7 },
+        { crudo: 3, referencia: 4 },
+      ],
+    }); // pendiente 1, desfase 1
+
+    const bdSistema = crearBdSistema(pgc.url("system"), "prueba-calibracion", 3);
+    try {
+      const cache = crearCacheCalibracion(bdSistema);
+      const base = {
+        nodoId: nodo,
+        espacioId: espacio,
+        temperatura: 20,
+        conductividad: null,
+        turbidez: null,
+        tds: null,
+      };
+      const ts = Date.now() - 60_000;
+      const lote: LecturaTrabajo[] = [
+        { ...base, ts, seq: 1, ph: 6.5, recibidoEn: ts },
+        { ...base, ts: ts + 1000, seq: 2, ph: null, recibidoEn: ts },
+      ];
+      const corregido = calibrarFilas(lote, await cache.coeficientes([nodo]));
+      expect(lote[0]?.ph).toBe(6.5); // no muta la entrada
+      expect(corregido[0]?.ph).toBeCloseTo(7.5, 6);
+      expect(corregido[0]?.crudo).toEqual({ ph: 6.5 });
+      expect(corregido[1]?.crudo).toBeUndefined();
+      await guardarLecturas(bdSistema, corregido);
+      const guardada = (
+        await owner.query("SELECT ph, crudo FROM ts.lecturas WHERE nodo_id = $1 AND seq = 1", [
+          nodo,
+        ])
+      ).rows[0];
+      expect(guardada.ph).toBeCloseTo(7.5, 4);
+      expect(guardada.crudo).toEqual({ ph: 6.5 });
+
+      // la API devuelve ambos valores
+      const api = await llamar(dani, "GET", `/api/nodos/${nodo}/lecturas?limite=5`);
+      expect(api.cuerpo.lecturas.find((l: { seq: number }) => l.seq === 1).crudo).toEqual({
+        ph: 6.5,
+      });
+
+      // al restablecer y invalidar la caché, las lecturas siguientes pasan tal cual
+      await llamar(dani, "POST", "/api/calibraciones/restablecer", {
+        nodo_id: nodo,
+        parametro: "ph",
+      });
+      cache.invalidar(nodo);
+      const sinCorregir = calibrarFilas(lote, await cache.coeficientes([nodo]));
+      expect(sinCorregir[0]?.ph).toBe(6.5);
+      expect(sinCorregir[0]?.crudo).toBeUndefined();
+    } finally {
+      await bdSistema.cerrar();
+    }
   });
 
   it("toda prueba de acceso cruzado citada en rutas-cubiertas.ts existe en este archivo", () => {

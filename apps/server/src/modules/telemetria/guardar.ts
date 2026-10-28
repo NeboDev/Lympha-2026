@@ -63,6 +63,7 @@ export async function guardarLecturas(
         conductividad: l.conductividad,
         turbidez: l.turbidez,
         tds: l.tds,
+        crudo: l.crudo ?? null,
         recibidoEn: new Date(l.recibidoEn),
       }));
       const r = await tx

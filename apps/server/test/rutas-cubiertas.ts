@@ -86,4 +86,18 @@ export const RUTAS_CUBIERTAS: Record<string, Cobertura> = {
   "POST /api/alarmas/:alarmaId/atender": ajeno(
     "alarmas: un ajeno recibe 404 al listar y al atender",
   ),
+
+  // Autocalibración: leer es de cualquier miembro; guardar, revertir y restablecer, del propietario.
+  "GET /api/calibraciones": ajeno(
+    "calibración: un ajeno recibe 404, el miembro 403 y la recta se calcula en el servidor",
+  ),
+  "POST /api/calibraciones": ajeno(
+    "calibración: un ajeno recibe 404, el miembro 403 y la recta se calcula en el servidor",
+  ),
+  "POST /api/calibraciones/restablecer": ajeno(
+    "calibración: un ajeno recibe 404, el miembro 403 y la recta se calcula en el servidor",
+  ),
+  "POST /api/calibraciones/:calibracionId/activar": ajeno(
+    "calibración: un ajeno recibe 404, el miembro 403 y la recta se calcula en el servidor",
+  ),
 };

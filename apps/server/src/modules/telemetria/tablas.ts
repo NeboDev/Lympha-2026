@@ -1,4 +1,4 @@
-import { integer, pgSchema, real, timestamp, uuid } from "drizzle-orm/pg-core";
+import { integer, jsonb, pgSchema, real, timestamp, uuid } from "drizzle-orm/pg-core";
 
 const ts = pgSchema("ts");
 
@@ -12,5 +12,6 @@ export const lecturas = ts.table("lecturas", {
   conductividad: real("conductividad"),
   turbidez: real("turbidez"),
   tds: real("tds"),
+  crudo: jsonb("crudo").$type<Record<string, number>>(),
   recibidoEn: timestamp("recibido_en", { withTimezone: true, mode: "date" }).notNull(),
 });

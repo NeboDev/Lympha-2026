@@ -4,6 +4,11 @@ import {
   iniciarMantenimiento,
   resolverSinConexion,
 } from "../modules/alarmas/index.ts";
+import {
+  CANAL_INVALIDAR_CALIBRACION,
+  calibrarFilas,
+  crearCacheCalibracion,
+} from "../modules/calibracion/index.ts";
 import { crearEvaluador } from "../modules/calidad/index.ts";
 import { crearResolvedorNodo } from "../modules/dispositivos/index.ts";
 import { iniciarConsumidor } from "../modules/telemetria/index.ts";
@@ -28,6 +33,12 @@ export async function iniciarWorker(
   const conexion = crearConexionBullmq(config.VALKEY_URL, "worker");
   // Conexión de uso general: memoria del motor WQI, caché de nodos y publicación del estado.
   const valkey = crearValkey(config.VALKEY_URL, "worker");
+
+  // Coeficientes de calibración por nodo: en memoria, invalidados por la API (pub/sub) y con caducidad propia.
+  const cacheCalibracion = crearCacheCalibracion(bd);
+  const suscriptor = crearValkey(config.VALKEY_URL, "worker-calibracion");
+  suscriptor.on("message", (_canal, nodoId) => cacheCalibracion.invalidar(nodoId));
+  await suscriptor.subscribe(CANAL_INVALIDAR_CALIBRACION);
 
   const registro = crearRegistro();
   const avisosEncolados = registro.contador(
@@ -75,6 +86,8 @@ export async function iniciarWorker(
     conexion,
     bd,
     log,
+    alCalibrar: async (filas) =>
+      calibrarFilas(filas, await cacheCalibracion.coeficientes(filas.map((f) => f.nodoId))),
     alEvaluar: (filas) => evaluador.procesar(filas),
     // Un nodo que vuelve cierra su alarma de desconexión al instante; si esto falla, el barrido la cierra.
     alReconectar: async (nodoId) => {
@@ -135,6 +148,7 @@ export async function iniciarWorker(
       await mantenimiento.detener();
       await consumidor.detener();
       conexion.disconnect();
+      suscriptor.disconnect();
       valkey.disconnect();
       await bd.cerrar();
     },

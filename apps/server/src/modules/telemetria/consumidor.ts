@@ -41,6 +41,12 @@ export interface OpcionesConsumidor {
    */
   alEvaluar?: (filas: LecturaTrabajo[]) => Promise<void>;
   /**
+   * Corrige las lecturas con la calibración vigente de cada nodo ANTES de guardarlas (y de evaluarlas). Debe devolver
+   * filas nuevas, sin mutar las recibidas: si el lote se reintenta parte de los valores originales. Si lanza, el lote
+   * se reintenta (mejor que guardar sin corregir).
+   */
+  alCalibrar?: (filas: LecturaTrabajo[]) => Promise<LecturaTrabajo[]>;
+  /**
    * Un nodo pasó de desconectado a conectado (cambio real, no un evento repetido). Va después de aplicar el
    * evento y NO debe lanzar: si falla, el barrido de mantenimiento cierra la alarma de desconexión de todos modos.
    */
@@ -142,7 +148,8 @@ export async function iniciarConsumidor(op: OpcionesConsumidor): Promise<Consumi
       if (lote.trabajos.length === 0) continue;
 
       try {
-        const r = await guardarLecturas(op.bd, lote.filas);
+        const filas = op.alCalibrar ? await op.alCalibrar(lote.filas) : lote.filas;
+        const r = await guardarLecturas(op.bd, filas);
         const reconectados: string[] = [];
         for (const evento of lote.eventos) {
           const cambio = await aplicarEvento(op.bd, evento);
@@ -161,7 +168,7 @@ export async function iniciarConsumidor(op: OpcionesConsumidor): Promise<Consumi
           }
         }
         for (const nodoId of reconectados) await op.alReconectar?.(nodoId);
-        await op.alEvaluar?.(lote.filas);
+        await op.alEvaluar?.(filas);
         op.alGuardar?.(r, lote.eventos.length);
         op.log.debug(
           { ...r, eventos: lote.eventos.length, trabajos: lote.trabajos.length },

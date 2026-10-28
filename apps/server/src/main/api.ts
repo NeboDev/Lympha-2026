@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { rutasAlarmas } from "../modules/alarmas/index.ts";
+import { rutasCalibracion } from "../modules/calibracion/index.ts";
 import { rutasCalidad } from "../modules/calidad/index.ts";
 import { rutasDispositivos } from "../modules/dispositivos/index.ts";
 import { rutasEspacios } from "../modules/espacios/index.ts";
@@ -74,6 +75,7 @@ export async function registrarRutas(app: FastifyInstance, deps: DepsRutas, _log
   await app.register(rutasTelemetria, { bd: deps.bd, autenticar });
   await app.register(rutasCalidad, { bd: deps.bd, valkey: deps.valkey, autenticar });
   await app.register(rutasAlarmas, { bd: deps.bd, valkey: deps.valkey, autenticar });
+  await app.register(rutasCalibracion, { bd: deps.bd, valkey: deps.valkey, autenticar });
   await app.register(rutasNotificaciones, {
     bd: deps.bd,
     valkey: deps.valkey,

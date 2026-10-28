@@ -15,6 +15,14 @@ describe("nombreEventoEspacio", () => {
     ).toBe("conexion");
   });
 
+  it("reconoce el cambio de calibración por calibracion_id", () => {
+    expect(
+      nombreEventoEspacio(
+        JSON.stringify({ calibracion_id: NODO, nodo_id: NODO, cambio: "registrada" }),
+      ),
+    ).toBe("calibracion");
+  });
+
   it("una alarma gana si el mensaje trae ambas claves", () => {
     expect(nombreEventoEspacio(JSON.stringify({ alarma_id: NODO, conectado: true }))).toBe(
       "alarma",

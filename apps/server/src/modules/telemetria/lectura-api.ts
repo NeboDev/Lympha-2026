@@ -25,8 +25,9 @@ export async function ultimasLecturas(
       conductividad: number | null;
       turbidez: number | null;
       tds: number | null;
+      crudo: Record<string, number> | null;
     }>(sql`
-      SELECT nodo_id, ts, seq, ph, temperatura, conductividad, turbidez, tds
+      SELECT nodo_id, ts, seq, ph, temperatura, conductividad, turbidez, tds, crudo
       FROM app.v_lecturas
       WHERE nodo_id = ${nodoId}
       ORDER BY ts DESC
@@ -40,6 +41,7 @@ export async function ultimasLecturas(
       conductividad: f.conductividad,
       turbidez: f.turbidez,
       tds: f.tds,
+      crudo: f.crudo,
     }));
   });
 }
