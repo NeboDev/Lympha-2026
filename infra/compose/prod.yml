@@ -135,6 +135,9 @@ services:
       MQTT_URL: mqtt://mosquitto:1883
       MQTT_CONTROL_USER: ${MQTT_CONTROL_USER:?}
       MQTT_CONTROL_PASSWORD: ${MQTT_CONTROL_PASSWORD:?}
+      # Solo para el panel de administración (lotes, etiquetas, revocar); ver docs/decisiones.md. Vacío = esas acciones dan 503.
+      MQTT_ADMIN_USER: ${MQTT_ADMIN_USER:-}
+      MQTT_ADMIN_PASSWORD: ${MQTT_ADMIN_PASSWORD:-}
       CLAIM_PEPPER: ${CLAIM_PEPPER:?}
       FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:?}
       FIREBASE_SERVICE_ACCOUNT: ${FIREBASE_SERVICE_ACCOUNT:-} # opcional (base64 del JSON)

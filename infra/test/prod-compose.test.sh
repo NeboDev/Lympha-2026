@@ -29,7 +29,7 @@ if ! grep -B3 'published: "3000"' <<<"$salida" | grep -q 'host_ip: 127.0.0.1'; t
 fi
 
 # Ningún servicio de aplicación debe recibir los secretos de otro (p. ej. la contraseña del dueño de la base).
-if awk '/^  (api|ingest|worker|notifier):/{s=$1} /^  [a-z-]+:$/{if($1!~/^(api|ingest|worker|notifier):$/)s=""} s!="" && /PW_OWNER|POSTGRES_PASSWORD|MQTT_ADMIN_PASSWORD/{print s": "$0}' <<<"$salida" | grep -q .; then
+if awk '/^  (api|ingest|worker|notifier):/{s=$1} /^  [a-z-]+:$/{if($1!~/^(api|ingest|worker|notifier):$/)s=""} s!="" && (/PW_OWNER|POSTGRES_PASSWORD/ || (s!="api:" && /MQTT_ADMIN_PASSWORD/)){print s": "$0}' <<<"$salida" | grep -q .; then
   echo "FALLA: un proceso de aplicación recibe un secreto que no le corresponde" >&2
   exit 1
 fi
