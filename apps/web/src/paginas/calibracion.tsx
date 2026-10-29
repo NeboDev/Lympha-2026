@@ -73,7 +73,7 @@ export function Calibracion() {
                   <button
                     type="button"
                     aria-pressed={seleccionado}
-                    className={`tarjeta grid w-full gap-1 p-4 text-left ${seleccionado ? "border-2 border-brand" : ""}`}
+                    className={`tarjeta grid h-auto min-h-0 w-full justify-items-start gap-1 rounded-card bg-surface p-4 text-left font-normal text-text hover:bg-surface-2 ${seleccionado ? "border-2 border-brand" : ""}`}
                     onClick={() => setBusqueda({ nodo: nodo.id }, { replace: true })}
                   >
                     <strong>{nodo.nombre ?? "Nodo sin nombre"}</strong>
