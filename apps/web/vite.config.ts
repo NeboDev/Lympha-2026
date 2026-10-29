@@ -50,5 +50,11 @@ export default defineConfig({
     }),
   ],
   server: { host: "127.0.0.1", port: 5173, strictPort: true },
-  preview: { host: "127.0.0.1", port: 4173, strictPort: true },
+  // allowedHosts: permite abrir el build por un túnel de Cloudflare (pruebas desde el celular); solo esos subdominios.
+  preview: {
+    host: "127.0.0.1",
+    port: 4173,
+    strictPort: true,
+    allowedHosts: [".trycloudflare.com"],
+  },
 });
