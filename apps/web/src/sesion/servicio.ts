@@ -47,6 +47,9 @@ const MENSAJES: Record<string, string> = {
   "auth/network-request-failed": "No hay conexión. Revisa tu red e inténtalo de nuevo.",
   "auth/popup-closed-by-user": "Cerraste la ventana de Google antes de terminar.",
   "auth/cancelled-popup-request": "Cerraste la ventana de Google antes de terminar.",
+  "auth/unauthorized-domain":
+    "Este sitio no está autorizado para iniciar sesión con Google. Pide que lo agreguen en los dominios autorizados de Firebase.",
+  "auth/operation-not-allowed": "El acceso con Google no está habilitado en este proyecto.",
   "auth/popup-blocked":
     "Tu navegador bloqueó la ventana de Google. Permite las ventanas emergentes.",
 };
