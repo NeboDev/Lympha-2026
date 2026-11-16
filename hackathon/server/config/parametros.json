@@ -16,9 +16,16 @@
         "histeresis": 0.1,
         "lecturas_para_entrar": 3,
         "estable_desv_max": 0.02,
-        "sensor_pendiente_min_pct": 85
+        "sensor_pendiente_min_pct": 85,
+        "lecturas_estable": 10,
+        "fisico_min": 0,
+        "fisico_max": 14,
+        "riel_margen": 0.05,
+        "lecturas_riel": 3,
+        "lecturas_pegadas": 120
       },
-      "criterio": "Los márgenes y el cambio rápido son criterio del equipo, no de la norma."
+      "cloro": { "temp_defecto_c": 25 },
+      "criterio": "Los márgenes, el cambio rápido y los criterios de sensor son del equipo, no de la norma."
     },
     "cloro_libre": {
       "nombre": "Cloro residual libre",
