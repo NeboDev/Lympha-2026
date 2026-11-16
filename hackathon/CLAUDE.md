@@ -60,8 +60,10 @@ Pasos 0–8 se pueden hacer **sin hardware** gracias al simulador.
 Contradicciones o huecos que cambian el diseño (p. ej. la rúbrica premia algo que obliga a otra arquitectura; Blynk no ofrece lo que se asumió; el reto cambia el actuador). Preguntas menores: decide y anota. **Antes de cada paso, lista los archivos que vas a crear o modificar.**
 
 ## 9. Estado
-Hasta ahora existe solo documentación y tokens: **nada está construido ni probado.** Actualiza esta sección al cerrar cada paso con: qué quedó hecho, qué se verificó de verdad y qué sigue sin verificar.
+Actualiza esta sección al cerrar cada paso con: qué quedó hecho, qué se verificó de verdad y qué sigue sin verificar.
 
 | Paso | Estado |
 |---|---|
-| 0–11 | pendientes |
+| 0 | **Hecho (2026-11-16).** Verificado de verdad: Blynk `getAll`/`update`/`get`/`isHardwareConnected` con un dispositivo de prueba; Atlas ping + escritura + borrado. Sin verificar: límites del plan gratuito de Blynk. Plantilla `Atl Nodos` (V1–V10) creada a mano. |
+| 1 | **Hecho (2026-11-16).** `server/` con config zod, Mongo, logger con `redact`, `GET /api/salud`, CORS por `CORS_ORIGINS` y 11 índices. Verificado: 15 pruebas, lint y typecheck en verde; `pnpm db:indices` creó los índices en Atlas; `/api/salud` devolvió `{ok,mongo,blynk}` todos `true` con el servidor real. Con el DNS de esta máquina hace falta `MONGODB_DNS=8.8.8.8,1.1.1.1`. Sin verificar: Mongo local en Docker (el demonio no estaba activo). |
+| 2–11 | pendientes |

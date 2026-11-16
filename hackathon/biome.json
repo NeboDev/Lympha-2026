@@ -1,0 +1,53 @@
+{
+  "root": false,
+  "extends": "//",
+  "files": {
+    "includes": ["**", "!**/node_modules", "!**/dist", "!**/*.md", "!pnpm-lock.yaml", "!**/.env"]
+  },
+  "linter": {
+    "enabled": true,
+    "rules": { "preset": "recommended" }
+  },
+  "overrides": [
+    {
+      "includes": ["server/src/modulos/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["../*/*", "!../*/index.ts"],
+                    "message": "Un módulo solo importa la interfaz pública de otro (modulos/<x>/index.ts)."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["server/src/main.ts", "server/src/cli/**", "server/src/plataforma/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["../modulos/*/*", "./modulos/*/*", "!**/modulos/*/index.ts"],
+                    "message": "Solo se importa la interfaz pública de un módulo (modulos/<x>/index.ts)."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

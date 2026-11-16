@@ -1,0 +1,14 @@
+# Decisiones — Atl
+
+## 2026-11-16 · Paso 0 (parcial) y documento de cloración
+- **Cloración según pH:** documentado en `docs/cloracion-ph.md`. Decisión: Atl calcula y muestra la **fracción de HOCl** (efectividad del cloro) pero **no** calcula dosis automáticas; la dosis a mano se documenta como referencia.
+- **Corrección:** el ejemplo «pH 8.3 → ~24 %» de `IDENTIDAD_VISUAL.md` §8 no coincide con la fórmula (≈ 15 % a 25 °C). El mensaje usará el valor calculado.
+- **Sin temperatura:** se asume 25 °C y se dice «estimado».
+- **Paso 0, Blynk:** `blynk.cloud` responde; con token inválido `getAll` e `isHardwareConnected` devuelven HTTP 400 `{"error":{"message":"Invalid token."}}`. Falta probar con un token real (lo pone la persona en `.env`).
+- **Paso 0, Mongo:** el demonio de Docker no responde en esta máquina (Docker 29.7.2 instalado). Pendiente: iniciar Docker Desktop (plan B local) o dar `MONGODB_URI` de Atlas.
+- **Rama:** `hackathon/atl` (ya existía).
+- **Paso 0 cerrado (2026-11-16).** Blynk: `isHardwareConnected` → `false` sin placa; `getAll` devuelve JSON plano `{"v1":25.0,"v2":7.0,…}` (claves = pines en minúscula, valores numéricos); `update?v2=7.00` → 200 sin cuerpo; `get?v2` → `7`; sin cabeceras de límite de tasa (límites del plan gratuito sin verificar). Atlas: ping, escritura y borrado OK en la base `atl`.
+- **DNS:** con el DNS de esta máquina falla la búsqueda SRV de Atlas (`querySrv ECONNREFUSED`); funciona con DNS públicos. La prueba lo resolvió con `dns.setServers(["8.8.8.8","1.1.1.1"])`. Decisión: `plataforma/mongo.ts` acepta `MONGODB_DNS` opcional (lista de servidores) para el caso del Wi-Fi del recinto; plan alterno: cadena `mongodb://` sin SRV o Mongo local.
+- **`.env`:** los comentarios van en su propia línea; `config.ts` además recorta `# …` del final por si acaso.
+- **Paso 1 (2026-11-16).** CORS hecho a mano en `modulos/api/cors.ts` (un hook, solo orígenes de `CORS_ORIGINS`) para no sumar `@fastify/cors`, que no está en el stack aprobado. Se agregó `plataforma/blynk.ts` (no estaba en la lista; es el único archivo que habla con Blynk y por ahora solo comprueba que el host responde). `/api/salud` responde siempre 200 y el estado va en el cuerpo. En Fastify 5 una instancia de pino se pasa como `loggerInstance`, no `logger`. Biome: `biome.json` propio en `hackathon/` con `preset: recommended` (el de la raíz no se toca; falta proponer `!hackathon` allá). Producción no es objetivo (tiempo y dinero): se prioriza la demo.
+- **Plantilla de Blynk creada a mano (V1–V10).** Nombres reales en la consola: `Temperature` (V1), `PH` (V2), `mv` (V3), `estado` (V4), `estable` (V5), `seg` (V6, es el `seq` del diseño), `ph_crudo` (V7), `bomba` (V8), `modo` (V9), `cal_pct` (V10). El servidor mapea **por pin**, no por nombre, así que no hay cambios de código; los nombres de la consola difieren del diseño pero no importan. `mv` y `cal_pct` sin unidad en la lista de Blynk (se rotulan por alias).
