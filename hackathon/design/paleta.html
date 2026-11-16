@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Atl — paleta</title>
+<link rel="stylesheet" href="tokens.css">
+<style>
+  body { margin: 0; padding: var(--sp-5); max-width: 960px; margin-inline: auto; }
+  h1 { font-size: var(--text-display); margin: var(--sp-5) 0 var(--sp-2); }
+  h2 { font-size: var(--text-heading); margin: var(--sp-7) 0 var(--sp-4); }
+  .rejilla { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: var(--sp-3); }
+  .m { border-radius: var(--radius-card); background: var(--surface); overflow: hidden; border: 1px solid var(--line); }
+  .m i { display: block; height: 72px; }
+  .m b, .m span { display: block; padding: 0 var(--sp-3); font-size: var(--text-body-sm); }
+  .m b { padding-top: var(--sp-2); }
+  .m span { color: var(--text-2); font-family: var(--font-mono); padding-bottom: var(--sp-2); font-size: 12px; }
+  .est { display: flex; gap: var(--sp-3); flex-wrap: wrap; }
+  .p { display: inline-flex; gap: var(--sp-2); align-items: center; padding: var(--sp-2) var(--sp-4); border-radius: var(--radius-pill); color: var(--on-state); font-weight: 500; min-height: var(--tap-min); }
+  .boton { display: inline-flex; align-items: center; min-height: var(--tap-min); padding: 0 var(--sp-5); border-radius: var(--radius-pill); background: var(--talavera); color: var(--on-brand); font-weight: 500; border: 0; }
+  .tarjeta { background: var(--surface); border-radius: var(--radius-card); padding: var(--sp-5); }
+  .escala { height: 20px; border-radius: var(--radius-pill); background: linear-gradient(90deg, var(--ph-acido), var(--ph-neutro) 50%, var(--ph-basico)); }
+  .logo { display: flex; align-items: center; gap: var(--sp-3); }
+  .logo img { width: 56px; height: 56px; }
+</style>
+</head>
+<body>
+  <div class="logo"><img src="logo-atl.svg" alt=""><h1 style="margin:0">Atl</h1></div>
+  <p>Agua que se cuida entre todos.</p>
+
+  <h2>Identidad</h2>
+  <div class="rejilla">
+    <div class="m"><i style="background:var(--talavera)"></i><b>Talavera</b><span>#1F4FA3</span></div>
+    <div class="m"><i style="background:var(--agua)"></i><b>Agua</b><span>#CFE8EE</span></div>
+    <div class="m"><i style="background:var(--manantial)"></i><b>Manantial</b><span>#1B7A78</span></div>
+    <div class="m"><i style="background:var(--barro)"></i><b>Barro</b><span>#9A4423</span></div>
+    <div class="m"><i style="background:var(--bg)"></i><b>Cal</b><span>#FBF8F2</span></div>
+    <div class="m"><i style="background:var(--surface)"></i><b>Arena</b><span>#F2EBDD</span></div>
+    <div class="m"><i style="background:var(--text)"></i><b>Tinta</b><span>#14233A</span></div>
+    <div class="m"><i style="background:var(--text-2)"></i><b>Humo</b><span>#566175</span></div>
+  </div>
+
+  <h2>Estados del agua (símbolo + palabra, nunca solo color)</h2>
+  <div class="est">
+    <span class="p" style="background:var(--good)">● En rango</span>
+    <span class="p" style="background:var(--fair)">▲ Atención</span>
+    <span class="p" style="background:var(--poor)">◆ Fuera de rango</span>
+    <span class="p" style="background:var(--crit)">■ Crítico</span>
+    <span class="p" style="background:var(--none)">? Revisar sensor / Sin conexión</span>
+  </div>
+
+  <h2>Escala de pH</h2>
+  <div class="escala" role="img" aria-label="Escala de pH de ácido a básico"></div>
+
+  <h2>Componentes</h2>
+  <div class="tarjeta">
+    <h3 style="margin-top:0;font-size:var(--text-lead)">Tinaco azotea</h3>
+    <p style="color:var(--text-2)">pH 7.12 · lectura estable · hace 4 s</p>
+    <button class="boton">Generar reporte</button>
+  </div>
+</body>
+</html>

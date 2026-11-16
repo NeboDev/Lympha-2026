@@ -1,0 +1,57 @@
+{
+  "version": "0.1-hackathon",
+  "nota": "Los límites de la NOM-127-SSA1-2021 deben contrastarse con el texto vigente antes de citarlos. Los marcados 'verificar' son de memoria y no se usan en alertas hasta confirmarse.",
+  "parametros": {
+    "ph": {
+      "nombre": "pH",
+      "unidad": "",
+      "decimales": 2,
+      "norma": { "fuente": "NOM-127-SSA1-2021", "min": 6.5, "max": 8.5 },
+      "medible": true,
+      "blynk": { "pin": "v2", "crudo": "v7" },
+      "reglas": {
+        "atencion_margen": 0.3,
+        "cambio_rapido": { "delta": 0.5, "ventana_min": 5 },
+        "critico_margen": 1.0,
+        "histeresis": 0.1,
+        "lecturas_para_entrar": 3,
+        "estable_desv_max": 0.02,
+        "sensor_pendiente_min_pct": 85
+      },
+      "criterio": "Los márgenes y el cambio rápido son criterio del equipo, no de la norma."
+    },
+    "cloro_libre": {
+      "nombre": "Cloro residual libre",
+      "unidad": "mg/L",
+      "decimales": 2,
+      "norma": { "fuente": "NOM-127-SSA1-2021", "min": 0.2, "max": 1.5, "estado": "verificar" },
+      "medible": false,
+      "blynk": null
+    },
+    "turbidez": {
+      "nombre": "Turbidez",
+      "unidad": "UTN",
+      "decimales": 1,
+      "norma": { "fuente": "NOM-127-SSA1-2021", "min": null, "max": 4, "estado": "verificar" },
+      "medible": false,
+      "blynk": null
+    },
+    "tds": {
+      "nombre": "Sólidos disueltos totales",
+      "unidad": "mg/L",
+      "decimales": 0,
+      "norma": { "fuente": "NOM-127-SSA1-2021", "min": null, "max": 1000, "estado": "verificar" },
+      "medible": false,
+      "blynk": null
+    },
+    "orp": {
+      "nombre": "Potencial óxido-reducción",
+      "unidad": "mV",
+      "decimales": 0,
+      "norma": null,
+      "medible": false,
+      "blynk": null,
+      "nota": "Sin límite en la NOM; útil como indicador de desinfección. Se activa solo si el reto trae el sensor."
+    }
+  }
+}

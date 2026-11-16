@@ -1,0 +1,138 @@
+/* Atl — tokens de diseño. Una sola fuente de verdad para la web, los reportes y los avisos.
+   Contrastes calculados (WCAG): ver docs/IDENTIDAD_VISUAL.md §3.
+   Regla: el color de estado comunica SOLO el estado del agua; el azul Talavera es para acciones, enlaces y foco.
+   El estado nunca va solo en color: siempre símbolo + palabra. */
+
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  /* Copiar de apps/web/public/fuentes/inter-latin.woff2 (Inter variable, OFL 1.1) */
+  src: url("/fuentes/inter-latin.woff2") format("woff2");
+}
+
+:root {
+  /* Identidad */
+  --talavera: #1f4fa3; /* marca: acciones, enlaces, foco */
+  --talavera-osc: #16397a; /* hover / presionado */
+  --agua: #cfe8ee; /* relleno suave, gráficas de fondo */
+  --manantial: #1b7a78; /* acento secundario (texto AA sobre cal) */
+  --barro: #9a4423; /* calidez humana: bitácora, llamadas a la comunidad (texto AA) */
+  --barro-claro: #f3d9cb; /* relleno suave de barro */
+
+  /* Superficies y texto (claro) */
+  --bg: #fbf8f2; /* cal: lienzo cálido, no blanco clínico */
+  --surface: #f2ebdd; /* arena: tarjetas planas */
+  --surface-2: #e3dac8; /* piedra: líneas, placas de icono */
+  --text: #14233a; /* tinta */
+  --text-2: #566175; /* humo */
+  --line: #e3dac8;
+  --line-strong: #8a8478;
+  --on-brand: #ffffff;
+  --scrim: rgb(20 35 58 / 0.45);
+
+  /* Semáforo (mismos valores que Lympha, para coherencia de familia) */
+  --good: #5dc756;
+  --fair: #ffda26;
+  --poor: #ff7136;
+  --crit: #f92620;
+  --none: #9aa0a6;
+  --on-state: #101317; /* texto sobre un relleno de estado: siempre oscuro */
+
+  --good-soft: color-mix(in srgb, var(--good) 16%, var(--surface));
+  --fair-soft: color-mix(in srgb, var(--fair) 22%, var(--surface));
+  --poor-soft: color-mix(in srgb, var(--poor) 16%, var(--surface));
+  --crit-soft: color-mix(in srgb, var(--crit) 12%, var(--surface));
+  --none-soft: color-mix(in srgb, var(--none) 18%, var(--surface));
+
+  /* Escala de pH (papel indicador) */
+  --ph-acido: #e5674a; /* ≈ pH 4 */
+  --ph-neutro: #5fb877; /* ≈ pH 7 */
+  --ph-basico: #6b7fe0; /* ≈ pH 10 */
+
+  /* Tipografía */
+  --font-sans: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-mono: ui-monospace, "Cascadia Mono", Menlo, Consolas, monospace;
+  --peso-titulo: 300; /* títulos ligeros, como en Lympha */
+  --text-caption: 12px;
+  --text-body-sm: 14px;
+  --text-body: 16px;
+  --text-lead: 20px;
+  --text-heading: 32px;
+  --text-display: 48px;
+  --leading-body: 1.55;
+  --tracking-title: -0.02em;
+
+  /* Espacio, forma y elevación */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 24px;
+  --sp-6: 32px;
+  --sp-7: 48px;
+  --sp-8: 64px;
+  --radius-card: 20px;
+  --radius-input: 10px;
+  --radius-pill: 9999px;
+  --shadow-1: none;
+  --shadow-2:
+    0 0 1px rgb(20 35 58 / 0.4), 0 1px 1px rgb(20 35 58 / 0.04), 0 2px 4px rgb(20 35 58 / 0.04);
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --tap-min: 44px; /* objetivo táctil mínimo */
+
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --talavera: #7fa6f2;
+    --talavera-osc: #a5c0f6;
+    --agua: #1d3a52;
+    --manantial: #62c7c3;
+    --barro: #e58a62;
+    --barro-claro: #3a2a22;
+    --bg: #0b1626;
+    --surface: #13233a;
+    --surface-2: #1c3150;
+    --text: #f3eee4;
+    --text-2: #9da9bc;
+    --line: #243a5a;
+    --line-strong: #6c7b92;
+    --on-brand: #0b1626;
+    --scrim: rgb(0 0 0 / 0.6);
+    --good-soft: color-mix(in srgb, var(--good) 10%, var(--surface));
+    --fair-soft: color-mix(in srgb, var(--fair) 10%, var(--surface));
+    --poor-soft: color-mix(in srgb, var(--poor) 11%, var(--surface));
+    --crit-soft: color-mix(in srgb, var(--crit) 13%, var(--surface));
+    --none-soft: color-mix(in srgb, var(--none) 12%, var(--surface));
+    --shadow-2: 0 2px 4px rgb(0 0 0 / 0.4), 0 12px 32px rgb(0 0 0 / 0.4);
+    color-scheme: dark;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Base mínima para probar los tokens */
+html {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  line-height: var(--leading-body);
+}
+h1,
+h2,
+h3 {
+  font-weight: var(--peso-titulo);
+  letter-spacing: var(--tracking-title);
+}
+:focus-visible {
+  outline: 3px solid var(--talavera);
+  outline-offset: 2px;
+}
