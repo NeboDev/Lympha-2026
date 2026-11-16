@@ -51,6 +51,27 @@ const CLAVES = [
   "SIN_DATOS_S",
 ] as const;
 
+/** Configuración mínima de las herramientas que solo hablan con Blynk (simulador): sin Mongo. */
+export function cargarConfigBlynk(env: Record<string, string | undefined>) {
+  const r = z
+    .object({
+      BLYNK_HOST: z.string().default("blynk.cloud"),
+      BLYNK_TOKEN_PRUEBA: z
+        .string({ required_error: "falta BLYNK_TOKEN_PRUEBA" })
+        .min(10, "BLYNK_TOKEN_PRUEBA parece incompleto"),
+    })
+    .strict()
+    .safeParse({
+      BLYNK_HOST: limpiar(env.BLYNK_HOST),
+      BLYNK_TOKEN_PRUEBA: limpiar(env.BLYNK_TOKEN_PRUEBA),
+    });
+  if (!r.success) {
+    const problemas = r.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`);
+    throw new Error(`Configuración inválida: ${problemas.join("; ")}`);
+  }
+  return { blynkHost: r.data.BLYNK_HOST, blynkToken: r.data.BLYNK_TOKEN_PRUEBA };
+}
+
 /** Valida el entorno. Si falta o sobra algo, lanza un error con todos los problemas (sin valores). */
 export function cargarConfig(env: Record<string, string | undefined>): Config {
   const entrada: Record<string, string | undefined> = {};

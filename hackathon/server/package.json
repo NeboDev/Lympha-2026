@@ -13,7 +13,8 @@
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "typecheck": "tsc --noEmit",
-    "db:indices": "node --env-file=.env src/cli/indices.ts"
+    "db:indices": "node --env-file=.env src/cli/indices.ts",
+    "simulador": "node --env-file=.env src/simulador/main.ts"
   },
   "dependencies": {
     "fastify": "^5.12.8",

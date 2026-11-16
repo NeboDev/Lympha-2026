@@ -78,8 +78,13 @@ describe("entrada con N lecturas consecutivas", () => {
     expect(ev([...ruido(7, 10), 6.2, 6.21, 6.19], "en_rango").estado).toBe("fuera_de_rango");
   });
 
-  it("una lectura suelta fuera no cambia el estado", () => {
-    expect(ev([...ruido(7, 10), 6.2, 7.0, 7.01], "en_rango").estado).toBe("en_rango");
+  it("una lectura suelta fuera de rango no llega a «fuera de rango»", () => {
+    // Un salto de 0.8 en una sola lectura sí cuenta como cambio rápido: queda en atención.
+    expect(ev([...ruido(7, 10), 6.2, 7.0, 7.01], "en_rango").estado).toBe("atencion");
+  });
+
+  it("una desviación suelta pequeña no cambia el estado", () => {
+    expect(ev([...ruido(7, 10), 6.8, 7.0, 7.01], "en_rango").estado).toBe("en_rango");
   });
 
   it("lo crítico entra de inmediato, con una sola lectura", () => {
@@ -131,10 +136,27 @@ describe("cambio rápido", () => {
     expect(ev(lenta, "en_rango").cambioRapido).toBe(false);
   });
 
-  it("sin una lectura de hace 5 min no hay cambio que medir", () => {
+  it("con una sola lectura no hay cambio que medir", () => {
+    const sola = ev([7.0]);
+    expect(sola.cambio).toBeNull();
+    expect(sola.cambioRapido).toBe(false);
+  });
+
+  it("un salto brusco cuenta aunque la ventana sea corta", () => {
     const corta = ev([7.0, 7.9]);
-    expect(corta.cambio).toBeNull();
-    expect(corta.cambioRapido).toBe(false);
+    expect(corta.cambio).toBeCloseTo(0.9, 6);
+    expect(corta.cambioRapido).toBe(true);
+  });
+
+  it("un pico que sube y vuelve dentro de 5 min sigue contando", () => {
+    // 7.0 → 7.8 → 7.0 con pasos de 30 s: la última lectura ya volvió, pero el pico es reciente.
+    const pico = [...repetir(7.0, 10), 7.4, 7.8, 7.4, 7.0, 7.0, 7.0];
+    expect(ev(pico).cambioRapido).toBe(true);
+  });
+
+  it("el pico deja de contar al salir de la ventana de 5 min", () => {
+    const pico = [...repetir(7.0, 10), 7.8, ...repetir(7.0, 25)]; // 25 · 30 s = 12.5 min después
+    expect(ev(pico).cambioRapido).toBe(false);
   });
 });
 

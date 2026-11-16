@@ -27,20 +27,35 @@ function distanciaFuera(v: number, n: Limites): number {
   return d;
 }
 
-/** Cambio frente a la última lectura que tenga al menos `ventana_min` de antigüedad. */
-function cambioEn(ventana: Lectura[], i: number, reglas: ReglasParametro): number | null {
+type Cambio = {
+  /** Mayor diferencia (con signo) entre la lectura `i` y otra de los últimos `ventana_min`; para informar. */
+  cambio: number | null;
+  /** ¿El rango (máx − mín) de los últimos `ventana_min` supera `delta`? */
+  rapido: boolean;
+};
+
+/**
+ * Cambio rápido en los últimos `ventana_min`. Se decide por el **rango** de la ventana (máx − mín),
+ * no por el extremo: así un pico que sube y baja cuenta, y el estado no parpadea mientras el
+ * pico siga dentro de la ventana.
+ */
+function cambioEn(ventana: Lectura[], i: number, reglas: ReglasParametro): Cambio {
   const actual = ventana[i];
-  if (!actual) return null;
-  const limite = actual.ts.getTime() - reglas.cambio_rapido.ventana_min * 60_000;
+  if (!actual || !Number.isFinite(actual.valor)) return { cambio: null, rapido: false };
+  const desde = actual.ts.getTime() - reglas.cambio_rapido.ventana_min * 60_000;
+  let mayor: number | null = null;
+  let min = actual.valor;
+  let max = actual.valor;
   for (let j = i - 1; j >= 0; j--) {
     const ref = ventana[j];
-    if (ref && ref.ts.getTime() <= limite) return actual.valor - ref.valor;
+    if (!ref || ref.ts.getTime() < desde) break;
+    if (!Number.isFinite(ref.valor)) continue;
+    min = Math.min(min, ref.valor);
+    max = Math.max(max, ref.valor);
+    const cambio = actual.valor - ref.valor;
+    if (mayor === null || Math.abs(cambio) > Math.abs(mayor)) mayor = cambio;
   }
-  return null;
-}
-
-function esRapido(cambio: number | null, reglas: ReglasParametro): boolean {
-  return cambio !== null && Math.abs(cambio) > reglas.cambio_rapido.delta;
+  return { cambio: mayor, rapido: mayor !== null && max - min > reglas.cambio_rapido.delta };
 }
 
 /** Estado de una sola lectura, sin memoria. */
@@ -117,8 +132,7 @@ export function evaluar(e: EntradaEvaluacion): ResultadoEvaluacion {
   const ultima = ventana[i] as Lectura;
 
   const motivosSensor = motivosDeSensor(e, ventana);
-  const cambio = cambioEn(ventana, i, r);
-  const cambioRapido = esRapido(cambio, r);
+  const { cambio, rapido: cambioRapido } = cambioEn(ventana, i, r);
 
   const k = Math.min(r.lecturas_estable, ventana.length);
   const cola = ventana.slice(-k).map((l) => l.valor);
@@ -157,7 +171,7 @@ export function evaluar(e: EntradaEvaluacion): ResultadoEvaluacion {
     let minima = Number.POSITIVE_INFINITY;
     for (let j = ventana.length - n; j < ventana.length; j++) {
       const v = (ventana[j] as Lectura).valor;
-      const rap = esRapido(cambioEn(ventana, j, r), r);
+      const rap = cambioEn(ventana, j, r).rapido;
       minima = Math.min(minima, GRAVEDAD[estadoBruto(distanciaFuera(v, e.norma), rap, r)]);
     }
     return resultado(minima > gPrevio ? (POR_GRAVEDAD[minima] as EstadoAgua) : previo);
