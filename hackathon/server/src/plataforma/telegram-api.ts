@@ -45,6 +45,10 @@ export class ErrorTelegram extends Error {
 
 /** Tiempo máximo de espera de una llamada normal (las de long polling traen su propia señal). */
 const ESPERA_MAXIMA_MS = 15_000;
+/** Subir un archivo tarda más que un mensaje. */
+const ESPERA_DOCUMENTO_MS = 60_000;
+
+export type ArchivoTelegram = { nombre: string; contenido: Uint8Array; tipo?: string };
 
 export interface ClienteTelegram {
   /** Long polling: espera hasta `esperaS` segundos por actualizaciones con `update_id >= offset`. */
@@ -56,6 +60,8 @@ export interface ClienteTelegram {
   /** Telegram rechaza `getUpdates` si hay un webhook activo: se borra antes de empezar. */
   borrarWebhook(): Promise<void>;
   enviarMensaje(chatId: number, texto: string): Promise<void>;
+  /** Sube un archivo (el reporte PDF) con una leyenda opcional (máx. 1024 caracteres). */
+  enviarDocumento(chatId: number, archivo: ArchivoTelegram, leyenda?: string): Promise<void>;
   /** Nombre de usuario del bot (sin @). */
   obtenerNombreBot(): Promise<string>;
 }
@@ -65,16 +71,19 @@ type Fetch = typeof fetch;
 export function crearClienteTelegram(token: string, fetchImpl: Fetch = fetch): ClienteTelegram {
   async function llamar<T>(
     metodo: string,
-    cuerpo: Record<string, unknown>,
+    cuerpo: Record<string, unknown> | FormData,
     senal?: AbortSignal,
+    esperaMs: number = ESPERA_MAXIMA_MS,
   ): Promise<T> {
     let respuesta: Response;
     try {
+      // Con FormData fetch pone solo el `content-type` multipart (con su frontera).
+      const esFormulario = cuerpo instanceof FormData;
       respuesta = await fetchImpl(`https://api.telegram.org/bot${token}/${metodo}`, {
         method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(cuerpo),
-        signal: senal ?? AbortSignal.timeout(ESPERA_MAXIMA_MS),
+        ...(esFormulario ? {} : { headers: { "content-type": "application/json" } }),
+        body: esFormulario ? cuerpo : JSON.stringify(cuerpo),
+        signal: senal ?? AbortSignal.timeout(esperaMs),
       });
     } catch (error) {
       if (senal?.aborted) throw error;
@@ -121,6 +130,17 @@ export function crearClienteTelegram(token: string, fetchImpl: Fetch = fetch): C
         text: texto,
         link_preview_options: { is_disabled: true },
       });
+    },
+    async enviarDocumento(chatId, archivo, leyenda) {
+      const formulario = new FormData();
+      formulario.set("chat_id", String(chatId));
+      if (leyenda) formulario.set("caption", leyenda);
+      formulario.set(
+        "document",
+        new Blob([archivo.contenido], { type: archivo.tipo ?? "application/pdf" }),
+        archivo.nombre,
+      );
+      await llamar("sendDocument", formulario, undefined, ESPERA_DOCUMENTO_MS);
     },
     async obtenerNombreBot() {
       const bot = await llamar<{ username?: string }>("getMe", {});

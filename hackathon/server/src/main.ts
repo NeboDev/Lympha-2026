@@ -3,15 +3,19 @@ import { crearAlertas } from "./modulos/alertas/index.ts";
 import { crearApp } from "./modulos/api/index.ts";
 import { crearIngesta, crearPoller } from "./modulos/ingesta/index.ts";
 import { crearEnviador } from "./modulos/notificaciones/index.ts";
+import { crearServicioReportes } from "./modulos/reportes/index.ts";
 import { crearManejadorTelegram } from "./modulos/telegram/index.ts";
 import { crearAlmacenAlertasMongo } from "./plataforma/almacen-alertas-mongo.ts";
 import { crearAlmacenMongo } from "./plataforma/almacen-mongo.ts";
+import { crearAlmacenReportesMongo } from "./plataforma/almacen-reportes-mongo.ts";
 import { crearAlmacenTelegramMongo } from "./plataforma/almacen-telegram-mongo.ts";
 import { blynkAlcanzable } from "./plataforma/blynk.ts";
 import { crearBucle } from "./plataforma/bucle.ts";
 import { cargarCatalogo } from "./plataforma/catalogo.ts";
+import { crearGeneradorPdf } from "./plataforma/generador-reportes.ts";
 import { crearLectorBlynk } from "./plataforma/lector-blynk.ts";
 import { crearLogger } from "./plataforma/logger.ts";
+import { cargarSimboloLympha } from "./plataforma/logo-svg.ts";
 import { cargarMarca } from "./plataforma/marca.ts";
 import { conectarMongo } from "./plataforma/mongo.ts";
 import { crearClienteTelegram } from "./plataforma/telegram-api.ts";
@@ -61,6 +65,16 @@ const poller = config.ingestaActiva
     })
   : null;
 
+// Reportes PDF: el mismo generador lo usarán la API y la web (Pasos 7 y 9); Telegram es la segunda puerta.
+const reportes = crearGeneradorPdf({
+  servicio: crearServicioReportes({
+    almacen: crearAlmacenReportesMongo(mongo.db),
+    catalogo,
+    marca,
+  }),
+  logo: cargarSimboloLympha(),
+});
+
 // Telegram: envío de avisos y atención del bot por long polling. Sin token, los avisos esperan en la bandeja.
 let enviador: ReturnType<typeof crearBucle> | null = null;
 let polling: Awaited<ReturnType<typeof iniciarPolling>> | null = null;
@@ -76,6 +90,12 @@ if (config.telegramToken && config.telegramUsuario) {
       marca,
       catalogo,
       usuarioBot: config.telegramUsuario,
+      reportes: {
+        async generar(nodo, dias) {
+          const r = await reportes.ultimosDias(nodo._id, dias, "Telegram");
+          return { nombreArchivo: r.nombreArchivo, pdf: r.pdf };
+        },
+      },
       logger,
     }),
     logger,

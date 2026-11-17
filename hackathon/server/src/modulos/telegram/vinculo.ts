@@ -56,6 +56,16 @@ export interface AlmacenTelegram {
 
 export interface ResponderBot {
   enviarMensaje(chatId: number, texto: string): Promise<void>;
+  enviarDocumento(
+    chatId: number,
+    archivo: { nombre: string; contenido: Uint8Array },
+    leyenda?: string,
+  ): Promise<void>;
+}
+
+/** Genera el reporte PDF de un nodo (el mismo que pedirán la web y la línea de comandos). */
+export interface GeneradorReporte {
+  generar(nodo: NodoDoc, dias: number): Promise<{ nombreArchivo: string; pdf: Uint8Array }>;
 }
 
 export type LoggerTelegram = {
@@ -87,20 +97,25 @@ export type OpcionesManejador = {
   catalogo: Catalogo;
   /** Usuario del bot (sin @): para ignorar `/estado@otro_bot` en grupos. */
   usuarioBot?: string;
+  /** Sin esto, `/reporte` responde que no está disponible. */
+  reportes?: GeneradorReporte;
   reloj?: () => Date;
   logger?: LoggerTelegram;
 };
 
 const INICIO = /^\/start(?:@(\w+))?(?:\s+(\S+))?\s*$/i;
 const ESTADO = /^\/estado(?:@(\w+))?\s*$/i;
+const REPORTE = /^\/reporte(?:@(\w+))?(?:\s+(\S+))?\s*$/i;
 const AYUDA = /^\/(?:ayuda|help)(?:@(\w+))?\s*$/i;
 const DESVINCULAR = /^\/(?:desvincular|stop)(?:@(\w+))?\s*$/i;
 
-/** Manejador de actualizaciones del bot: `/start <token>`, `/estado`, `/ayuda` y `/desvincular`. */
+/** Manejador de actualizaciones del bot: `/start <token>`, `/estado`, `/reporte`, `/ayuda` y `/desvincular`. */
 export function crearManejadorTelegram(op: OpcionesManejador) {
   const reloj = op.reloj ?? (() => new Date());
   const logger = op.logger ?? { info() {}, warn() {}, error() {} };
-  const T = textosBot(op.marca);
+  const T = textosBot(op.marca, op.catalogo.reporte);
+  /** Chats con un reporte en preparación: evita que un mensaje repetido dispare varios a la vez. */
+  const generando = new Set<number>();
 
   const aMi = (sufijo: string | undefined): boolean =>
     !sufijo || !op.usuarioBot || sufijo.toLowerCase() === op.usuarioBot.toLowerCase();
@@ -166,6 +181,41 @@ export function crearManejadorTelegram(op: OpcionesManejador) {
     return textoEstado(comunidad.nombre, filas, op.marca);
   }
 
+  /** Devuelve el texto a responder, o null si ya se mandaron los documentos. */
+  async function reporte(chatId: number, argumento: string | undefined): Promise<string | null> {
+    if (!op.reportes) return T.reporteNoDisponible;
+    const { dias_defecto, dias_max } = op.catalogo.reporte;
+    let dias = dias_defecto;
+    if (argumento !== undefined) {
+      if (!/^\d{1,3}$/.test(argumento)) return T.reporteDiasInvalidos;
+      dias = Number(argumento);
+      if (dias < 1 || dias > dias_max) return T.reporteDiasInvalidos;
+    }
+    const comunidad = await op.almacen.comunidadDeChat(chatId);
+    if (!comunidad) return T.noVinculado;
+    if (generando.has(chatId)) return T.reporteOcupado;
+    const nodos = await op.almacen.nodosDeComunidad(comunidad._id);
+    if (nodos.length === 0) return T.reporteSinNodos;
+
+    generando.add(chatId);
+    try {
+      await responder(chatId, T.reporteEnCurso(dias));
+      // Un PDF por nodo: cada uno tiene su propia insignia, gráfica y cobertura.
+      for (const nodo of nodos) {
+        const r = await op.reportes.generar(nodo, dias);
+        await op.cliente.enviarDocumento(
+          chatId,
+          { nombre: r.nombreArchivo, contenido: r.pdf },
+          T.reporteLeyenda(nodo.nombre, dias),
+        );
+      }
+      logger.info({ nodos: nodos.length, dias }, "Telegram: reporte enviado");
+      return null;
+    } finally {
+      generando.delete(chatId);
+    }
+  }
+
   async function desvincular(chatId: number, desde: number | null): Promise<string> {
     const comunidad = await op.almacen.comunidadDeChat(chatId);
     if (!comunidad) return T.nadaQueDesvincular;
@@ -195,6 +245,10 @@ export function crearManejadorTelegram(op: OpcionesManejador) {
       } else if (AYUDA.test(texto)) {
         if (!aMi(AYUDA.exec(texto)?.[1])) return;
         respuesta = T.ayuda;
+      } else if (REPORTE.test(texto)) {
+        const m = REPORTE.exec(texto);
+        if (!aMi(m?.[1])) return;
+        respuesta = await reporte(chat.id, m?.[2]);
       } else if (DESVINCULAR.test(texto)) {
         if (!aMi(DESVINCULAR.exec(texto)?.[1])) return;
         respuesta = await desvincular(chat.id, desde);

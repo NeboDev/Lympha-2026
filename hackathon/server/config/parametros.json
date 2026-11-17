@@ -1,6 +1,14 @@
 {
   "version": "0.1-hackathon",
   "nota": "Los límites de la NOM-127-SSA1-2021 deben contrastarse con el texto vigente antes de citarlos. Los marcados 'verificar' son de memoria y no se usan en alertas hasta confirmarse.",
+  "reporte": {
+    "dias_defecto": 7,
+    "dias_max": 90,
+    "hueco_max_s": 120,
+    "cobertura_min_pct": 50,
+    "insignia": { "bien_pct": 95, "atencion_pct": 80 },
+    "grafica_puntos": 240
+  },
   "parametros": {
     "ph": {
       "nombre": "pH",

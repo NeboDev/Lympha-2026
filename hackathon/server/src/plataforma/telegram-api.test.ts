@@ -117,6 +117,62 @@ describe("obtenerActualizaciones", () => {
   });
 });
 
+describe("enviarDocumento", () => {
+  function conFormulario(respuesta: Response | Error) {
+    const llamadas: { url: string; init?: RequestInit }[] = [];
+    const f = (async (url: string, init?: RequestInit) => {
+      llamadas.push({ url: String(url), init });
+      if (respuesta instanceof Error) throw respuesta;
+      return respuesta;
+    }) as typeof fetch;
+    return { llamadas, cliente: crearClienteTelegram(TOKEN, f) };
+  }
+
+  it("sube el archivo con sendDocument como multipart, con chat y leyenda", async () => {
+    const { cliente, llamadas } = conFormulario(json({ ok: true, result: { message_id: 2 } }));
+    const pdf = new TextEncoder().encode("%PDF-1.3 prueba");
+    await cliente.enviarDocumento(-900, { nombre: "reporte-tinaco.pdf", contenido: pdf }, "Hola");
+
+    expect(llamadas[0]?.url).toBe(`https://api.telegram.org/bot${TOKEN}/sendDocument`);
+    const cuerpo = llamadas[0]?.init?.body;
+    expect(cuerpo).toBeInstanceOf(FormData);
+    const f = cuerpo as FormData;
+    expect(f.get("chat_id")).toBe("-900");
+    expect(f.get("caption")).toBe("Hola");
+    const archivo = f.get("document") as File;
+    expect(archivo.name).toBe("reporte-tinaco.pdf");
+    expect(archivo.type).toBe("application/pdf");
+    expect(await archivo.text()).toBe("%PDF-1.3 prueba");
+    // El content-type lo pone fetch con la frontera del multipart: no se fija a mano.
+    expect(llamadas[0]?.init?.headers).toBeUndefined();
+  });
+
+  it("sin leyenda no manda el campo", async () => {
+    const { cliente, llamadas } = conFormulario(json({ ok: true, result: true }));
+    await cliente.enviarDocumento(1, { nombre: "a.pdf", contenido: new Uint8Array([1]) });
+    const cuerpo = llamadas[0]?.init?.body;
+    expect(cuerpo).toBeInstanceOf(FormData);
+    expect((cuerpo as FormData).has("caption")).toBe(false);
+  });
+
+  it("los errores no filtran el token", async () => {
+    const caida = conFormulario(new Error(`fallo en https://api.telegram.org/bot${TOKEN}/x`));
+    const e1 = await caida.cliente
+      .enviarDocumento(1, { nombre: "a.pdf", contenido: new Uint8Array([1]) })
+      .catch((x) => x);
+    expect(e1).toBeInstanceOf(ErrorTelegram);
+    expect(e1.message).not.toContain(TOKEN);
+
+    const rechazo = conFormulario(
+      json({ ok: false, error_code: 403, description: "Forbidden: bot was kicked" }, 403),
+    );
+    const e2 = await rechazo.cliente
+      .enviarDocumento(1, { nombre: "a.pdf", contenido: new Uint8Array([1]) })
+      .catch((x) => x);
+    expect(e2).toMatchObject({ codigo: 403, descripcion: "Forbidden: bot was kicked" });
+  });
+});
+
 describe("otros métodos", () => {
   it("obtenerNombreBot devuelve el usuario sin @", async () => {
     const { cliente } = falso([json({ ok: true, result: { username: "lympha26_bot" } })]);

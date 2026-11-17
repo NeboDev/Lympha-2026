@@ -58,13 +58,46 @@ const parametroEsquema = z
   })
   .strict();
 
+/** Cómo se arman los reportes. Los umbrales de la insignia son criterio del equipo, no de la norma. */
+const reporteEsquema = z
+  .object({
+    dias_defecto: z.number().int().positive(),
+    dias_max: z.number().int().positive(),
+    /** Si entre dos muestras pasa más tiempo que esto, el tramo cuenta como hueco (no como dato). */
+    hueco_max_s: z.number().positive(),
+    /** Con menos cobertura que esto, la insignia dice «datos insuficientes» en vez de un porcentaje. */
+    cobertura_min_pct: z.number().min(0).max(100),
+    insignia: z
+      .object({
+        /** % del tiempo en rango a partir del cual la insignia es «en rango». */
+        bien_pct: z.number().min(0).max(100),
+        /** % a partir del cual es «atención»; por debajo, «fuera de rango». */
+        atencion_pct: z.number().min(0).max(100),
+      })
+      .strict(),
+    grafica_puntos: z.number().int().min(10),
+  })
+  .strict();
+
+const reporteDefecto = {
+  dias_defecto: 7,
+  dias_max: 90,
+  hueco_max_s: 120,
+  cobertura_min_pct: 50,
+  insignia: { bien_pct: 95, atencion_pct: 80 },
+  grafica_puntos: 240,
+};
+
 const catalogoEsquema = z
   .object({
     version: z.string(),
     nota: z.string(),
     parametros: z.record(parametroEsquema),
+    reporte: reporteEsquema.default(reporteDefecto),
   })
   .strict();
+
+export type ReglasReporte = z.infer<typeof reporteEsquema>;
 
 export type ReglasParametro = z.infer<typeof reglasEsquema>;
 export type NormaParametro = z.infer<typeof normaEsquema>;

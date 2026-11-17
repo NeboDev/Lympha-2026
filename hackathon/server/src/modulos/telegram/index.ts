@@ -5,6 +5,7 @@ export {
   crearTokenVinculo,
   type DatosChat,
   enlaceDeVinculo,
+  type GeneradorReporte,
   type LoggerTelegram,
   type OpcionesManejador,
   type ResponderBot,

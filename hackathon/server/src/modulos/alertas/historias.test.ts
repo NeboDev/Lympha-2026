@@ -47,6 +47,8 @@ function montar(escenario: NombreEscenario, opciones: { recordatorioMin?: number
       }
       chat.push(texto);
     },
+    // Estas historias no piden reportes: solo existe para cumplir la interfaz del bot.
+    async enviarDocumento() {},
   };
 
   // Un «servidor» completo; se puede volver a crear para simular un reinicio.

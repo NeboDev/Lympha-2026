@@ -1,5 +1,5 @@
 import { ObjectId } from "mongodb";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { textosBot } from "../../dominio/frases.ts";
 import type { Marca } from "../../dominio/marca.ts";
 import {
@@ -15,20 +15,24 @@ import {
   crearManejadorTelegram,
   crearTokenVinculo,
   enlaceDeVinculo,
+  type GeneradorReporte,
 } from "./index.ts";
 
 const marca: Marca = {
-  nombre: "Atl",
+  nombre: "Lympha Atl",
   nombre_bot: "Lympha-HP26",
   alarma_local_en_avisos: false,
   dosificacion_automatica: false,
 };
 const T = textosBot(marca);
 
-function escenario() {
+type Generar = GeneradorReporte["generar"];
+
+function escenario(opciones: { generar?: Generar } = {}) {
   const base = new BaseFalsa();
   const nodo = base.agregarNodo(nodoDePrueba(new ObjectId(), "Tinaco azotea"), "Primaria X");
   const enviados: { chat: number; texto: string }[] = [];
+  const documentos: { chat: number; nombre: string; bytes: number; leyenda?: string }[] = [];
   let fallaEnvio = false;
   let ahora = T0;
   const { logs, logger } = loggerDePrueba();
@@ -39,7 +43,17 @@ function escenario() {
         if (fallaEnvio) throw new Error("sin red");
         enviados.push({ chat, texto });
       },
+      async enviarDocumento(chat, archivo, leyenda) {
+        if (fallaEnvio) throw new Error("sin red");
+        documentos.push({
+          chat,
+          nombre: archivo.nombre,
+          bytes: archivo.contenido.length,
+          ...(leyenda === undefined ? {} : { leyenda }),
+        });
+      },
     },
+    ...(opciones.generar ? { reportes: { generar: opciones.generar } } : {}),
     marca,
     catalogo: catalogoDePrueba,
     usuarioBot: "lympha26_bot",
@@ -59,6 +73,7 @@ function escenario() {
     base,
     nodo,
     enviados,
+    documentos,
     logs,
     manejar,
     mensaje,
@@ -213,6 +228,150 @@ describe("/estado", () => {
     await e.manejar(e.mensaje("/estado"));
     expect(e.ultimaRespuesta()).toContain("⚪ Sin conexión");
     expect(e.ultimaRespuesta()).toContain("hace 10 minutos");
+  });
+});
+
+describe("/reporte", () => {
+  const PDF = new Uint8Array([37, 80, 68, 70, 45]);
+  const generarOk: Generar = async (nodo) => ({
+    nombreArchivo: `reporte-${nodo.nombre.toLowerCase().replace(/\s+/g, "-")}.pdf`,
+    pdf: PDF,
+  });
+
+  it("en un chat sin vincular lo explica", async () => {
+    const e = escenario({ generar: generarOk });
+    await e.manejar(e.mensaje("/reporte"));
+    expect(e.ultimaRespuesta()).toBe(T.noVinculado);
+    expect(e.documentos).toHaveLength(0);
+  });
+
+  it("manda el PDF del nodo con una leyenda honesta, y avisa que lo está preparando", async () => {
+    const llamadas: number[] = [];
+    const e = escenario({
+      generar: async (nodo, dias) => {
+        llamadas.push(dias);
+        return generarOk(nodo, dias);
+      },
+    });
+    e.base.vincularFalso(e.nodo.comunidad_id, 100);
+    await e.manejar(e.mensaje("/reporte"));
+    expect(llamadas).toEqual([7]); // el valor por defecto sale del catálogo
+    expect(e.enviados.map((x) => x.texto)).toEqual([T.reporteEnCurso(7)]);
+    expect(e.documentos).toEqual([
+      {
+        chat: 100,
+        nombre: "reporte-tinaco-azotea.pdf",
+        bytes: 5,
+        leyenda: T.reporteLeyenda("Tinaco azotea", 7),
+      },
+    ]);
+    expect(e.documentos[0]?.leyenda).toContain("no certifica el agua");
+  });
+
+  it("acepta un número de días y también /reporte@bot", async () => {
+    const llamadas: number[] = [];
+    const e = escenario({
+      generar: async (nodo, dias) => {
+        llamadas.push(dias);
+        return generarOk(nodo, dias);
+      },
+    });
+    e.base.vincularFalso(e.nodo.comunidad_id, 100);
+    await e.manejar(e.mensaje("/reporte 30"));
+    await e.manejar(e.mensaje("/reporte@lympha26_bot 1"));
+    await e.manejar(e.mensaje("/reporte@otro_bot 3"));
+    expect(llamadas).toEqual([30, 1]); // el comando dirigido a otro bot se ignora
+    expect(e.documentos).toHaveLength(2);
+  });
+
+  it("rechaza días fuera de 1 a 90 o que no son un número, sin generar nada", async () => {
+    const llamadas: number[] = [];
+    const e = escenario({
+      generar: async (nodo, dias) => {
+        llamadas.push(dias);
+        return generarOk(nodo, dias);
+      },
+    });
+    e.base.vincularFalso(e.nodo.comunidad_id, 100);
+    for (const malo of ["0", "91", "-3", "abc", "7.5", "1000"]) {
+      await e.manejar(e.mensaje(`/reporte ${malo}`));
+      expect(e.ultimaRespuesta(), malo).toBe(T.reporteDiasInvalidos);
+    }
+    expect(llamadas).toEqual([]);
+    expect(e.documentos).toHaveLength(0);
+  });
+
+  it("manda un PDF por cada nodo de la comunidad", async () => {
+    const e = escenario({ generar: generarOk });
+    e.base.vincularFalso(e.nodo.comunidad_id, 100);
+    e.base.agregarNodo(nodoDePrueba(e.nodo.comunidad_id, "Cisterna"));
+    await e.manejar(e.mensaje("/reporte"));
+    expect(e.documentos.map((d) => d.nombre).sort()).toEqual([
+      "reporte-cisterna.pdf",
+      "reporte-tinaco-azotea.pdf",
+    ]);
+  });
+
+  it("una comunidad sin nodos lo dice", async () => {
+    const e = escenario({ generar: generarOk });
+    const vacia = new ObjectId();
+    e.base.comunidades.set(vacia.toHexString(), { _id: vacia, nombre: "Vacía", telegram: null });
+    e.base.vincularFalso(vacia, 100);
+    await e.manejar(e.mensaje("/reporte"));
+    expect(e.ultimaRespuesta()).toBe(T.reporteSinNodos);
+  });
+
+  it("si se pide otro mientras se prepara el primero, responde que está ocupado", async () => {
+    let liberar: () => void = () => {};
+    const espera = new Promise<void>((r) => {
+      liberar = r;
+    });
+    const e = escenario({
+      generar: async (nodo, dias) => {
+        await espera;
+        return generarOk(nodo, dias);
+      },
+    });
+    e.base.vincularFalso(e.nodo.comunidad_id, 100);
+    const primero = e.manejar(e.mensaje("/reporte"));
+    await vi.waitFor(() => expect(e.enviados).toHaveLength(1)); // ya mandó «Preparando…»
+    await e.manejar(e.mensaje("/reporte"));
+    expect(e.ultimaRespuesta()).toBe(T.reporteOcupado);
+    liberar();
+    await primero;
+    expect(e.documentos).toHaveLength(1);
+    // Ya libre, se puede pedir otro.
+    await e.manejar(e.mensaje("/reporte"));
+    expect(e.documentos).toHaveLength(2);
+  });
+
+  it("si falla la generación responde con un error amable y libera el chat", async () => {
+    let falla = true;
+    const e = escenario({
+      generar: async (nodo, dias) => {
+        if (falla) throw new Error("boom: detalle interno");
+        return generarOk(nodo, dias);
+      },
+    });
+    e.base.vincularFalso(e.nodo.comunidad_id, 100);
+    await e.manejar(e.mensaje("/reporte"));
+    expect(e.ultimaRespuesta()).toBe(T.errorInterno);
+    expect(e.ultimaRespuesta()).not.toContain("boom");
+    expect(e.logs.error).toHaveLength(1);
+    falla = false;
+    await e.manejar(e.mensaje("/reporte"));
+    expect(e.documentos).toHaveLength(1);
+  });
+
+  it("sin generador configurado dice que no está disponible", async () => {
+    const e = escenario();
+    e.base.vincularFalso(e.nodo.comunidad_id, 100);
+    await e.manejar(e.mensaje("/reporte"));
+    expect(e.ultimaRespuesta()).toBe(T.reporteNoDisponible);
+  });
+
+  it("la ayuda lo menciona", () => {
+    expect(T.ayuda).toContain("/reporte [días]");
   });
 });
 

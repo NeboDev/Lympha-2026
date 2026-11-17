@@ -5,7 +5,7 @@ import { parsearMarca } from "./marca.ts";
 describe("marca.json", () => {
   it("el archivo real es válido y trae el nombre del bot", () => {
     const m = cargarMarca();
-    expect(m.nombre).toBe("Atl");
+    expect(m.nombre).toBe("Lympha Atl");
     expect(m.nombre_bot).toBe("Lympha-HP26");
   });
 

@@ -203,15 +203,232 @@ export function textoEstado(comunidad: string, filas: FilaEstado[], marca: Marca
   ].join("\n");
 }
 
+/* ---- Reporte (PDF) ----
+ * El PDF usa fuentes estándar (WinAnsi): sin emoji ni símbolos como ✓ o ≥. Todo texto del reporte
+ * pasa por aquí para que `frases.test.ts` verifique que no dice «potable», «seguro» ni «cumple».
+ */
+
+const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+
+/** «16 nov 2026, 14:05» en hora de México; con `conHora = false`, solo «16 nov 2026». */
+export function fechaMx(d: Date, conHora = true): string {
+  const partes = new Intl.DateTimeFormat("es-MX", {
+    timeZone: "America/Mexico_City",
+    day: "numeric",
+    month: "numeric",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(d);
+  const p = (tipo: string) => partes.find((x) => x.type === tipo)?.value ?? "";
+  const dia = `${p("day")} ${MESES[Number(p("month")) - 1] ?? ""} ${p("year")}`;
+  return conHora ? `${dia}, ${p("hour")}:${p("minute")}` : dia;
+}
+
+export function periodoLegible(desde: Date, hasta: Date): string {
+  return `${fechaMx(desde)} a ${fechaMx(hasta)} (hora de México)`;
+}
+
+/** «6.5 a 8.5», «hasta 4», «0.2 o más»; null si no hay límites. */
+export function rangoNorma(min: number | null, max: number | null, dec: number): string | null {
+  if (min !== null && max !== null) return `${limite(min, dec)} a ${limite(max, dec)}`;
+  if (max !== null) return `hasta ${limite(max, dec)}`;
+  if (min !== null) return `${limite(min, dec)} o más`;
+  return null;
+}
+
+export type NivelInsignia = "bien" | "atencion" | "fuera" | "sin_datos";
+export type Insignia = { nivel: NivelInsignia; rotulo: string; texto: string };
+
+export type FuenteInsignia = {
+  nombre: string;
+  articulo?: "el" | "la";
+  /** % del tiempo con datos que el parámetro estuvo dentro del rango; null si no hubo muestras. */
+  pctEnRango: number | null;
+  coberturaPct: number;
+  norma: {
+    min: number | null;
+    max: number | null;
+    decimales: number;
+    /** Complemento de «del rango …»: «de la NOM-127» o «configurado para este nodo». */
+    origen: string;
+  };
+  coberturaMinPct: number;
+  bienPct: number;
+  atencionPct: number;
+};
+
+const ROTULO_INSIGNIA: Record<NivelInsignia, string> = {
+  bien: "En rango",
+  atencion: "Atención",
+  fuera: "Fuera de rango",
+  sin_datos: "Datos insuficientes",
+};
+
+/**
+ * La insignia de un parámetro: «pH dentro del rango de la NOM-127 el 97.2 % del tiempo». Nunca un
+ * «cumple» global. Con poca cobertura no se da un porcentaje que parezca describir todo el periodo.
+ */
+export function insigniaParametro(f: FuenteInsignia): Insignia {
+  const sujeto = `${f.articulo === "la" ? "La" : "El"} ${f.nombre}`;
+  if (f.pctEnRango === null || f.coberturaPct < f.coberturaMinPct) {
+    return {
+      nivel: "sin_datos",
+      rotulo: ROTULO_INSIGNIA.sin_datos,
+      texto: `${sujeto}: no hay datos suficientes para describir el periodo (se recibieron datos el ${f.coberturaPct.toFixed(0)} % del tiempo).`,
+    };
+  }
+  const nivel: NivelInsignia =
+    f.pctEnRango >= f.bienPct ? "bien" : f.pctEnRango >= f.atencionPct ? "atencion" : "fuera";
+  const rango = rangoNorma(f.norma.min, f.norma.max, f.norma.decimales);
+  const donde = rango ? `del rango ${f.norma.origen} (${rango})` : `del rango ${f.norma.origen}`;
+  const texto =
+    nivel === "fuera"
+      ? `${sujeto} estuvo dentro ${donde} solo el ${f.pctEnRango.toFixed(1)} % del tiempo con datos.`
+      : `${sujeto} estuvo dentro ${donde} el ${f.pctEnRango.toFixed(1)} % del tiempo con datos.`;
+  return { nivel, rotulo: ROTULO_INSIGNIA[nivel], texto };
+}
+
+export type FuenteResumen = {
+  comunidad: string;
+  nodo: string;
+  desde: Date;
+  hasta: Date;
+  /** Parámetros que el nodo midió, con su género. */
+  medidos: { nombre: string; articulo?: "el" | "la" }[];
+  alertas: { total: number; masGrave: "atencion" | "alta" | "critica" | null };
+  coberturaPct: number;
+  coberturaMinPct: number;
+  huecos: number;
+  huecoMayorS: number | null;
+};
+
+const SEVERIDAD_LEGIBLE = { atencion: "atención", alta: "alta", critica: "crítica" } as const;
+
+/** Resumen en lenguaje sencillo: qué se midió, cuánto del tiempo en rango, qué pasó. 3 a 5 líneas. */
+export function resumenReporte(f: FuenteResumen): string[] {
+  const lineas: string[] = [];
+  const medidos = f.medidos.map((m) => m.nombre).join(", ");
+  lineas.push(
+    `Del ${fechaMx(f.desde, false)} al ${fechaMx(f.hasta, false)}, el nodo «${f.nodo}» de «${f.comunidad}» midió: ${medidos || "nada (todavía no hay parámetros configurados)"}.`,
+  );
+  lineas.push(
+    f.alertas.total === 0
+      ? "No hubo alertas en este periodo."
+      : `Hubo ${f.alertas.total} ${plural(f.alertas.total, "alerta", "alertas")}${f.alertas.masGrave ? ` (la más grave fue de severidad ${SEVERIDAD_LEGIBLE[f.alertas.masGrave]})` : ""}.`,
+  );
+  let datos = `Se recibieron datos durante el ${f.coberturaPct.toFixed(0)} % del periodo`;
+  if (f.huecos > 0) {
+    const mayor =
+      f.huecoMayorS === null ? "" : `, el más largo de ${duracionLegible(f.huecoMayorS / 60)}`;
+    datos += `, con ${f.huecos} ${plural(f.huecos, "hueco", "huecos")} sin datos${mayor}`;
+  }
+  datos += ".";
+  if (f.coberturaPct < f.coberturaMinPct) {
+    datos += " Con tan pocos datos, las cifras no describen todo el periodo.";
+  }
+  lineas.push(datos);
+  return lineas;
+}
+
+export const TITULO_REPORTE = "Bitácora de calidad del agua";
+
+export const AVISO_NO_CUBRE = [
+  "Un sensor no sustituye el muestreo ni el análisis de laboratorio.",
+  "La NOM-127 exige más parámetros de los que este nodo mide (por ejemplo, los microbiológicos); este reporte no los cubre.",
+];
+
+export const TEXTO_NO_MEDIDOS = "Parámetros de la NOM-127 que este nodo no midió en este periodo:";
+export const TEXTO_SIN_REGISTROS = "Sin registros en este periodo.";
+export const TEXTO_SIN_DATOS_GRAFICA = "Sin datos en este periodo.";
+export const TEXTO_HUECOS_GRAFICA = "Los tramos sin línea son huecos: el nodo no envió datos.";
+
+export function pieReporte(f: { marca: string; id: string; hash: string; generado: Date }): string {
+  return `${f.marca} · no es una certificación · Reporte ${f.id} · huella ${f.hash} · generado ${fechaMx(f.generado)}`;
+}
+
+const TITULO_NIVEL: Record<string, string> = {
+  critica: "crítico",
+  alta: "fuera de rango",
+  atencion: "en atención",
+};
+
+export type FuenteAlerta = {
+  tipo: "nivel" | "cambio_rapido" | "sensor" | "sin_conexion";
+  severidadMaxima: "atencion" | "alta" | "critica";
+  /** Nombre legible del parámetro, o null para alertas del nodo completo. */
+  parametro: string | null;
+  abierta: Date;
+  cerrada: Date | null;
+  valorApertura: number | null;
+  decimales: number;
+  /** Fin del periodo del reporte: para medir cuánto lleva abierta una alerta que sigue abierta. */
+  hasta: Date;
+};
+
+export function tituloAlerta(
+  a: Pick<FuenteAlerta, "tipo" | "severidadMaxima" | "parametro">,
+): string {
+  const p = a.parametro ?? "parámetro";
+  switch (a.tipo) {
+    case "nivel":
+      return `${p} ${TITULO_NIVEL[a.severidadMaxima] ?? "fuera de rango"}`;
+    case "cambio_rapido":
+      return `Cambio rápido de ${p}`;
+    case "sensor":
+      return `Revisar sensor de ${p}`;
+    case "sin_conexion":
+      return "Nodo sin conexión";
+  }
+}
+
+export function detalleAlerta(a: FuenteAlerta): string {
+  const fin = a.cerrada ?? a.hasta;
+  const minutos = Math.max(0, (fin.getTime() - a.abierta.getTime()) / 60_000);
+  const partes = [
+    a.cerrada ? `Duró ${duracionLegible(minutos)}` : `Seguía abierta (${duracionLegible(minutos)})`,
+  ];
+  if (a.valorApertura !== null)
+    partes.push(`valor al abrir ${a.valorApertura.toFixed(a.decimales)}`);
+  return partes.join(" · ");
+}
+
+export const TITULO_EVENTO: Record<string, string> = {
+  sin_datos: "Nodo sin datos",
+  reconexion: "Nodo volvió a enviar datos",
+  actuador: "Acción del actuador",
+};
+
+export const DIAGNOSTICO_CALIBRACION: Record<string, string> = {
+  buena: "Buena",
+  desgastada: "Desgastada",
+  revisar: "Revisar",
+};
+
 /* ---- Bot ---- */
 
-export function textosBot(marca: Marca) {
+export type ReglasDiasReporte = { dias_defecto: number; dias_max: number };
+
+export function textosBot(
+  marca: Marca,
+  reporte: ReglasDiasReporte = { dias_defecto: 7, dias_max: 90 },
+) {
   return {
+    reporteEnCurso: (dias: number) =>
+      `Preparando el reporte de los últimos ${dias} ${plural(dias, "día", "días")}…`,
+    reporteLeyenda: (nodo: string, dias: number) =>
+      `Reporte de «${nodo}» · últimos ${dias} ${plural(dias, "día", "días")}. ${marca.nombre} no certifica el agua: es la bitácora de lo que midió el nodo.`,
+    reporteDiasInvalidos: `Pídeme un periodo de 1 a ${reporte.dias_max} días, por ejemplo: /reporte ${reporte.dias_defecto}`,
+    reporteNoDisponible: "El reporte no está disponible por ahora.",
+    reporteOcupado: "Ya estoy preparando un reporte para este chat. Espera un momento.",
+    reporteSinNodos: `Esta comunidad aún no tiene nodos conectados a ${marca.nombre}.`,
     ayuda: [
       `Soy ${marca.nombre_bot}, el bot de avisos de la calidad del agua de tu comunidad.`,
       "",
       "Comandos:",
       "/estado — cómo está el agua ahora",
+      `/reporte [días] — reporte en PDF (por defecto, ${reporte.dias_defecto} días)`,
       "/ayuda — este mensaje",
       "/desvincular — dejar de recibir avisos (solo quien vinculó el chat)",
       "",

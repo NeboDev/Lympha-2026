@@ -20,18 +20,21 @@
     "nodo:borrar": "node --env-file=.env src/cli/nodo.ts borrar",
     "telegram:vinculo": "node --env-file=.env src/cli/telegram.ts vinculo",
     "telegram:probar": "node --env-file=.env src/cli/telegram.ts probar",
-    "telegram:estado": "node --env-file=.env src/cli/telegram.ts estado"
+    "telegram:estado": "node --env-file=.env src/cli/telegram.ts estado",
+    "reporte": "node --env-file=.env src/cli/reporte.ts"
   },
   "dependencies": {
     "fastify": "^5.12.8",
     "fastify-type-provider-zod": "^4.0.2",
     "mongodb": "^7.9.0",
+    "pdfkit": "^0.20.2",
     "pino": "^10.4.0",
     "zod": "^3.25.76"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.6.8",
     "@types/node": "^24.19.2",
+    "@types/pdfkit": "^0.17.7",
     "typescript": "~5.9.3",
     "vitest": "^5.1.0"
   }
