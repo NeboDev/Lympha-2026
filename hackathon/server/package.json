@@ -14,7 +14,10 @@
     "lint:fix": "biome check --write .",
     "typecheck": "tsc --noEmit",
     "db:indices": "node --env-file=.env src/cli/indices.ts",
-    "simulador": "node --env-file=.env src/simulador/main.ts"
+    "simulador": "node --env-file=.env src/simulador/main.ts",
+    "nodo:alta": "node --env-file=.env src/cli/nodo.ts alta",
+    "nodo:lista": "node --env-file=.env src/cli/nodo.ts lista",
+    "nodo:borrar": "node --env-file=.env src/cli/nodo.ts borrar"
   },
   "dependencies": {
     "fastify": "^5.12.8",

@@ -23,6 +23,12 @@ const esquema = z
     BLYNK_HOST: z.string().default("blynk.cloud"),
     POLL_MS: entero(5000),
     SIN_DATOS_S: entero(60),
+    ATL_CLAVE_CIFRADO: z
+      .string({ required_error: "falta ATL_CLAVE_CIFRADO" })
+      .refine((s) => Buffer.from(s, "base64").length === 32, {
+        message: "ATL_CLAVE_CIFRADO debe ser de 32 bytes en base64",
+      }),
+    INGESTA_ACTIVA: z.enum(["true", "false"]).default("true"),
   })
   .strict();
 
@@ -37,6 +43,10 @@ export type Config = {
   blynkHost: string;
   pollMs: number;
   sinDatosS: number;
+  /** Clave AES-256 (32 bytes) con la que se cifra el token de Blynk de cada nodo. */
+  claveCifrado: Buffer;
+  /** `false` levanta solo la API, sin el poller de Blynk. */
+  ingestaActiva: boolean;
 };
 
 const CLAVES = [
@@ -49,6 +59,8 @@ const CLAVES = [
   "BLYNK_HOST",
   "POLL_MS",
   "SIN_DATOS_S",
+  "ATL_CLAVE_CIFRADO",
+  "INGESTA_ACTIVA",
 ] as const;
 
 /** Configuración mínima de las herramientas que solo hablan con Blynk (simulador): sin Mongo. */
@@ -99,5 +111,7 @@ export function cargarConfig(env: Record<string, string | undefined>): Config {
     blynkHost: e.BLYNK_HOST,
     pollMs: e.POLL_MS,
     sinDatosS: e.SIN_DATOS_S,
+    claveCifrado: Buffer.from(e.ATL_CLAVE_CIFRADO, "base64"),
+    ingestaActiva: e.INGESTA_ACTIVA === "true",
   };
 }

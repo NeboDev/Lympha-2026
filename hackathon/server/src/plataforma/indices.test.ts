@@ -1,13 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { definicionesIndices } from "./indices.ts";
+import { definicionesIndices, indicesObsoletos } from "./indices.ts";
 
 describe("definicionesIndices", () => {
-  it("muestras tiene el índice único parcial por (nodo_id, seq) para la ingesta idempotente", () => {
+  it("muestras es único por (nodo_id, sesion, seq): un reinicio del nodo no choca", () => {
     const d = definicionesIndices.find(
       (x) => x.coleccion === "muestras" && x.opciones?.unique === true,
     );
-    expect(d?.clave).toEqual({ nodo_id: 1, seq: 1 });
+    expect(d?.clave).toEqual({ nodo_id: 1, sesion: 1, seq: 1 });
     expect(d?.opciones?.partialFilterExpression).toBeDefined();
+  });
+
+  it("se borra el índice viejo por (nodo_id, seq)", () => {
+    expect(indicesObsoletos).toContainEqual({ coleccion: "muestras", nombre: "nodo_id_1_seq_1" });
   });
 
   it("vinculos_pendientes expira solo por TTL y el token es único", () => {

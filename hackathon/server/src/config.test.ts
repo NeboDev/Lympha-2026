@@ -1,9 +1,24 @@
 import { describe, expect, it } from "vitest";
 import { cargarConfig } from "./config.ts";
 
-const base = { MONGODB_URI: "mongodb://127.0.0.1:27017/atl" };
+const CLAVE = Buffer.alloc(32, 7).toString("base64");
+const base = { MONGODB_URI: "mongodb://127.0.0.1:27017/atl", ATL_CLAVE_CIFRADO: CLAVE };
 
 describe("cargarConfig", () => {
+  it("exige una clave de cifrado de 32 bytes", () => {
+    expect(() => cargarConfig({ MONGODB_URI: base.MONGODB_URI })).toThrow(/ATL_CLAVE_CIFRADO/);
+    expect(() =>
+      cargarConfig({ ...base, ATL_CLAVE_CIFRADO: Buffer.alloc(16).toString("base64") }),
+    ).toThrow(/32 bytes/);
+    expect(cargarConfig(base).claveCifrado).toHaveLength(32);
+  });
+
+  it("INGESTA_ACTIVA es true por defecto y se puede apagar", () => {
+    expect(cargarConfig(base).ingestaActiva).toBe(true);
+    expect(cargarConfig({ ...base, INGESTA_ACTIVA: "false" }).ingestaActiva).toBe(false);
+    expect(() => cargarConfig({ ...base, INGESTA_ACTIVA: "quizá" })).toThrow();
+  });
+
   it("aplica valores por defecto", () => {
     const c = cargarConfig(base);
     expect(c.puerto).toBe(3000);
