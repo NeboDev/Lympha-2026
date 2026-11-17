@@ -12,12 +12,14 @@ import { crearAlmacenTelegramMongo } from "./plataforma/almacen-telegram-mongo.t
 import { blynkAlcanzable } from "./plataforma/blynk.ts";
 import { crearBucle } from "./plataforma/bucle.ts";
 import { cargarCatalogo } from "./plataforma/catalogo.ts";
+import { crearVerificadorFirebase } from "./plataforma/firebase.ts";
 import { crearGeneradorPdf } from "./plataforma/generador-reportes.ts";
 import { crearLectorBlynk } from "./plataforma/lector-blynk.ts";
 import { crearLogger } from "./plataforma/logger.ts";
 import { cargarSimboloLympha } from "./plataforma/logo-svg.ts";
 import { cargarMarca } from "./plataforma/marca.ts";
 import { conectarMongo } from "./plataforma/mongo.ts";
+import { crearServiciosApi } from "./plataforma/servicios-api.ts";
 import { crearClienteTelegram } from "./plataforma/telegram-api.ts";
 import { iniciarPolling } from "./plataforma/telegram-polling.ts";
 
@@ -26,6 +28,19 @@ const logger = crearLogger();
 const catalogo = cargarCatalogo();
 const marca = cargarMarca();
 
+// Sin el id del proyecto de Firebase no hay forma de saber quién es quién: la API no arranca.
+if (!config.firebase) {
+  throw new Error(
+    "Falta FIREBASE_PROJECT_ID en .env (Configuración del proyecto > ID del proyecto)",
+  );
+}
+if (config.firebase.usarEmulador) {
+  logger.warn({}, "FIREBASE_USE_EMULATOR=true: se aceptan tokens sin firma (solo para desarrollo)");
+}
+if (config.demoToken) {
+  logger.warn({}, "Usuario de demostración ACTIVO: quien tenga USUARIO_DEMO_TOKEN entra como demo");
+}
+
 const mongo = await conectarMongo(config);
 const app = crearApp({
   corsOrigenes: config.corsOrigenes,
@@ -33,6 +48,17 @@ const app = crearApp({
     mongo: () => mongo.ping(),
     blynk: () => blynkAlcanzable(config.blynkHost),
   },
+  servicios: crearServiciosApi({
+    db: mongo.db,
+    catalogo,
+    marca,
+    verificador: crearVerificadorFirebase(config.firebase),
+    demoToken: config.demoToken,
+    claveCifrado: config.claveCifrado,
+    blynkHost: config.blynkHost,
+    logo: cargarSimboloLympha(),
+    usuarioBot: config.telegramToken ? config.telegramUsuario : null,
+  }),
   logger,
 });
 

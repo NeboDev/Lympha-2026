@@ -13,6 +13,8 @@ const reglasEsquema = z
     lecturas_para_entrar: z.number().int().positive(),
     estable_desv_max: z.number().nonnegative(),
     sensor_pendiente_min_pct: z.number().positive(),
+    /** % de Nernst a partir del cual la calibración se diagnostica como «buena» (por defecto, 95). */
+    sensor_pendiente_buena_pct: z.number().positive().optional(),
     lecturas_estable: z.number().int().positive(),
     fisico_min: z.number(),
     fisico_max: z.number(),

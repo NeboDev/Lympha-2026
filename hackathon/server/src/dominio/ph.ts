@@ -54,3 +54,22 @@ export function pKaHOCl(tempC: number): number {
 export function fraccionHOCl(ph: number, tempC: number): number {
   return 1 / (1 + 10 ** (ph - pKaHOCl(tempC)));
 }
+
+/** Parámetros del catálogo que se calibran con dos puntos (buffers de pH). */
+export const PARAMETROS_CALIBRABLES: readonly string[] = ["ph"];
+
+export type DiagnosticoSonda = "buena" | "desgastada" | "revisar";
+
+/**
+ * Qué tan sana está la sonda según su pendiente respecto de la teórica de Nernst. Los umbrales los
+ * pone el catálogo (`sensor_pendiente_min_pct`, `sensor_pendiente_buena_pct`): son criterio del
+ * equipo, no de la norma. Una pendiente de signo contrario (cables invertidos) siempre es «revisar».
+ */
+export function diagnosticarSonda(
+  cal: Pick<Calibracion, "pendienteMvPorPh" | "pendientePctNernst">,
+  minimoPct: number,
+  buenaPct: number,
+): DiagnosticoSonda {
+  if (cal.pendienteMvPorPh >= 0 || cal.pendientePctNernst < minimoPct) return "revisar";
+  return cal.pendientePctNernst >= buenaPct ? "buena" : "desgastada";
+}

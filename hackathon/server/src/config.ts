@@ -39,8 +39,37 @@ const esquema = z
       .optional(),
     RECORDATORIO_MIN: entero(30),
     BARRIDO_MS: entero(15000),
+    FIREBASE_PROJECT_ID: z
+      .string()
+      .regex(
+        /^[a-z][a-z0-9-]{4,28}[a-z0-9]$/,
+        "FIREBASE_PROJECT_ID no parece un id de proyecto de Firebase",
+      )
+      .optional(),
+    FIREBASE_USE_EMULATOR: z.enum(["true", "false"]).default("false"),
+    FIREBASE_AUTH_EMULATOR_HOST: z
+      .string()
+      .regex(/^[\w.-]+:\d{2,5}$/, "FIREBASE_AUTH_EMULATOR_HOST va como host:puerto")
+      .default("127.0.0.1:9099"),
+    USUARIO_DEMO_ACTIVO: z.enum(["true", "false"]).default("false"),
+    USUARIO_DEMO_TOKEN: z
+      .string()
+      .min(16, "USUARIO_DEMO_TOKEN debe tener al menos 16 caracteres")
+      .optional(),
   })
   .strict()
+  .refine((e) => e.FIREBASE_USE_EMULATOR === "false" || e.APP_ENV === "local", {
+    message: "el emulador de Firebase solo se permite con APP_ENV=local",
+    path: ["FIREBASE_USE_EMULATOR"],
+  })
+  .refine((e) => e.USUARIO_DEMO_ACTIVO === "false" || e.APP_ENV === "demo", {
+    message: "el usuario de demostración solo se permite con APP_ENV=demo",
+    path: ["USUARIO_DEMO_ACTIVO"],
+  })
+  .refine((e) => e.USUARIO_DEMO_ACTIVO === "false" || !!e.USUARIO_DEMO_TOKEN, {
+    message: "con USUARIO_DEMO_ACTIVO hace falta USUARIO_DEMO_TOKEN (un secreto de 16+ caracteres)",
+    path: ["USUARIO_DEMO_TOKEN"],
+  })
   .refine((e) => !e.TELEGRAM_BOT_TOKEN || !!e.TELEGRAM_BOT_USERNAME, {
     message: "con TELEGRAM_BOT_TOKEN hace falta TELEGRAM_BOT_USERNAME (para los enlaces)",
     path: ["TELEGRAM_BOT_USERNAME"],
@@ -67,6 +96,10 @@ export type Config = {
   /** Minutos entre recordatorios de una alerta abierta (la mitad si es crítica). */
   recordatorioMin: number;
   barridoMs: number;
+  /** null = sin acceso configurado: la API no arranca (ver main.ts). */
+  firebase: { projectId: string; usarEmulador: boolean; hostEmulador: string } | null;
+  /** Token fijo del usuario de demostración (plan B del jueves); null = desactivado. */
+  demoToken: string | null;
 };
 
 const CLAVES = [
@@ -85,6 +118,11 @@ const CLAVES = [
   "TELEGRAM_BOT_USERNAME",
   "RECORDATORIO_MIN",
   "BARRIDO_MS",
+  "FIREBASE_PROJECT_ID",
+  "FIREBASE_USE_EMULATOR",
+  "FIREBASE_AUTH_EMULATOR_HOST",
+  "USUARIO_DEMO_ACTIVO",
+  "USUARIO_DEMO_TOKEN",
 ] as const;
 
 /** Configuración mínima de las herramientas que solo hablan con Blynk (simulador): sin Mongo. */
@@ -141,5 +179,13 @@ export function cargarConfig(env: Record<string, string | undefined>): Config {
     telegramUsuario: e.TELEGRAM_BOT_USERNAME ?? null,
     recordatorioMin: e.RECORDATORIO_MIN,
     barridoMs: e.BARRIDO_MS,
+    firebase: e.FIREBASE_PROJECT_ID
+      ? {
+          projectId: e.FIREBASE_PROJECT_ID,
+          usarEmulador: e.FIREBASE_USE_EMULATOR === "true",
+          hostEmulador: e.FIREBASE_AUTH_EMULATOR_HOST,
+        }
+      : null,
+    demoToken: e.USUARIO_DEMO_ACTIVO === "true" ? (e.USUARIO_DEMO_TOKEN ?? null) : null,
   };
 }

@@ -21,11 +21,13 @@
     "telegram:vinculo": "node --env-file=.env src/cli/telegram.ts vinculo",
     "telegram:probar": "node --env-file=.env src/cli/telegram.ts probar",
     "telegram:estado": "node --env-file=.env src/cli/telegram.ts estado",
-    "reporte": "node --env-file=.env src/cli/reporte.ts"
+    "reporte": "node --env-file=.env src/cli/reporte.ts",
+    "dev:token": "node --env-file=.env src/cli/dev-token.ts"
   },
   "dependencies": {
     "fastify": "^5.12.8",
     "fastify-type-provider-zod": "^4.0.2",
+    "firebase-admin": "^14.5.1",
     "mongodb": "^7.9.0",
     "pdfkit": "^0.20.2",
     "pino": "^10.4.0",

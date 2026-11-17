@@ -26,6 +26,7 @@
         "lecturas_para_entrar": 3,
         "estable_desv_max": 0.02,
         "sensor_pendiente_min_pct": 85,
+        "sensor_pendiente_buena_pct": 95,
         "lecturas_estable": 10,
         "fisico_min": 0,
         "fisico_max": 14,

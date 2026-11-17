@@ -1,16 +1,15 @@
 import { createHash } from "node:crypto";
 import { ObjectId } from "mongodb";
 import type { Catalogo } from "../../dominio/catalogo.ts";
+import { ErrorDominio } from "../../dominio/errores.ts";
 import type { Marca } from "../../dominio/marca.ts";
 import { type ContenidoReporte, construirContenido } from "./contenido.ts";
 import type { AlmacenReportes, ReporteDoc } from "./puertos.ts";
 
-export class ErrorReporte extends Error {
-  readonly codigo: "nodo_inexistente" | "periodo_invalido";
+/** Un reporte que no se puede armar: el nodo no existe o el periodo no vale. La API lo traduce a HTTP. */
+export class ErrorReporte extends ErrorDominio {
   constructor(codigo: "nodo_inexistente" | "periodo_invalido", mensaje: string) {
-    super(mensaje);
-    this.name = "ErrorReporte";
-    this.codigo = codigo;
+    super(codigo === "nodo_inexistente" ? 404 : 422, codigo, mensaje);
   }
 }
 

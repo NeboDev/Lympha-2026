@@ -105,3 +105,49 @@ describe("cargarConfig", () => {
     }
   });
 });
+
+describe("cargarConfig: acceso (Firebase) y usuario de demostración", () => {
+  it("sin FIREBASE_PROJECT_ID la configuración es válida pero sin acceso (main.ts no arranca la API)", () => {
+    expect(cargarConfig(base).firebase).toBeNull();
+    expect(cargarConfig(base).demoToken).toBeNull();
+  });
+
+  it("valida el id del proyecto y por defecto no usa el emulador", () => {
+    expect(() => cargarConfig({ ...base, FIREBASE_PROJECT_ID: "Mi Proyecto" })).toThrow(
+      /FIREBASE_PROJECT_ID/,
+    );
+    expect(cargarConfig({ ...base, FIREBASE_PROJECT_ID: "lympha-atl-1a2b3" }).firebase).toEqual({
+      projectId: "lympha-atl-1a2b3",
+      usarEmulador: false,
+      hostEmulador: "127.0.0.1:9099",
+    });
+  });
+
+  it("el emulador solo se permite con APP_ENV=local", () => {
+    const f = { ...base, FIREBASE_PROJECT_ID: "lympha-atl-1a2b3", FIREBASE_USE_EMULATOR: "true" };
+    expect(cargarConfig(f).firebase?.usarEmulador).toBe(true);
+    expect(() => cargarConfig({ ...f, APP_ENV: "demo" })).toThrow(
+      /solo se permite con APP_ENV=local/,
+    );
+  });
+
+  it("el usuario de demostración exige APP_ENV=demo y un token largo", () => {
+    const d = { ...base, USUARIO_DEMO_ACTIVO: "true" };
+    expect(() => cargarConfig(d)).toThrow(/APP_ENV=demo/);
+    expect(() => cargarConfig({ ...d, APP_ENV: "demo" })).toThrow(/USUARIO_DEMO_TOKEN/);
+    expect(() => cargarConfig({ ...d, APP_ENV: "demo", USUARIO_DEMO_TOKEN: "corto" })).toThrow(
+      /16 caracteres/,
+    );
+    expect(
+      cargarConfig({ ...d, APP_ENV: "demo", USUARIO_DEMO_TOKEN: "un-secreto-de-16+chars" })
+        .demoToken,
+    ).toBe("un-secreto-de-16+chars");
+  });
+
+  it("un token de demostración suelto no activa nada", () => {
+    expect(
+      cargarConfig({ ...base, APP_ENV: "demo", USUARIO_DEMO_TOKEN: "un-secreto-de-16+chars" })
+        .demoToken,
+    ).toBeNull();
+  });
+});
