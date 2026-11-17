@@ -76,6 +76,10 @@ export function crearAlmacenReportesMongo(db: Db): AlmacenReportes {
         .toArray();
     },
 
+    async recientes(nodoId, limite) {
+      return reportes.find({ nodo_id: nodoId }).sort({ generado: -1 }).limit(limite).toArray();
+    },
+
     async guardarReporte(doc) {
       await reportes.insertOne({ ...doc });
     },

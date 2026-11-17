@@ -63,15 +63,13 @@ export function crearServiciosApi(op: OpcionesServiciosApi): ServiciosApi {
     cifrar: (token) => cifrar(token, op.claveCifrado),
     reloj,
   });
-  const reportes = crearGeneradorPdf({
-    servicio: crearServicioReportes({
-      almacen: crearAlmacenReportesMongo(op.db),
-      catalogo: op.catalogo,
-      marca: op.marca,
-      reloj,
-    }),
-    logo: op.logo,
+  const servicioReportes = crearServicioReportes({
+    almacen: crearAlmacenReportesMongo(op.db),
+    catalogo: op.catalogo,
+    marca: op.marca,
+    reloj,
   });
+  const reportes = crearGeneradorPdf({ servicio: servicioReportes, logo: op.logo });
   const almacenTelegram = crearAlmacenTelegramMongo(op.db);
   const usuarioBot = op.usuarioBot;
 
@@ -88,6 +86,7 @@ export function crearServiciosApi(op: OpcionesServiciosApi): ServiciosApi {
     }),
     catalogo: op.catalogo,
     reportes: {
+      recientes: (nodoId, limite) => servicioReportes.recientes(nodoId, limite),
       async generar(nodoId, desde, hasta, generadoPor) {
         const r = await reportes.periodo(nodoId, desde, hasta, generadoPor);
         return { pdf: r.pdf, nombreArchivo: r.nombreArchivo };

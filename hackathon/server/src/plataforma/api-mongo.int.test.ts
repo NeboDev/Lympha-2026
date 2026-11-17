@@ -403,6 +403,12 @@ describe.skipIf(!activo)("API sobre MongoDB (integración)", () => {
     expect(
       await mongo.db.collection("reportes").countDocuments({ nodo_id: new ObjectId(nodoId) }),
     ).toBe(1);
+    const anteriores = (await pedir("ana", "GET", `/api/nodos/${nodoId}/reportes`)).json().reportes;
+    expect(anteriores).toHaveLength(1);
+    expect(anteriores[0]).toMatchObject({
+      generado_por: "Ana",
+      huella: expect.stringMatching(/^[0-9a-f]{12}$/),
+    });
 
     const link = (await pedir("ana", "POST", `/api/comunidades/${com.id}/telegram/vinculo`)).json();
     expect(link.enlace).toMatch(/^https:\/\/t\.me\/lympha26_bot\?start=[A-Za-z0-9_-]{43}$/);

@@ -37,6 +37,7 @@ const RUTAS_ESPERADAS = [
   "POST /api/nodos/:id/bitacora",
   "GET /api/nodos/:id/calibraciones",
   "POST /api/nodos/:id/calibraciones",
+  "GET /api/nodos/:id/reportes",
   "POST /api/nodos/:id/reportes",
 ];
 
@@ -147,6 +148,12 @@ const RUTAS_CON_ID = [
     ruta: (id: string) => `/api/nodos/${id}/calibraciones`,
     cuerpo: { parametro: "ph", puntos: PUNTOS },
     minimo: "responsable",
+  },
+  {
+    familia: "nodo",
+    metodo: "GET",
+    ruta: (id: string) => `/api/nodos/${id}/reportes`,
+    minimo: "integrante",
   },
   {
     familia: "nodo",
@@ -485,6 +492,30 @@ describe("POST /api/nodos/:id/reportes", () => {
   });
 });
 
+describe("GET /api/nodos/:id/reportes", () => {
+  it("lista los reportes anteriores con su resumen y su huella corta", async () => {
+    const e = await escenario();
+    expect((await e.pedir("token-ana", "GET", `/api/nodos/${e.nodoId}/reportes`)).json()).toEqual({
+      reportes: [],
+    });
+    await e.pedir("token-beto", "POST", `/api/nodos/${e.nodoId}/reportes`, { dias: 30 });
+    const r = await e.pedir("token-ana", "GET", `/api/nodos/${e.nodoId}/reportes?limite=5`);
+    expect(r.statusCode).toBe(200);
+    expect(r.json().reportes).toEqual([
+      expect.objectContaining({ generado_por: "Beto", huella: "abcdef012345" }),
+    ]);
+    expect(r.headers["cache-control"]).toBe("no-store");
+  });
+
+  it("rechaza un límite que no es un número positivo", async () => {
+    const e = await escenario();
+    for (const q of ["limite=0", "limite=abc", "limite=-1", "otro=1"]) {
+      const r = await e.pedir("token-ana", "GET", `/api/nodos/${e.nodoId}/reportes?${q}`);
+      expect(r.statusCode, q).toBe(400);
+    }
+  });
+});
+
 describe("POST /api/comunidades/:id/telegram/vinculo", () => {
   it("el responsable obtiene un enlace de un solo uso", async () => {
     const e = await escenario();
@@ -536,6 +567,7 @@ describe("cabeceras y CORS", () => {
     expect(ok.statusCode).toBe(204);
     expect(ok.headers["access-control-allow-origin"]).toBe("http://localhost:5173");
     expect(ok.headers["access-control-allow-headers"]).toContain("Authorization");
+    expect(ok.headers["access-control-expose-headers"]).toBe("Content-Disposition");
     const ajeno = await api.app.inject({
       method: "OPTIONS",
       url: "/api/yo",

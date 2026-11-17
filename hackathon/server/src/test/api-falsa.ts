@@ -156,6 +156,19 @@ export function crearApiFalsa(
     }),
     catalogo: catalogoDePrueba,
     reportes: {
+      async recientes(nodoId) {
+        return reportesPedidos
+          .filter((p) => p.nodoId === nodoId.toHexString())
+          .map((p, i) => ({
+            id: `rep${i}`,
+            desde: p.desde,
+            hasta: p.hasta,
+            generado: new Date(T0),
+            generado_por: p.por,
+            huella: "abcdef012345",
+            resumen: { parametros: {}, cobertura_pct: 100, alertas: 0 },
+          }));
+      },
       async generar(nodoId, desde, hasta, por) {
         if (opciones.reporteFalla) throw new Error("fallo interno: detalle que no debe salir");
         reportesPedidos.push({ nodoId: nodoId.toHexString(), desde, hasta, por });

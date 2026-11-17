@@ -51,6 +51,12 @@ function crearBase(opciones: {
     async guardarReporte(doc) {
       guardados.push(doc);
     },
+    async recientes(nodoId, limite) {
+      return guardados
+        .filter((g) => g.nodo_id.equals(nodoId))
+        .sort((a, b) => b.generado.getTime() - a.generado.getTime())
+        .slice(0, limite);
+    },
   };
   return { almacen, nodo, comunidadId, guardados };
 }

@@ -27,5 +27,6 @@ export {
   huellaDe,
   type OpcionesReportes,
   type ReporteGenerado,
+  type ReporteVista,
   type ServicioReportes,
 } from "./servicio.ts";

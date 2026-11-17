@@ -13,6 +13,18 @@ export class ErrorReporte extends ErrorDominio {
   }
 }
 
+/** Lo que la API muestra de un reporte ya generado. */
+export type ReporteVista = {
+  id: string;
+  desde: Date;
+  hasta: Date;
+  generado: Date;
+  generado_por: string;
+  /** Primeros 12 caracteres del sha256 del contenido: sirve para comprobar que no cambió. */
+  huella: string;
+  resumen: ReporteDoc["resumen"];
+};
+
 export type ReporteGenerado = {
   id: string;
   generado: Date;
@@ -125,7 +137,21 @@ export function crearServicioReportes(op: OpcionesReportes) {
     });
   }
 
-  return { generar, ultimosDias };
+  /** Los reportes anteriores del nodo con su resumen (sin quién los pidió más allá de su nombre). */
+  async function recientes(nodoId: ObjectId, limite = 20): Promise<ReporteVista[]> {
+    const docs = await op.almacen.recientes(nodoId, Math.min(Math.max(limite, 1), 100));
+    return docs.map((d) => ({
+      id: d._id.toHexString(),
+      desde: d.desde,
+      hasta: d.hasta,
+      generado: d.generado,
+      generado_por: d.generado_por,
+      huella: d.hash.replace(/^sha256:/, "").slice(0, 12),
+      resumen: d.resumen,
+    }));
+  }
+
+  return { generar, ultimosDias, recientes };
 }
 
 export type ServicioReportes = ReturnType<typeof crearServicioReportes>;

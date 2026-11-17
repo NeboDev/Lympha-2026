@@ -70,4 +70,6 @@ export interface AlmacenReportes {
   ): Promise<EventoReporte[]>;
   calibraciones(nodoId: ObjectId, desde: Date, hasta: Date): Promise<CalibracionDoc[]>;
   guardarReporte(doc: ReporteDoc): Promise<void>;
+  /** Los últimos reportes del nodo, el más reciente primero. */
+  recientes(nodoId: ObjectId, limite: number): Promise<ReporteDoc[]>;
 }

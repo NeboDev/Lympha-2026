@@ -14,6 +14,7 @@ import type { ServicioCalibraciones } from "../calibraciones/index.ts";
 import { type ServicioComunidades, TIPOS_COMUNIDAD } from "../comunidades/index.ts";
 import type { ServicioIdentidad, Usuario } from "../identidad/index.ts";
 import type { ServicioNodos } from "../nodos/index.ts";
+import type { ReporteVista } from "../reportes/index.ts";
 
 /** Todo lo que las rutas de usuario necesitan, ya armado. Las rutas no conocen Mongo, Blynk ni Telegram. */
 export type ServiciosApi = {
@@ -24,6 +25,8 @@ export type ServiciosApi = {
   calibraciones: ServicioCalibraciones;
   catalogo: Catalogo;
   reportes: {
+    /** Los reportes anteriores del nodo, el más reciente primero. */
+    recientes(nodoId: ObjectId, limite: number): Promise<ReporteVista[]>;
     /** El PDF del periodo. Lo mismo que pide Telegram con `/reporte`. */
     generar(
       nodoId: ObjectId,
@@ -278,6 +281,24 @@ export function registrarRutas(app: FastifyInstance, s: ServiciosApi): void {
           offset_mv: c.offset_mv,
           diagnostico: c.diagnostico,
         });
+      },
+    );
+
+    r.get(
+      "/api/nodos/:id/reportes",
+      {
+        schema: {
+          params: idParam,
+          querystring: z.object({ limite: z.coerce.number().int().positive().optional() }).strict(),
+        },
+      },
+      async (req) => {
+        const { nodo } = await s.nodos.acceso(
+          usuarioDe(req).uid,
+          idDe(req.params.id),
+          "integrante",
+        );
+        return { reportes: await s.reportes.recientes(nodo._id, req.query.limite ?? 20) };
       },
     );
 
