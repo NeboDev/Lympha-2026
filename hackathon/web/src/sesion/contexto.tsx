@@ -28,6 +28,8 @@ export type Sesion = {
   /** Cliente de la API ya autenticado. */
   api: Cliente;
   puedeGoogle: boolean;
+  /** Por qué se volvió a la pantalla de entrada tras haber iniciado sesión (el servidor rechazó la cuenta), o `null`. */
+  motivo: string | null;
   puedeDemo: boolean;
   entrarConGoogle(): Promise<string | null>;
   entrarDemo(): void;
@@ -37,6 +39,9 @@ export type Sesion = {
 const Contexto = createContext<Sesion | null>(null);
 
 const CLAVE_DEMO = "atl.demo";
+
+export const MOTIVO_RECHAZO =
+  "Iniciaste sesión con Google, pero el servidor de Atl no aceptó tu cuenta. Quien administra Atl debe revisar que el servidor use el mismo FIREBASE_PROJECT_ID que esta web (el registro del servidor dice el motivo).";
 
 /** `sessionStorage` puede fallar (modo privado, datos bloqueados): la web debe seguir funcionando sin él. */
 const leerDemo = (): boolean => {
@@ -62,6 +67,7 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
   );
   const [estado, setEstado] = useState<Estado>({ tipo: "cargando" });
   const demoRef = useRef(false);
+  const [motivo, setMotivo] = useState<string | null>(null);
 
   useEffect(() => {
     if (CONFIG.demoToken && leerDemo()) {
@@ -97,7 +103,10 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
         obtenerToken: async () =>
           demoRef.current ? CONFIG.demoToken : ((await acceso?.obtenerToken()) ?? null),
         // La API dice que la sesión ya no vale: se vuelve a la pantalla de entrada.
-        alNoAutenticado: () => void salir(),
+        alNoAutenticado: () => {
+          if (!demoRef.current) setMotivo(MOTIVO_RECHAZO);
+          void salir();
+        },
       }),
     [acceso, salir],
   );
@@ -107,9 +116,11 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
       estado,
       api,
       puedeGoogle: acceso !== null,
+      motivo,
       puedeDemo: CONFIG.demoToken !== null,
       async entrarConGoogle() {
         if (!acceso) return "Falta configurar Firebase.";
+        setMotivo(null);
         try {
           await acceso.entrar();
           return null;
@@ -123,6 +134,7 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
         if (!CONFIG.demoToken) return;
         guardarDemo(true);
         demoRef.current = true;
+        setMotivo(null);
         setEstado({
           tipo: "dentro",
           demo: true,
@@ -131,7 +143,7 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
       },
       salir,
     }),
-    [estado, api, acceso, salir],
+    [estado, api, acceso, salir, motivo],
   );
 
   return <Contexto.Provider value={sesion}>{children}</Contexto.Provider>;

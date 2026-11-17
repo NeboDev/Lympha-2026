@@ -72,6 +72,26 @@ describe("autenticar", () => {
     expect(e.verificados).toEqual([]);
   });
 
+  it("avisa al registro del servidor por qué se rechazó, pero no al cliente", async () => {
+    const causas: unknown[] = [];
+    const servicio = crearServicioIdentidad({
+      verificador: {
+        async verificar() {
+          throw new Error("incorrect aud claim");
+        },
+      },
+      almacen: { async registrar() {} },
+      alRechazar: (e) => causas.push(e),
+    });
+    const error = await servicio.autenticar("Bearer token-malo").catch((x) => x);
+    expect(error.message).toBe("Hace falta iniciar sesión.");
+    expect(causas).toHaveLength(1);
+    expect((causas[0] as Error).message).toBe("incorrect aud claim");
+    // Una cabecera mal formada ni siquiera llega a Firebase.
+    await servicio.autenticar("Basic x").catch(() => undefined);
+    expect(causas).toHaveLength(1);
+  });
+
   it("un token inválido da siempre el mismo error genérico, sin el detalle de Firebase", async () => {
     const e = escenario();
     const error = await e.servicio.autenticar("Bearer token-malo").catch((x) => x);

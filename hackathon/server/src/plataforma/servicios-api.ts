@@ -29,6 +29,8 @@ export type OpcionesServiciosApi = {
   catalogo: Catalogo;
   marca: Marca;
   verificador: VerificadorToken;
+  /** Se llama con la causa cuando Firebase rechaza un token (para el registro del servidor). */
+  alRechazarToken?: (error: unknown) => void;
   /** Token fijo del usuario de demostración; `null` lo desactiva. */
   demoToken: string | null;
   claveCifrado: Buffer;
@@ -48,6 +50,7 @@ export function crearServiciosApi(op: OpcionesServiciosApi): ServiciosApi {
     verificador: op.verificador,
     almacen: crearAlmacenUsuariosMongo(op.db),
     demoToken: op.demoToken,
+    ...(op.alRechazarToken ? { alRechazar: op.alRechazarToken } : {}),
     reloj,
   });
   const comunidades = crearServicioComunidades({

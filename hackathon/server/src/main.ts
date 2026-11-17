@@ -53,6 +53,12 @@ const app = crearApp({
     catalogo,
     marca,
     verificador: crearVerificadorFirebase(config.firebase),
+    // Por qué Firebase rechazó un token (otro proyecto, vencido…). Es el mensaje de Firebase, sin el token.
+    alRechazarToken: (e) =>
+      logger.warn(
+        { causa: (e instanceof Error ? e.message : "error").slice(0, 240) },
+        "Acceso: Firebase rechazó un token",
+      ),
     demoToken: config.demoToken,
     claveCifrado: config.claveCifrado,
     blynkHost: config.blynkHost,

@@ -7,6 +7,8 @@ export type OpcionesIdentidad = {
   almacen: AlmacenUsuarios;
   /** Token fijo del usuario de demostración; `null` lo desactiva. */
   demoToken?: string | null;
+  /** Se llama con el error de Firebase cuando rechaza un token. Solo para el registro del servidor: al cliente no se le cuenta. */
+  alRechazar?: (error: unknown) => void;
   reloj?: () => Date;
 };
 
@@ -52,8 +54,9 @@ export function crearServicioIdentidad(op: OpcionesIdentidad) {
       let identidad: IdentidadVerificada;
       try {
         identidad = await op.verificador.verificar(token);
-      } catch {
-        // Firebase dice por qué falló (vencido, otro proyecto…); al cliente no se le cuenta.
+      } catch (e) {
+        // Firebase dice por qué falló (vencido, otro proyecto…); al cliente no se le cuenta, pero al registro sí.
+        op.alRechazar?.(e);
         throw new NoAutenticado();
       }
       await registrar(identidad);

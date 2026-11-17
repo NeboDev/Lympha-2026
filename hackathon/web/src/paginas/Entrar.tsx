@@ -32,6 +32,7 @@ export function Entrar() {
         </Aviso>
       )}
       {error && <Aviso tipo="error">{error}</Aviso>}
+      {sesion.motivo && <Aviso tipo="error">{sesion.motivo}</Aviso>}
 
       <div className="entrar-acciones">
         <button
