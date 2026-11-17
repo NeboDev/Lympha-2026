@@ -17,7 +17,10 @@
     "simulador": "node --env-file=.env src/simulador/main.ts",
     "nodo:alta": "node --env-file=.env src/cli/nodo.ts alta",
     "nodo:lista": "node --env-file=.env src/cli/nodo.ts lista",
-    "nodo:borrar": "node --env-file=.env src/cli/nodo.ts borrar"
+    "nodo:borrar": "node --env-file=.env src/cli/nodo.ts borrar",
+    "telegram:vinculo": "node --env-file=.env src/cli/telegram.ts vinculo",
+    "telegram:probar": "node --env-file=.env src/cli/telegram.ts probar",
+    "telegram:estado": "node --env-file=.env src/cli/telegram.ts estado"
   },
   "dependencies": {
     "fastify": "^5.12.8",

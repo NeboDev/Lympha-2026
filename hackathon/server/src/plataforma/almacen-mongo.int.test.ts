@@ -48,6 +48,7 @@ describe.skipIf(!activo)("almacén de Mongo (integración)", () => {
     sesion,
     v: { ph: 7.1 },
     crudo: { ph: 7.15 },
+    detalles: { ph: { cambio_rapido: false, cambio: null, motivos_sensor: [] } },
     estado: "en_rango",
     estados: { ph: "en_rango" },
     estable: true,

@@ -29,8 +29,22 @@ const esquema = z
         message: "ATL_CLAVE_CIFRADO debe ser de 32 bytes en base64",
       }),
     INGESTA_ACTIVA: z.enum(["true", "false"]).default("true"),
+    TELEGRAM_BOT_TOKEN: z
+      .string()
+      .regex(/^\d{6,12}:[A-Za-z0-9_-]{30,}$/, "TELEGRAM_BOT_TOKEN no parece un token de BotFather")
+      .optional(),
+    TELEGRAM_BOT_USERNAME: z
+      .string()
+      .regex(/^[A-Za-z0-9_]{5,32}$/, "TELEGRAM_BOT_USERNAME va sin @ (letras, números y _)")
+      .optional(),
+    RECORDATORIO_MIN: entero(30),
+    BARRIDO_MS: entero(15000),
   })
-  .strict();
+  .strict()
+  .refine((e) => !e.TELEGRAM_BOT_TOKEN || !!e.TELEGRAM_BOT_USERNAME, {
+    message: "con TELEGRAM_BOT_TOKEN hace falta TELEGRAM_BOT_USERNAME (para los enlaces)",
+    path: ["TELEGRAM_BOT_USERNAME"],
+  });
 
 export type Config = {
   appEnv: "local" | "demo";
@@ -47,6 +61,12 @@ export type Config = {
   claveCifrado: Buffer;
   /** `false` levanta solo la API, sin el poller de Blynk. */
   ingestaActiva: boolean;
+  /** null = Telegram apagado: los avisos esperan en la bandeja. */
+  telegramToken: string | null;
+  telegramUsuario: string | null;
+  /** Minutos entre recordatorios de una alerta abierta (la mitad si es crítica). */
+  recordatorioMin: number;
+  barridoMs: number;
 };
 
 const CLAVES = [
@@ -61,6 +81,10 @@ const CLAVES = [
   "SIN_DATOS_S",
   "ATL_CLAVE_CIFRADO",
   "INGESTA_ACTIVA",
+  "TELEGRAM_BOT_TOKEN",
+  "TELEGRAM_BOT_USERNAME",
+  "RECORDATORIO_MIN",
+  "BARRIDO_MS",
 ] as const;
 
 /** Configuración mínima de las herramientas que solo hablan con Blynk (simulador): sin Mongo. */
@@ -113,5 +137,9 @@ export function cargarConfig(env: Record<string, string | undefined>): Config {
     sinDatosS: e.SIN_DATOS_S,
     claveCifrado: Buffer.from(e.ATL_CLAVE_CIFRADO, "base64"),
     ingestaActiva: e.INGESTA_ACTIVA === "true",
+    telegramToken: e.TELEGRAM_BOT_TOKEN ?? null,
+    telegramUsuario: e.TELEGRAM_BOT_USERNAME ?? null,
+    recordatorioMin: e.RECORDATORIO_MIN,
+    barridoMs: e.BARRIDO_MS,
   };
 }

@@ -10,6 +10,28 @@ describe("definicionesIndices", () => {
     expect(d?.opciones?.partialFilterExpression).toBeDefined();
   });
 
+  it("alertas: una sola abierta por (nodo, tipo, parámetro)", () => {
+    const d = definicionesIndices.find(
+      (x) => x.coleccion === "alertas" && x.opciones?.unique === true,
+    );
+    expect(d?.clave).toEqual({ nodo_id: 1, tipo: 1, parametro: 1 });
+    expect(d?.opciones?.partialFilterExpression).toEqual({ estado: "abierta" });
+  });
+
+  it("avisos: la clave es única (no se manda dos veces lo mismo)", () => {
+    const d = definicionesIndices.find(
+      (x) => x.coleccion === "avisos" && x.opciones?.unique === true,
+    );
+    expect(d?.clave).toEqual({ clave: 1 });
+  });
+
+  it("un chat de Telegram solo pertenece a una comunidad", () => {
+    const d = definicionesIndices.find(
+      (x) => x.coleccion === "comunidades" && x.opciones?.unique === true,
+    );
+    expect(d?.clave).toEqual({ "telegram.chat_id": 1 });
+  });
+
   it("se borra el índice viejo por (nodo_id, seq)", () => {
     expect(indicesObsoletos).toContainEqual({ coleccion: "muestras", nombre: "nodo_id_1_seq_1" });
   });

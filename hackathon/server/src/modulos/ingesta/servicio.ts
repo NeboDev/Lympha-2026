@@ -1,6 +1,6 @@
 import type { Catalogo } from "../../dominio/catalogo.ts";
 import { type Estado, evaluar, type Lectura } from "../evaluacion/index.ts";
-import type { NodoDoc, UltimoNodo } from "../nodos/index.ts";
+import type { DetalleParametro, NodoDoc, UltimoNodo } from "../nodos/index.ts";
 import {
   decidirCiclo,
   ESTADO_CICLO_INICIAL,
@@ -9,6 +9,7 @@ import {
 } from "./ciclo.ts";
 import type {
   AlmacenIngesta,
+  CambioNodo,
   EventoIngesta,
   LectorNodo,
   LoggerIngesta,
@@ -48,6 +49,12 @@ export type OpcionesIngesta = {
   ventanaMin?: number;
   /** Máximo de escrituras en memoria si Mongo no responde. */
   maxPendientes?: number;
+  /**
+   * Se llama después de guardar cada muestra y cuando un nodo se da por detenido, con la misma cola
+   * de reintentos que las demás escrituras: si falla, se repite sin perder el orden. Debe ser
+   * idempotente (las alertas se reconcilian contra la foto del nodo, no cuentan eventos).
+   */
+  alCambio?: (cambio: CambioNodo) => Promise<void>;
   reloj?: () => Date;
   logger?: LoggerIngesta;
 };
@@ -130,8 +137,16 @@ export function crearIngesta(op: OpcionesIngesta) {
     }
   }
 
+  /** Avisa a las alertas (después de guardar). Va por la misma cola, así que se reintenta en orden. */
+  function avisarCambio(est: EstadoNodo, nodoId: string, cambio: CambioNodo) {
+    const alCambio = op.alCambio;
+    if (!alCambio) return;
+    encolar(est, nodoId, "alertas", () => alCambio(cambio));
+  }
+
   function evaluarParametros(nodo: NodoDoc, est: EstadoNodo, m: MuestraNueva) {
     const resultado: Record<string, Estado> = {};
+    const detalles: Record<string, DetalleParametro> = {};
     let estable: boolean | null = null;
     for (const id of nodo.parametros) {
       const p = op.catalogo.parametros[id];
@@ -143,6 +158,7 @@ export function crearIngesta(op: OpcionesIngesta) {
         // El nodo publicó un `seq` nuevo pero sin valor para este parámetro: no es dato confiable.
         resultado[id] = "revisar_sensor";
         est.previo[id] = "revisar_sensor";
+        detalles[id] = { cambio_rapido: false, cambio: null, motivos_sensor: ["sin_valor"] };
         estable = false;
         continue;
       }
@@ -164,9 +180,14 @@ export function crearIngesta(op: OpcionesIngesta) {
       });
       resultado[id] = r.estado;
       est.previo[id] = r.estado;
+      detalles[id] = {
+        cambio_rapido: r.cambioRapido,
+        cambio: r.cambio,
+        motivos_sensor: r.motivosSensor,
+      };
       estable = (estable ?? true) && r.estable;
     }
-    return { estados: resultado, estable: estable ?? m.estableNodo };
+    return { estados: resultado, detalles, estable: estable ?? m.estableNodo };
   }
 
   /** Un sondeo de un nodo. Si Blynk falla, el error sube al poller (reintento con espera). */
@@ -210,6 +231,7 @@ export function crearIngesta(op: OpcionesIngesta) {
           est.ultimo = { ...est.ultimo, sin_datos: true };
           const ultimo = est.ultimo;
           encolar(est, id, "ultimo (sin datos)", () => op.almacen.guardarUltimo(nodo._id, ultimo));
+          avisarCambio(est, id, { nodo, ultimo, ahora });
         }
       }
       await vaciar(est, id);
@@ -236,6 +258,7 @@ export function crearIngesta(op: OpcionesIngesta) {
       crudo: m.crudo,
       estado,
       estados: evaluado.estados,
+      detalles: evaluado.detalles,
       estable: evaluado.estable,
       estado_nodo: m.estadoNodo,
     };
@@ -244,6 +267,7 @@ export function crearIngesta(op: OpcionesIngesta) {
       v: m.v,
       estado,
       estados: evaluado.estados,
+      detalles: evaluado.detalles,
       seq: m.seq,
       sesion: m.sesion,
       estable: evaluado.estable,
@@ -273,6 +297,7 @@ export function crearIngesta(op: OpcionesIngesta) {
       logger.info({ nodo_id: id }, "nodo reconectado");
       encolar(est, id, "evento reconexion", () => op.almacen.registrarEvento(evento));
     }
+    avisarCambio(est, id, { nodo, ultimo, ahora });
     await vaciar(est, id);
     return { tipo: "muestra", estado, pendientes: est.pendientes.length };
   }
@@ -299,6 +324,8 @@ export function esperaTrasFallos(fallos: number, pollMs: number, maxMs = 60_000)
 
 const dormirReal = (ms: number, senal: AbortSignal) =>
   new Promise<void>((resolver) => {
+    // Si ya se pidió detener, no se duerme: el aborto no volvería a avisar.
+    if (senal.aborted) return resolver();
     const t = setTimeout(resolver, ms);
     senal.addEventListener(
       "abort",

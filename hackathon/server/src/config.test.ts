@@ -13,6 +13,41 @@ describe("cargarConfig", () => {
     expect(cargarConfig(base).claveCifrado).toHaveLength(32);
   });
 
+  it("Telegram es opcional; con token exige el usuario del bot y valida el formato", () => {
+    const c = cargarConfig(base);
+    expect(c.telegramToken).toBeNull();
+    expect(c.telegramUsuario).toBeNull();
+    expect(c.recordatorioMin).toBe(30);
+    expect(c.barridoMs).toBe(15000);
+
+    const token = `123456789:${"A".repeat(35)}`;
+    expect(() => cargarConfig({ ...base, TELEGRAM_BOT_TOKEN: token })).toThrow(
+      /TELEGRAM_BOT_USERNAME/,
+    );
+    expect(() => cargarConfig({ ...base, TELEGRAM_BOT_TOKEN: "no-es-un-token" })).toThrow(
+      /BotFather/,
+    );
+    expect(() =>
+      cargarConfig({ ...base, TELEGRAM_BOT_TOKEN: token, TELEGRAM_BOT_USERNAME: "@mi_bot" }),
+    ).toThrow(/sin @/);
+    const ok = cargarConfig({
+      ...base,
+      TELEGRAM_BOT_TOKEN: token,
+      TELEGRAM_BOT_USERNAME: "lympha26_bot",
+      RECORDATORIO_MIN: "10",
+    });
+    expect(ok.telegramUsuario).toBe("lympha26_bot");
+    expect(ok.recordatorioMin).toBe(10);
+  });
+
+  it("el error de configuración no filtra el token", () => {
+    try {
+      cargarConfig({ ...base, TELEGRAM_BOT_TOKEN: "123456789:secretoinvalido" });
+    } catch (e) {
+      expect(String(e)).not.toContain("secretoinvalido");
+    }
+  });
+
   it("INGESTA_ACTIVA es true por defecto y se puede apagar", () => {
     expect(cargarConfig(base).ingestaActiva).toBe(true);
     expect(cargarConfig({ ...base, INGESTA_ACTIVA: "false" }).ingestaActiva).toBe(false);

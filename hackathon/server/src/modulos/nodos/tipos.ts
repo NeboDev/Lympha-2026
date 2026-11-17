@@ -13,6 +13,14 @@ export type MapeoPines = {
   cal_pct?: string;
 };
 
+/** Detalle de la evaluación de un parámetro: lo que las alertas necesitan además del estado. */
+export type DetalleParametro = {
+  cambio_rapido: boolean;
+  /** Mayor cambio (con signo) en la ventana de cambio rápido. */
+  cambio: number | null;
+  motivos_sensor: string[];
+};
+
 /** Última foto del nodo; la web y los avisos la leen sin tocar las muestras. */
 export type UltimoNodo = {
   ts: Date;
@@ -20,6 +28,8 @@ export type UltimoNodo = {
   /** Peor estado de todos los parámetros evaluados. */
   estado: Estado | null;
   estados: Record<string, Estado>;
+  /** Ausente en documentos anteriores al Paso 5. */
+  detalles?: Record<string, DetalleParametro>;
   seq: number;
   sesion: number;
   estable: boolean | null;

@@ -6,6 +6,7 @@ export {
 } from "./ciclo.ts";
 export type {
   AlmacenIngesta,
+  CambioNodo,
   EventoIngesta,
   LectorNodo,
   LoggerIngesta,

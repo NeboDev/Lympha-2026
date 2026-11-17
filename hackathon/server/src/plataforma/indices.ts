@@ -10,7 +10,26 @@ type DefinicionIndice = {
 export const definicionesIndices: DefinicionIndice[] = [
   { coleccion: "usuarios", clave: { google_uid: 1 }, opciones: { unique: true } },
   { coleccion: "comunidades", clave: { "miembros.uid": 1 } },
+  {
+    // Un chat de Telegram solo puede pertenecer a una comunidad.
+    coleccion: "comunidades",
+    clave: { "telegram.chat_id": 1 },
+    opciones: {
+      unique: true,
+      partialFilterExpression: { "telegram.chat_id": { $type: "number" } },
+    },
+  },
   { coleccion: "nodos", clave: { comunidad_id: 1 } },
+  {
+    // Una sola alerta abierta por (nodo, tipo, parámetro): abrir dos veces no duplica.
+    coleccion: "alertas",
+    clave: { nodo_id: 1, tipo: 1, parametro: 1 },
+    opciones: { unique: true, partialFilterExpression: { estado: "abierta" } },
+  },
+  { coleccion: "alertas", clave: { comunidad_id: 1, abierta: -1 } },
+  // La clave única de un aviso evita mandar dos veces lo mismo al reintentar.
+  { coleccion: "avisos", clave: { clave: 1 }, opciones: { unique: true } },
+  { coleccion: "avisos", clave: { estado: 1, proximo_intento: 1 } },
   { coleccion: "muestras", clave: { nodo_id: 1, ts: -1 } },
   {
     // Ingesta idempotente: una misma `seq` no se inserta dos veces dentro de una sesión del nodo.

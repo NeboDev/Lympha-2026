@@ -35,13 +35,24 @@ const normaEsquema = z
 const parametroEsquema = z
   .object({
     nombre: z.string(),
+    /** Género para los textos («el pH», «la turbidez»). Por defecto «el». */
+    articulo: z.enum(["el", "la"]).optional(),
     unidad: z.string(),
     decimales: z.number().int().nonnegative(),
     norma: normaEsquema.nullable(),
     medible: z.boolean(),
     blynk: z.object({ pin: z.string(), crudo: z.string().optional() }).strict().nullable(),
     reglas: reglasEsquema.optional(),
-    cloro: z.object({ temp_defecto_c: z.number() }).strict().optional(),
+    /** Efectividad del cloro según el pH (docs/cloracion-ph.md). Solo para parámetros que la afectan. */
+    cloro: z
+      .object({
+        /** Temperatura que se supone cuando el nodo no la mide. */
+        temp_defecto_c: z.number(),
+        /** Por debajo de este % de HOCl, los avisos de pH alto lo mencionan. */
+        aviso_bajo_pct: z.number().min(0).max(100),
+      })
+      .strict()
+      .optional(),
     criterio: z.string().optional(),
     nota: z.string().optional(),
   })

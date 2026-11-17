@@ -1,6 +1,6 @@
 import type { ObjectId } from "mongodb";
 import type { Estado } from "../evaluacion/index.ts";
-import type { NodoDoc, UltimoNodo } from "../nodos/index.ts";
+import type { DetalleParametro, NodoDoc, UltimoNodo } from "../nodos/index.ts";
 
 /** Valores de todos los pines del nodo, tal como los devuelve Blynk (`getAll`). */
 export type Snapshot = Record<string, number | string>;
@@ -22,6 +22,7 @@ export type MuestraDoc = {
   /** Peor estado evaluado, o null si no se pudo evaluar nada. */
   estado: Estado | null;
   estados: Record<string, Estado>;
+  detalles: Record<string, DetalleParametro>;
   estable: boolean | null;
   /** V4 tal como lo reportó el nodo (0 ok · 1 atención · 2 fuera · 3 error de sensor). */
   estado_nodo: number | null;
@@ -50,6 +51,9 @@ export interface AlmacenIngesta {
   guardarUltimo(nodoId: ObjectId, ultimo: UltimoNodo): Promise<void>;
   registrarEvento(evento: EventoIngesta): Promise<void>;
 }
+
+/** Lo que cambió en un nodo tras un sondeo: las alertas se reconcilian contra esta foto. */
+export type CambioNodo = { nodo: NodoDoc; ultimo: UltimoNodo; ahora: Date };
 
 /** Subconjunto de pino: lo que la ingesta registra. */
 export type LoggerIngesta = {
