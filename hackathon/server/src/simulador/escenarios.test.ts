@@ -128,6 +128,27 @@ describe("historias de punta a punta con la evaluación", () => {
     ]);
   });
 
+  it("demo_limon: llega a crítico en menos de un minuto, dura ~2 min y vuelve al rango", () => {
+    const r = correr("demo_limon", 700);
+    expect(r.secuencia).toEqual([
+      "en_rango",
+      "atencion",
+      "fuera_de_rango",
+      "critico",
+      "fuera_de_rango",
+      "atencion",
+      "en_rango",
+    ]);
+    // Para la demo: el crítico aparece pronto (la gente no espera 3 minutos a que pase algo).
+    const critico = Array.from({ length: 60 / PASO_S }, (_, i) =>
+      correr("demo_limon", (i + 1) * PASO_S),
+    ).some((x) => x.ultimo?.estado === "critico");
+    expect(critico).toBe(true);
+    expect(duracionDe("demo_limon")).toBeLessThanOrEqual(130);
+    expect(muestra("demo_limon", 65, norma).ph).toBeLessThan(5.5);
+    expect(muestra("demo_limon", 119, norma).ph).toBeGreaterThan(7.1);
+  });
+
   it("pico: solo atención por cambio rápido, nunca fuera de rango, y se calma", () => {
     const r = correr("pico", 600);
     expect(r.secuencia).toEqual(["en_rango", "atencion", "en_rango"]);

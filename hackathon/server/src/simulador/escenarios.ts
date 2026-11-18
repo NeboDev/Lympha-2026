@@ -7,6 +7,7 @@
 export const NOMBRES_ESCENARIOS = [
   "estable",
   "acidificacion",
+  "demo_limon",
   "pico",
   "sensor_desconectado",
   "nodo_detenido",
@@ -33,6 +34,7 @@ export type LimitesNorma = { min: number; max: number };
 
 const PH_BASE = 7.2;
 const PH_ACIDO = 5.2; // como con limón: baja hasta zona crítica (más de 1.0 bajo 6.5)
+const PH_DEMO = 5.3; // el mínimo de la demo: crítico (más de 1.0 bajo 6.5), como con limón
 const PH_PICO = 8.0; // sube 0.8: sigue en rango, pero es un cambio rápido
 const RIEL = 14;
 const MARGEN_ATENCION = 0.3; // el mismo margen que usa el servidor (parametros.json)
@@ -63,6 +65,18 @@ const ESCENARIOS: Record<NombreEscenario, { descripcion: string; duracionS: numb
         if (t >= 60 && t < 180) ph = rampa(t, 60, 180, PH_BASE, PH_ACIDO);
         else if (t >= 180 && t < 300) ph = PH_ACIDO;
         else if (t >= 300 && t < 420) ph = rampa(t, 300, 420, PH_ACIDO, PH_BASE);
+        return { ph, sensorOk: true, escribe: true };
+      },
+    },
+    demo_limon: {
+      descripcion:
+        "para la demo: pH 7.2, baja a 5.3 en 30 s (limón), se sostiene 30 s y se recupera en 30 s; ~2 min",
+      duracionS: 120,
+      base: (t) => {
+        let ph = PH_BASE;
+        if (t >= 20 && t < 50) ph = rampa(t, 20, 50, PH_BASE, PH_DEMO);
+        else if (t >= 50 && t < 80) ph = PH_DEMO;
+        else if (t >= 80 && t < 110) ph = rampa(t, 80, 110, PH_DEMO, PH_BASE);
         return { ph, sensorOk: true, escribe: true };
       },
     },

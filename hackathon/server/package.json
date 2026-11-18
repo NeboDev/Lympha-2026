@@ -22,7 +22,8 @@
     "telegram:probar": "node --env-file=.env src/cli/telegram.ts probar",
     "telegram:estado": "node --env-file=.env src/cli/telegram.ts estado",
     "reporte": "node --env-file=.env src/cli/reporte.ts",
-    "dev:token": "node --env-file=.env src/cli/dev-token.ts"
+    "dev:token": "node --env-file=.env src/cli/dev-token.ts",
+    "smoke": "node --env-file=.env src/cli/humo.ts"
   },
   "dependencies": {
     "fastify": "^5.12.8",
