@@ -604,3 +604,47 @@ details summary {
     grid-template-columns: repeat(4, 1fr);
   }
 }
+
+/* ---- Dosificación (actuador) ---- */
+.tarjeta-dosis {
+  border-left: 4px solid var(--manantial);
+}
+.tarjeta-dosis h2 {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin: 0;
+}
+.sello-simulado {
+  padding: var(--sp-1) var(--sp-3);
+  border: 1.5px dashed var(--barro);
+  border-radius: var(--radius-pill);
+  color: var(--barro);
+  font-size: var(--text-body-sm);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.lista-simple {
+  margin: var(--sp-2) 0 0;
+  padding-left: var(--sp-5);
+}
+.que-hacer-chico {
+  margin: var(--sp-2) 0 0;
+  font-weight: 500;
+}
+.formulario label.casilla {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-3);
+  font-weight: 400;
+}
+.casilla input {
+  width: 22px;
+  min-height: 22px;
+  margin-top: 2px;
+  flex: none;
+}
+.ajustes-actuador {
+  margin: var(--sp-3) 0;
+}

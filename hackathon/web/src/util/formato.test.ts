@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   aInputLocal,
   desdeInputLocal,
+  duracionCorta,
   fechaMx,
   haceLegible,
   horaMx,
+  segundosRestantes,
   valorLegible,
 } from "./formato.ts";
 
@@ -54,5 +56,23 @@ describe("valorLegible", () => {
     expect(valorLegible(null, 2)).toBe("—");
     expect(valorLegible(undefined, 2)).toBe("—");
     expect(valorLegible(Number.NaN, 2)).toBe("—");
+  });
+});
+
+describe("segundosRestantes y duracionCorta", () => {
+  it("cuentan hacia arriba, sin bajar de cero", () => {
+    const ahora = new Date(1_000_000);
+    expect(segundosRestantes(new Date(1_000_000 + 4_200), ahora)).toBe(5);
+    expect(segundosRestantes(new Date(1_000_000 + 1_000), ahora)).toBe(1);
+    expect(segundosRestantes(new Date(1_000_000), ahora)).toBe(0);
+    expect(segundosRestantes(new Date(900_000), ahora)).toBe(0);
+  });
+
+  it("duracionCorta", () => {
+    expect(duracionCorta(0)).toBe("0 s");
+    expect(duracionCorta(45)).toBe("45 s");
+    expect(duracionCorta(60)).toBe("1 min");
+    expect(duracionCorta(80)).toBe("1 min 20 s");
+    expect(duracionCorta(-3)).toBe("0 s");
   });
 });

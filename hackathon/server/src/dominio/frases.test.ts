@@ -30,6 +30,7 @@ import {
   TITULO_REPORTE,
   type TipoRecordatorio,
   textoEstado,
+  textosActuador,
   textosBot,
   tituloAlerta,
 } from "./frases.ts";
@@ -191,6 +192,12 @@ function todosLosTextos(): string[] {
   ];
   t.push(textoEstado("Primaria", filas, marca), textoEstado("Primaria", [], marca));
   t.push(...textosReporte());
+  for (const simulado of [true, false]) {
+    const a = textosActuador({ nombre: "Bomba de cloro", simulado });
+    t.push(a.enviada(10), a.terminada(10), a.detenidaPersona, a.cancelada, a.expirada, a.fallida);
+    t.push(a.rechazada("El pH está fuera de rango: no se dosifica."));
+    for (const m of ["fuera_de_rango", "sensor", "sin_datos"] as const) t.push(a.detenidaAuto(m));
+  }
   const bot = textosBot(marca);
   t.push(
     bot.reporteEnCurso(1),

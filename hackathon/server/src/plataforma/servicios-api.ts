@@ -5,6 +5,11 @@ import type { ServiciosApi } from "../modulos/api/index.ts";
 import { crearServicioBitacora } from "../modulos/bitacora/index.ts";
 import { crearServicioCalibraciones } from "../modulos/calibraciones/index.ts";
 import { crearServicioComunidades } from "../modulos/comunidades/index.ts";
+import {
+  crearControl,
+  type EscritorActuador,
+  type LoggerControl,
+} from "../modulos/control/index.ts";
 import { crearServicioIdentidad, type VerificadorToken } from "../modulos/identidad/index.ts";
 import { type ComprobadorToken, crearServicioNodos } from "../modulos/nodos/index.ts";
 import { crearServicioReportes } from "../modulos/reportes/index.ts";
@@ -16,11 +21,13 @@ import {
   crearAlmacenNodosMongo,
   crearAlmacenUsuariosMongo,
 } from "./almacen-api-mongo.ts";
+import { crearAlmacenControlMongo } from "./almacen-control-mongo.ts";
 import { crearAlmacenReportesMongo } from "./almacen-reportes-mongo.ts";
 import { crearAlmacenTelegramMongo } from "./almacen-telegram-mongo.ts";
 import { crearClienteBlynk } from "./blynk.ts";
 import { cifrar } from "./cifrado.ts";
 import { crearComprobadorBlynk } from "./comprobador-blynk.ts";
+import { crearEscritorActuadorBlynk } from "./escritor-actuador-blynk.ts";
 import { crearGeneradorPdf } from "./generador-reportes.ts";
 import type { LogoSvg } from "./logo-svg.ts";
 
@@ -38,6 +45,9 @@ export type OpcionesServiciosApi = {
   logo: LogoSvg;
   /** Usuario del bot de Telegram (sin @); `null` = sin Telegram, y el enlace de vinculación responde 503. */
   usuarioBot: string | null;
+  /** Solo para pruebas: sustituye a la escritura real del relevador en Blynk. */
+  escritorActuador?: EscritorActuador;
+  loggerControl?: LoggerControl;
   /** Solo para pruebas: sustituye a la comprobación real contra Blynk. */
   comprobador?: ComprobadorToken;
   reloj?: () => Date;
@@ -73,6 +83,13 @@ export function crearServiciosApi(op: OpcionesServiciosApi): ServiciosApi {
     reloj,
   });
   const reportes = crearGeneradorPdf({ servicio: servicioReportes, logo: op.logo });
+  const control = crearControl({
+    almacen: crearAlmacenControlMongo(op.db),
+    escritor: op.escritorActuador ?? crearEscritorActuadorBlynk({ clave: op.claveCifrado }),
+    nodos,
+    reloj,
+    ...(op.loggerControl ? { logger: op.loggerControl } : {}),
+  });
   const almacenTelegram = crearAlmacenTelegramMongo(op.db);
   const usuarioBot = op.usuarioBot;
 
@@ -87,6 +104,7 @@ export function crearServiciosApi(op: OpcionesServiciosApi): ServiciosApi {
       catalogo: op.catalogo,
       reloj,
     }),
+    control,
     catalogo: op.catalogo,
     reportes: {
       recientes: (nodoId, limite) => servicioReportes.recientes(nodoId, limite),

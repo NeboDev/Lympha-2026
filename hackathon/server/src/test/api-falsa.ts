@@ -9,6 +9,7 @@ import {
   type EventoCalibracion,
 } from "../modulos/calibraciones/index.ts";
 import { type ComunidadDoc, crearServicioComunidades } from "../modulos/comunidades/index.ts";
+import { crearControl } from "../modulos/control/index.ts";
 import { crearServicioIdentidad, type IdentidadVerificada } from "../modulos/identidad/index.ts";
 import {
   type AlmacenNodos,
@@ -18,6 +19,7 @@ import {
   type PuntoSerie,
   type ResultadoToken,
 } from "../modulos/nodos/index.ts";
+import { crearAlmacenControlFalso } from "./control-falso.ts";
 import { catalogoDePrueba, T0 } from "./falsos.ts";
 
 export const PERSONAS: Record<string, IdentidadVerificada> = {
@@ -36,6 +38,7 @@ export function crearApiFalsa(
   opciones: {
     token?: ResultadoToken;
     reporteFalla?: boolean;
+    actuadorFalla?: boolean;
     telegram?: boolean;
     demoToken?: string;
   } = {},
@@ -127,6 +130,20 @@ export function crearApiFalsa(
     reloj: () => new Date(T0),
   });
 
+  const controlFalso = crearAlmacenControlFalso(nodos);
+  const escriturasActuador: { pin: string; valor: 0 | 1 }[] = [];
+  const control = crearControl({
+    almacen: controlFalso.almacen,
+    escritor: {
+      async escribir(_n, pin, valor) {
+        if (opciones.actuadorFalla) throw new Error("Blynk caído");
+        escriturasActuador.push({ pin, valor });
+      },
+    },
+    nodos: serviciosNodos,
+    reloj: () => new Date(T0),
+  });
+
   const servicios: ServiciosApi = {
     identidad,
     comunidades: serviciosComunidades,
@@ -154,6 +171,7 @@ export function crearApiFalsa(
       catalogo: catalogoDePrueba,
       reloj: () => new Date(T0),
     }),
+    control,
     catalogo: catalogoDePrueba,
     reportes: {
       async recientes(nodoId) {
@@ -197,7 +215,12 @@ export function crearApiFalsa(
     observarRutas: (metodo, url) => rutas.push(`${metodo} ${url}`),
   });
 
-  const pedir = (token: string | null, metodo: "GET" | "POST", url: string, cuerpo?: unknown) =>
+  const pedir = (
+    token: string | null,
+    metodo: "GET" | "POST" | "PUT",
+    url: string,
+    cuerpo?: unknown,
+  ) =>
     app.inject({
       method: metodo,
       url,
@@ -215,6 +238,9 @@ export function crearApiFalsa(
     usuarios,
     eventos,
     calibraciones,
+    control,
+    controlFalso,
+    escriturasActuador,
     reportesPedidos,
     enlaces,
   };

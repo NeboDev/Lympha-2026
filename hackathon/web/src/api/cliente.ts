@@ -31,7 +31,7 @@ export type OpcionesCliente = {
 };
 
 export type Peticion<E extends z.ZodTypeAny> = {
-  metodo?: "GET" | "POST";
+  metodo?: "GET" | "POST" | "PUT";
   cuerpo?: unknown;
   /** Esquema de la respuesta. */
   esquema: E;
@@ -63,7 +63,7 @@ export function crearCliente(opciones: OpcionesCliente): Cliente {
 
   async function enviar(
     ruta: string,
-    metodo: "GET" | "POST",
+    metodo: "GET" | "POST" | "PUT",
     cuerpo: unknown,
     signal: AbortSignal | undefined,
     accept: string,

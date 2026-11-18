@@ -42,6 +42,18 @@ export const definicionesIndices: DefinicionIndice[] = [
   { coleccion: "eventos", clave: { comunidad_id: 1, ts: -1 } },
   { coleccion: "calibraciones", clave: { nodo_id: 1, ts: -1 } },
   { coleccion: "reportes", clave: { nodo_id: 1, generado: -1 } },
+  {
+    // Una sola acción del actuador pendiente o en curso por nodo: dos confirmaciones no mandan dos órdenes.
+    coleccion: "acciones_actuador",
+    clave: { nodo_id: 1 },
+    opciones: {
+      unique: true,
+      partialFilterExpression: { estado: { $in: ["pendiente", "en_curso"] } },
+    },
+  },
+  { coleccion: "acciones_actuador", clave: { nodo_id: 1, solicitada: -1 } },
+  // El barrido busca pendientes vencidas y pulsos que llegaron a su fin.
+  { coleccion: "acciones_actuador", clave: { estado: 1, expira: 1, fin: 1 } },
   { coleccion: "vinculos_pendientes", clave: { token: 1 }, opciones: { unique: true } },
   { coleccion: "vinculos_pendientes", clave: { expira: 1 }, opciones: { expireAfterSeconds: 0 } },
 ];

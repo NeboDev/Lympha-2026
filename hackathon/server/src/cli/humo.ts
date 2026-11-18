@@ -13,7 +13,7 @@ import {
   resumenDe,
 } from "../humo/corredor.ts";
 import { crearAlertas } from "../modulos/alertas/index.ts";
-import { crearApp } from "../modulos/api/index.ts";
+import { crearApp, type ServiciosApi } from "../modulos/api/index.ts";
 import { type AlmacenIngesta, crearIngesta, crearPoller } from "../modulos/ingesta/index.ts";
 import { crearDocumentoNodo, mapeoPorDefecto, type NodoDoc } from "../modulos/nodos/index.ts";
 import { crearAlmacenAlertasMongo } from "../plataforma/almacen-alertas-mongo.ts";
@@ -141,6 +141,11 @@ const estado: {
   pdf: Buffer | null;
   nombrePdf: string;
   rutaPdf: string | null;
+  servicios: ServiciosApi | null;
+  secreto: string;
+  /** Órdenes que el control quiso mandar al relevador: aquí solo se anotan, jamás salen a Blynk. */
+  ordenes: { pin: string; valor: 0 | 1 }[];
+  accionId: string | null;
 } = {
   comunidadId: null,
   nodo: null,
@@ -150,6 +155,10 @@ const estado: {
   pdf: null,
   nombrePdf: "reporte.pdf",
   rutaPdf: null,
+  servicios: null,
+  secreto: `humo-${randomBytes(18).toString("base64url")}`,
+  ordenes: [],
+  accionId: null,
 };
 
 const ph = catalogo.parametros.ph;
@@ -267,6 +276,36 @@ const pasos: PasoHumo[] = [
       });
       await db.collection<NodoDoc>("nodos").insertOne(nodo);
       estado.nodo = nodo;
+      // Servicios de la API (y del control del actuador) con un escritor que solo anota: el humo nunca mueve un relevador.
+      estado.servicios = crearServiciosApi({
+        db,
+        catalogo,
+        marca,
+        verificador: {
+          async verificar() {
+            throw new Error("el humo solo entra con la cuenta de demostración");
+          },
+        },
+        demoToken: estado.secreto,
+        claveCifrado: config.claveCifrado,
+        blynkHost,
+        logo: cargarSimboloLympha(),
+        usuarioBot: null,
+        loggerControl: SILENCIO,
+        escritorActuador: {
+          async escribir(_nodo, pin, valor) {
+            estado.ordenes.push({ pin, valor });
+          },
+        },
+      });
+      await estado.servicios.control.configurar("demo", nodo._id, {
+        habilitado: true,
+        nombre: "Bomba de prueba",
+        pulso_max_s: 60,
+        enfriamiento_s: 0,
+        simulado: true,
+        auto_detener: true,
+      });
       return `comunidad ${comunidadId.toHexString()}, nodo ${nodo._id.toHexString()}`;
     },
   },
@@ -302,7 +341,10 @@ const pasos: PasoHumo[] = [
           lector: crearLectorBlynk({ clave: config.claveCifrado }),
           catalogo,
           sinDatosS: config.sinDatosS,
-          alCambio: (c) => alertas.sincronizar(c),
+          alCambio: async (c) => {
+            await alertas.sincronizar(c);
+            await (estado.servicios as ServiciosApi).control.reaccionar(c);
+          },
           logger: SILENCIO,
         }),
         almacen: solo,
@@ -311,6 +353,31 @@ const pasos: PasoHumo[] = [
       });
       estado.poller.iniciar();
       return "sondeando solo el nodo de prueba";
+    },
+  },
+  {
+    nombre: "Actuador simulado: pulso pedido y confirmado con el agua en rango",
+    omitir: () => (comprobar ? "solo se comprueba (--comprobar)" : null),
+    correr: async () => {
+      const nodo = estado.nodo as NodoDoc;
+      const control = (estado.servicios as ServiciosApi).control;
+      await esperar(
+        () => db.collection("nodos").findOne({ _id: nodo._id, ultimo: { $ne: null } }),
+        30_000,
+        "la primera lectura del nodo",
+      );
+      const accion = await control.solicitar("demo", nodo._id, {
+        duracionS: 60,
+        motivo: "prueba de humo",
+      });
+      if (accion.estado !== "pendiente") throw new Error(`quedó ${accion.estado}, no pendiente`);
+      if (estado.ordenes.length > 0) throw new Error("pedir un pulso no debe mandar nada");
+      const c = await control.confirmar("demo", nodo._id, new ObjectId(accion.id));
+      estado.accionId = accion.id;
+      if (c.estado !== "en_curso") throw new Error(`al confirmar quedó ${c.estado}`);
+      if (estado.ordenes.length !== 1 || estado.ordenes[0]?.valor !== 1)
+        throw new Error("al confirmar debía salir exactamente una orden de encendido");
+      return "pedido (no manda nada), confirmado y orden de encendido anotada (simulada)";
     },
   },
   {
@@ -363,6 +430,27 @@ const pasos: PasoHumo[] = [
     },
   },
   {
+    nombre: "Actuador: el pulso se detuvo solo al salir de rango",
+    omitir: () => (comprobar ? "solo se comprueba (--comprobar)" : null),
+    correr: async () => {
+      const nodo = estado.nodo as NodoDoc;
+      const a = await esperar(
+        () =>
+          db.collection("acciones_actuador").findOne({
+            nodo_id: nodo._id,
+            estado: { $in: ["detenida", "terminada"] },
+          }),
+        20_000,
+        "que el pulso termine o se detenga",
+      );
+      const ultima = estado.ordenes[estado.ordenes.length - 1];
+      if (ultima?.valor !== 0) throw new Error("tras el pulso debía salir la orden de apagado");
+      if (a.estado !== "detenida" || a.automatica !== true)
+        throw new Error(`el pulso quedó «${a.estado}» y no lo detuvo la regla de seguridad`);
+      return `detenida por la regla de seguridad; órdenes anotadas: ${estado.ordenes.map((o) => o.valor).join(" → ")} (ninguna salió a Blynk)`;
+    },
+  },
+  {
     nombre: "Alerta cerrada al recuperarse el agua",
     omitir: () => (comprobar ? "solo se comprueba (--comprobar)" : null),
     esperaMaxMs: 90_000,
@@ -382,25 +470,11 @@ const pasos: PasoHumo[] = [
     omitir: () => (comprobar ? "solo se comprueba (--comprobar)" : null),
     correr: async () => {
       const nodo = estado.nodo as NodoDoc;
-      const secreto = `humo-${randomBytes(18).toString("base64url")}`;
+      const secreto = estado.secreto;
       const app = crearApp({
         corsOrigenes: [],
         salud: { mongo: () => mongo.ping(), blynk: async () => true },
-        servicios: crearServiciosApi({
-          db,
-          catalogo,
-          marca,
-          verificador: {
-            async verificar() {
-              throw new Error("el humo solo entra con la cuenta de demostración");
-            },
-          },
-          demoToken: secreto,
-          claveCifrado: config.claveCifrado,
-          blynkHost,
-          logo: cargarSimboloLympha(),
-          usuarioBot: null,
-        }),
+        servicios: estado.servicios as ServiciosApi,
       });
       const pedir = (metodo: "GET" | "POST", url: string, payload?: object) =>
         app.inject({
@@ -507,7 +581,14 @@ const pasos: PasoHumo[] = [
     correr: async () => {
       const nodo = estado.nodo as NodoDoc;
       let n = 0;
-      for (const col of ["muestras", "alertas", "eventos", "calibraciones", "reportes"]) {
+      for (const col of [
+        "muestras",
+        "alertas",
+        "eventos",
+        "calibraciones",
+        "reportes",
+        "acciones_actuador",
+      ]) {
         n += (await db.collection(col).deleteMany({ nodo_id: nodo._id })).deletedCount;
       }
       n += (await db.collection("avisos").deleteMany({ comunidad_id: nodo.comunidad_id }))

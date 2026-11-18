@@ -36,6 +36,8 @@ export function useConsulta<T>(
   const [version, setVersion] = useState(0);
   const cargarRef = useRef(cargar);
   cargarRef.current = cargar;
+  // Los `deps` de la última corrida: sirven para distinguir «cambió lo que pido» de «recargar lo mismo».
+  const depsPrevias = useRef<readonly unknown[] | null>(null);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: `deps` y `version` son los disparadores a propósito
   useEffect(() => {
@@ -47,10 +49,19 @@ export function useConsulta<T>(
     }
     const control = new AbortController();
     let vivo = true;
-    // Al cambiar de nodo o de periodo no se muestran datos del anterior.
-    setDatos(null);
-    setError(null);
-    setCargando(true);
+    // Al cambiar de nodo o de periodo no se muestran datos del anterior. Pero recargar lo MISMO (tras guardar algo)
+    // no vacía la pantalla: se siguen viendo los datos hasta que llegan los nuevos, sin perder el estado de la página.
+    const previas = depsPrevias.current;
+    const mismos =
+      previas !== null &&
+      previas.length === deps.length &&
+      deps.every((d, i) => Object.is(d, previas[i]));
+    depsPrevias.current = deps;
+    if (!mismos) {
+      setDatos(null);
+      setError(null);
+      setCargando(true);
+    }
 
     async function pedir() {
       try {

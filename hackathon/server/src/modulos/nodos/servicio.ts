@@ -68,6 +68,8 @@ export type NodoVista = {
     estable: boolean | null;
     sin_datos: boolean;
   } | null;
+  /** Qué actuador tiene, o `null`. El detalle y los controles salen de `/actuador`. */
+  actuador: { habilitado: boolean; nombre: string; simulado: boolean } | null;
   rol: Rol;
   creado: Date;
 };
@@ -143,6 +145,13 @@ export function crearServicioNodos(op: OpcionesNodos) {
             estados: u.estados,
             estable: u.estable,
             sin_datos: u.sin_datos,
+          }
+        : null,
+      actuador: nodo.actuador
+        ? {
+            habilitado: nodo.actuador.habilitado,
+            nombre: nodo.actuador.nombre,
+            simulado: nodo.actuador.simulado,
           }
         : null,
       rol,

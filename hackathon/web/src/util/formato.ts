@@ -75,3 +75,17 @@ export function desdeInputLocal(texto: string): Date | null {
   const fecha = new Date(Date.UTC(a, mes - 1, d, h + 6, mi));
   return Number.isNaN(fecha.getTime()) ? null : fecha;
 }
+
+/** Segundos que faltan para `hasta` (0 si ya pasó), redondeado hacia arriba. */
+export function segundosRestantes(hasta: Date, ahora: Date): number {
+  return Math.max(0, Math.ceil((hasta.getTime() - ahora.getTime()) / 1000));
+}
+
+/** «45 s», «1 min», «1 min 20 s». */
+export function duracionCorta(segundos: number): string {
+  const s = Math.max(0, Math.round(segundos));
+  if (s < 60) return `${s} s`;
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  return r === 0 ? `${m} min` : `${m} min ${r} s`;
+}

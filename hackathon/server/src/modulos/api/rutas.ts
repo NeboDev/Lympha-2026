@@ -12,6 +12,7 @@ import {
 import type { ServicioBitacora } from "../bitacora/index.ts";
 import type { ServicioCalibraciones } from "../calibraciones/index.ts";
 import { type ServicioComunidades, TIPOS_COMUNIDAD } from "../comunidades/index.ts";
+import type { Control } from "../control/index.ts";
 import type { ServicioIdentidad, Usuario } from "../identidad/index.ts";
 import type { ServicioNodos } from "../nodos/index.ts";
 import type { ReporteVista } from "../reportes/index.ts";
@@ -23,6 +24,8 @@ export type ServiciosApi = {
   nodos: ServicioNodos;
   bitacora: ServicioBitacora;
   calibraciones: ServicioCalibraciones;
+  /** Control del actuador (pulsos con confirmación). */
+  control: Control;
   catalogo: Catalogo;
   reportes: {
     /** Los reportes anteriores del nodo, el más reciente primero. */
@@ -107,6 +110,23 @@ const consultaEventos = z
     hasta: fecha.optional(),
     limite: z.coerce.number().int().positive().optional(),
   })
+  .strict();
+
+const idAccion = z.object({ id: z.string().max(40), accionId: z.string().max(40) }).strict();
+
+const cuerpoActuador = z
+  .object({
+    habilitado: z.boolean(),
+    nombre: z.string().max(100),
+    pulso_max_s: z.number().int().max(10_000),
+    enfriamiento_s: z.number().int().max(1_000_000),
+    simulado: z.boolean(),
+    auto_detener: z.boolean(),
+  })
+  .strict();
+
+const cuerpoPulso = z
+  .object({ duracion_s: z.number().int().max(10_000), motivo: z.string().max(400).optional() })
   .strict();
 
 const cuerpoBitacora = z.object({ texto: z.string().max(2000) }).strict();
@@ -301,6 +321,59 @@ export function registrarRutas(app: FastifyInstance, s: ServiciosApi): void {
         return { reportes: await s.reportes.recientes(nodo._id, req.query.limite ?? 20) };
       },
     );
+
+    r.get("/api/nodos/:id/actuador", { schema: { params: idParam } }, async (req) => {
+      return s.control.estado(usuarioDe(req).uid, idDe(req.params.id));
+    });
+
+    r.put(
+      "/api/nodos/:id/actuador",
+      { schema: { params: idParam, body: cuerpoActuador } },
+      async (req) => {
+        return s.control.configurar(usuarioDe(req).uid, idDe(req.params.id), req.body);
+      },
+    );
+
+    // Pedir un pulso NO manda nada a Blynk: queda pendiente hasta que una persona responsable lo confirme.
+    r.post(
+      "/api/nodos/:id/actuador/pulsos",
+      { schema: { params: idParam, body: cuerpoPulso } },
+      async (req, reply) => {
+        const accion = await s.control.solicitar(usuarioDe(req).uid, idDe(req.params.id), {
+          duracionS: req.body.duracion_s,
+          motivo: req.body.motivo,
+        });
+        return reply.code(201).send(accion);
+      },
+    );
+
+    r.post(
+      "/api/nodos/:id/actuador/pulsos/:accionId/confirmar",
+      { schema: { params: idAccion } },
+      async (req) => {
+        return s.control.confirmar(
+          usuarioDe(req).uid,
+          idDe(req.params.id),
+          idDe(req.params.accionId),
+        );
+      },
+    );
+
+    r.post(
+      "/api/nodos/:id/actuador/pulsos/:accionId/cancelar",
+      { schema: { params: idAccion } },
+      async (req) => {
+        return s.control.cancelar(
+          usuarioDe(req).uid,
+          idDe(req.params.id),
+          idDe(req.params.accionId),
+        );
+      },
+    );
+
+    r.post("/api/nodos/:id/actuador/detener", { schema: { params: idParam } }, async (req) => {
+      return { accion: await s.control.detener(usuarioDe(req).uid, idDe(req.params.id)) };
+    });
 
     r.post(
       "/api/nodos/:id/reportes",

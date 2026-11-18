@@ -19,6 +19,9 @@ export function fraccionHOCl(ph: number, tempC: number): number {
 
 export const TEMPERATURA_SUPUESTA_C = 25;
 
+/** Por debajo de este % de HOCl el cloro actúa con poca fuerza (el mismo `cloro.aviso_bajo_pct` del catálogo del servidor). */
+export const CLORO_BAJO_PCT = 40;
+
 /** Porcentaje entero para mostrar («~52 %»); `null` si el pH no es un número razonable. */
 export function efectividadCloroPct(
   ph: number | null | undefined,

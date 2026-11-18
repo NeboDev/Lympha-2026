@@ -8,7 +8,7 @@ si no está probado. Honestidad primero (`CLAUDE.md` §3).
 
 | Se puede afirmar (probado) | No se afirma salvo que esté probado en la placa |
 |---|---|
-| El pH llega de Blynk a Atlas y a la web en vivo, con su estado (color + símbolo + palabra) | «Atl detiene la dosificación» (el control del actuador no está construido) |
+| El pH llega de Blynk a Atlas y a la web en vivo, con su estado (color + símbolo + palabra) | «El relevador dosificó» o «Atl detiene la dosificación» en la placa (Atl manda la orden a Blynk, pero no ve si el relevador actuó; probado solo en modo simulado) |
 | Si el agua sale de rango, abre una alerta y avisa por Telegram con «qué hacer»; avisa al recuperarse | «La alarma local sigue con el WiFi apagado» (es del firmware; sin probar) |
 | `/estado` y `/reporte` en Telegram; el reporte PDF desde la web y desde Telegram | «Calibramos frente al jurado» (el firmware calibra; la web solo muestra la última) |
 | El PDF trae resumen, cobertura de datos, calibraciones, bitácora y **lo que no cubre** | «Cumple la NOM-127» o «es potable / segura»: **nunca** |

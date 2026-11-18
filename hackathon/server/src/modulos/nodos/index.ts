@@ -20,6 +20,7 @@ export {
   type ServicioNodos,
 } from "./servicio.ts";
 export type {
+  ConfigActuador,
   DetalleParametro,
   MapeoPines,
   NodoDoc,

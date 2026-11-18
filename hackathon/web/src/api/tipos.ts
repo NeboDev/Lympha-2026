@@ -71,6 +71,10 @@ export const nodo = z.object({
       sin_datos: z.boolean(),
     })
     .nullable(),
+  /** El actuador del nodo (resumen), o `null`. El detalle y los controles salen de `/actuador`. */
+  actuador: z
+    .object({ habilitado: z.boolean(), nombre: z.string(), simulado: z.boolean() })
+    .nullable(),
   rol,
   creado: fecha,
 });
@@ -171,3 +175,54 @@ export type EnlaceTelegram = z.infer<typeof enlaceTelegram>;
 
 /** Cuerpo de error de la API. */
 export const cuerpoError = z.object({ error: z.string(), mensaje: z.string().optional() });
+
+/* ---- Actuador (pulsos con confirmación) ---- */
+
+export const ESTADOS_ACCION = [
+  "pendiente",
+  "en_curso",
+  "terminada",
+  "detenida",
+  "cancelada",
+  "expirada",
+  "rechazada",
+  "fallida",
+] as const;
+export type EstadoAccion = (typeof ESTADOS_ACCION)[number];
+
+export const accion = z.object({
+  id: z.string(),
+  estado: z.enum(ESTADOS_ACCION),
+  duracion_s: z.number(),
+  solicitada: fecha,
+  expira: fecha,
+  inicio: fecha.nullable(),
+  fin: fecha.nullable(),
+  motivo: z.string().nullable(),
+  detalle: z.string().nullable(),
+  automatica: z.boolean(),
+  simulado: z.boolean(),
+});
+export type Accion = z.infer<typeof accion>;
+
+export const configActuador = z.object({
+  habilitado: z.boolean(),
+  nombre: z.string(),
+  pin: z.string(),
+  pulso_max_s: z.number(),
+  enfriamiento_s: z.number(),
+  simulado: z.boolean(),
+  auto_detener: z.boolean(),
+});
+export type ConfigActuador = z.infer<typeof configActuador>;
+
+export const estadoControl = z.object({
+  actuador: configActuador.nullable(),
+  activa: accion.nullable(),
+  recientes: z.array(accion),
+  bloqueos: z.array(z.object({ codigo: z.string(), mensaje: z.string() })),
+  puede_solicitar: z.boolean(),
+});
+export type EstadoControl = z.infer<typeof estadoControl>;
+
+export const respuestaDetener = z.object({ accion: accion.nullable() });

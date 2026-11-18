@@ -151,3 +151,15 @@ describe("cargarConfig: acceso (Firebase) y usuario de demostración", () => {
     ).toBeNull();
   });
 });
+
+describe("cargarConfig: interruptor del actuador", () => {
+  it("por defecto el control escribe en Blynk; con false solo ensaya", () => {
+    expect(cargarConfig(base).actuadorEscribeBlynk).toBe(true);
+    expect(cargarConfig({ ...base, ACTUADOR_ESCRIBE_BLYNK: "false" }).actuadorEscribeBlynk).toBe(
+      false,
+    );
+    expect(() => cargarConfig({ ...base, ACTUADOR_ESCRIBE_BLYNK: "no" })).toThrow(
+      /ACTUADOR_ESCRIBE_BLYNK/,
+    );
+  });
+});

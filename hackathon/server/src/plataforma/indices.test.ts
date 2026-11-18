@@ -32,6 +32,16 @@ describe("definicionesIndices", () => {
     expect(d?.clave).toEqual({ "telegram.chat_id": 1 });
   });
 
+  it("acciones del actuador: una sola pendiente o en curso por nodo", () => {
+    const d = definicionesIndices.find(
+      (x) => x.coleccion === "acciones_actuador" && x.opciones?.unique === true,
+    );
+    expect(d?.clave).toEqual({ nodo_id: 1 });
+    expect(d?.opciones?.partialFilterExpression).toEqual({
+      estado: { $in: ["pendiente", "en_curso"] },
+    });
+  });
+
   it("se borra el índice viejo por (nodo_id, seq)", () => {
     expect(indicesObsoletos).toContainEqual({ coleccion: "muestras", nombre: "nodo_id_1_seq_1" });
   });

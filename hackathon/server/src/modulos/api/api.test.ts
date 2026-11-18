@@ -39,6 +39,12 @@ const RUTAS_ESPERADAS = [
   "POST /api/nodos/:id/calibraciones",
   "GET /api/nodos/:id/reportes",
   "POST /api/nodos/:id/reportes",
+  "GET /api/nodos/:id/actuador",
+  "PUT /api/nodos/:id/actuador",
+  "POST /api/nodos/:id/actuador/pulsos",
+  "POST /api/nodos/:id/actuador/pulsos/:accionId/confirmar",
+  "POST /api/nodos/:id/actuador/pulsos/:accionId/cancelar",
+  "POST /api/nodos/:id/actuador/detener",
 ];
 
 describe("autenticación en todas las rutas de usuario", () => {
@@ -54,10 +60,10 @@ describe("autenticación en todas las rutas de usuario", () => {
     const protegidas = RUTAS_ESPERADAS.filter((r) => r !== "GET /api/salud");
     expect(protegidas.length).toBe(RUTAS_ESPERADAS.length - 1);
     for (const ruta of protegidas) {
-      const [metodo, plantilla] = ruta.split(" ") as ["GET" | "POST", string];
-      const url = plantilla.replace(":id", ID_FALSO);
+      const [metodo, plantilla] = ruta.split(" ") as ["GET" | "POST" | "PUT", string];
+      const url = plantilla.replace(":id", ID_FALSO).replace(":accionId", ID_FALSO);
       for (const token of [null, "token-que-no-existe"]) {
-        const r = await api.pedir(token, metodo, url, metodo === "POST" ? {} : undefined);
+        const r = await api.pedir(token, metodo, url, metodo !== "GET" ? {} : undefined);
         expect(r.statusCode, `${ruta} con ${token}`).toBe(401);
         expect(r.json()).toEqual({
           error: "no_autenticado",
@@ -161,7 +167,60 @@ const RUTAS_CON_ID = [
     ruta: (id: string) => `/api/nodos/${id}/reportes`,
     minimo: "integrante",
   },
+  {
+    familia: "nodo",
+    metodo: "GET",
+    ruta: (id: string) => `/api/nodos/${id}/actuador`,
+    minimo: "integrante",
+  },
+  {
+    familia: "nodo",
+    metodo: "PUT",
+    ruta: (id: string) => `/api/nodos/${id}/actuador`,
+    cuerpo: {
+      habilitado: false,
+      nombre: "Bomba de cloro",
+      pulso_max_s: 30,
+      enfriamiento_s: 300,
+      simulado: true,
+      auto_detener: true,
+    },
+    minimo: "responsable",
+  },
+  {
+    familia: "nodo",
+    metodo: "POST",
+    ruta: (id: string) => `/api/nodos/${id}/actuador/pulsos`,
+    cuerpo: { duracion_s: 10 },
+    minimo: "responsable",
+    anaEsperado: 422, // el nodo del escenario no tiene actuador habilitado
+  },
+  {
+    familia: "nodo",
+    metodo: "POST",
+    ruta: (id: string) => `/api/nodos/${id}/actuador/pulsos/:accionId/confirmar`,
+    minimo: "responsable",
+    anaEsperado: 404, // esa solicitud no existe
+  },
+  {
+    familia: "nodo",
+    metodo: "POST",
+    ruta: (id: string) => `/api/nodos/${id}/actuador/pulsos/:accionId/cancelar`,
+    minimo: "responsable",
+    anaEsperado: 404,
+  },
+  {
+    familia: "nodo",
+    metodo: "POST",
+    ruta: (id: string) => `/api/nodos/${id}/actuador/detener`,
+    minimo: "responsable",
+    anaEsperado: 409, // no hay ningún pulso en curso
+  },
 ] as const;
+
+/** La URL de una ruta con id; las de una solicitud llevan un id de solicitud que no existe. */
+const urlDe = (r: { ruta: (id: string) => string }, id: string) =>
+  r.ruta(id).replace(":accionId", ID_FALSO);
 
 describe("acceso cruzado entre comunidades", () => {
   it("las pruebas de acceso cubren todas las rutas con id", async () => {
@@ -182,19 +241,19 @@ describe("acceso cruzado entre comunidades", () => {
     it(`${nombre}: una persona ajena recibe el mismo 404 que un id que no existe`, async () => {
       const e = await escenario();
       const id = r.familia === "comunidad" ? e.comunidadId : e.nodoId;
-      const ajeno = await e.pedir("token-carla", r.metodo, r.ruta(id), cuerpo);
-      const noExiste = await e.pedir("token-carla", r.metodo, r.ruta(ID_FALSO), cuerpo);
+      const ajeno = await e.pedir("token-carla", r.metodo, urlDe(r, id), cuerpo);
+      const noExiste = await e.pedir("token-carla", r.metodo, urlDe(r, ID_FALSO), cuerpo);
       expect(ajeno.statusCode).toBe(404);
       expect(ajeno.json()).toEqual(noExiste.json());
       // El responsable de verdad sí accede: el 404 no es un error general de la ruta.
-      expect((await e.pedir("token-ana", r.metodo, r.ruta(id), cuerpo)).statusCode).toBeLessThan(
-        300,
-      );
+      const ana = (await e.pedir("token-ana", r.metodo, urlDe(r, id), cuerpo)).statusCode;
+      if ("anaEsperado" in r) expect(ana).toBe(r.anaEsperado);
+      else expect(ana).toBeLessThan(300);
     });
 
     it(`${nombre}: un id mal formado es 404, no 400`, async () => {
       const e = await escenario();
-      const r2 = await e.pedir("token-ana", r.metodo, r.ruta("no-es-un-id"), cuerpo);
+      const r2 = await e.pedir("token-ana", r.metodo, urlDe(r, "no-es-un-id"), cuerpo);
       expect(r2.statusCode).toBe(404);
       expect(r2.json().error).toBe("no_encontrado");
     });
@@ -203,7 +262,7 @@ describe("acceso cruzado entre comunidades", () => {
       it(`${nombre}: un integrante recibe 403`, async () => {
         const e = await escenario();
         const id = r.familia === "comunidad" ? e.comunidadId : e.nodoId;
-        const res = await e.pedir("token-beto", r.metodo, r.ruta(id), cuerpo);
+        const res = await e.pedir("token-beto", r.metodo, urlDe(r, id), cuerpo);
         expect(res.statusCode).toBe(403);
         expect(res.json().error).toBe("sin_permiso");
       });
@@ -211,7 +270,7 @@ describe("acceso cruzado entre comunidades", () => {
       it(`${nombre}: un integrante sí puede`, async () => {
         const e = await escenario();
         const id = r.familia === "comunidad" ? e.comunidadId : e.nodoId;
-        const res = await e.pedir("token-beto", r.metodo, r.ruta(id), cuerpo);
+        const res = await e.pedir("token-beto", r.metodo, urlDe(r, id), cuerpo);
         expect(res.statusCode).toBeLessThan(300);
       });
     }

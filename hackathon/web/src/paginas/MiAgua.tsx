@@ -21,9 +21,10 @@ import {
 import { useEspacio } from "../espacio.tsx";
 import { Grafica } from "../graficas/Grafica.tsx";
 import { useSesion } from "../sesion/contexto.tsx";
-import { efectividadCloroPct } from "../util/cloro.ts";
+import { CLORO_BAJO_PCT, efectividadCloroPct } from "../util/cloro.ts";
 import { fechaMx, valorLegible } from "../util/formato.ts";
 import { esPh } from "../util/ph.ts";
+import { TarjetaDosificacion } from "./Dosificacion.tsx";
 
 const DIA_MS = 86_400_000;
 
@@ -113,6 +114,7 @@ function VistaNodo({ id }: { id: string }) {
           conectado={n.conexion === "conectado"}
         />
       )}
+      <TarjetaDosificacion nodo={n} />
       <Alertas nodoId={n.id} />
       {principal && <SeccionGrafica nodoId={n.id} parametro={principal} />}
       <UltimaCalibracion nodoId={n.id} />
@@ -183,6 +185,12 @@ function TarjetaCloro({ valor, conectado }: { valor: number | null; conectado: b
           Es la parte del cloro libre que actúa en su forma más efectiva. Es una estimación a 25 °C:
           Atl no mide el cloro.
         </p>
+        {pct < CLORO_BAJO_PCT && (
+          <p className="que-hacer-chico">
+            Con este pH el cloro actúa con poca fuerza: conviene corregir el pH antes de subir la
+            dosis.
+          </p>
+        )}
       </div>
     </section>
   );

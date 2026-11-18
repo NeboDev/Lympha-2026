@@ -37,34 +37,53 @@ if (!config.firebase) {
 if (config.firebase.usarEmulador) {
   logger.warn({}, "FIREBASE_USE_EMULATOR=true: se aceptan tokens sin firma (solo para desarrollo)");
 }
+if (!config.actuadorEscribeBlynk) {
+  logger.warn({}, "ACTUADOR_ESCRIBE_BLYNK=false: el control del actuador no escribe en Blynk");
+}
 if (config.demoToken) {
   logger.warn({}, "Usuario de demostración ACTIVO: quien tenga USUARIO_DEMO_TOKEN entra como demo");
 }
 
 const mongo = await conectarMongo(config);
+// Los servicios de la API se arman una vez: el control del actuador también lo usan la ingesta y el barrido.
+const servicios = crearServiciosApi({
+  db: mongo.db,
+  catalogo,
+  marca,
+  verificador: crearVerificadorFirebase(config.firebase),
+  // Por qué Firebase rechazó un token (otro proyecto, vencido…). Es el mensaje de Firebase, sin el token.
+  alRechazarToken: (e) =>
+    logger.warn(
+      { causa: (e instanceof Error ? e.message : "error").slice(0, 240) },
+      "Acceso: Firebase rechazó un token",
+    ),
+  demoToken: config.demoToken,
+  claveCifrado: config.claveCifrado,
+  blynkHost: config.blynkHost,
+  logo: cargarSimboloLympha(),
+  usuarioBot: config.telegramToken ? config.telegramUsuario : null,
+  loggerControl: logger,
+  // Con ACTUADOR_ESCRIBE_BLYNK=false se ensaya todo sin mover nada: la orden se registra pero no sale a Blynk.
+  ...(config.actuadorEscribeBlynk
+    ? {}
+    : {
+        escritorActuador: {
+          async escribir(nodo: { _id: { toHexString(): string } }, pin: string, valor: 0 | 1) {
+            logger.warn(
+              { nodo_id: nodo._id.toHexString(), pin, valor },
+              "ACTUADOR_ESCRIBE_BLYNK=false: la orden NO se mandó a Blynk",
+            );
+          },
+        },
+      }),
+});
 const app = crearApp({
   corsOrigenes: config.corsOrigenes,
   salud: {
     mongo: () => mongo.ping(),
     blynk: () => blynkAlcanzable(config.blynkHost),
   },
-  servicios: crearServiciosApi({
-    db: mongo.db,
-    catalogo,
-    marca,
-    verificador: crearVerificadorFirebase(config.firebase),
-    // Por qué Firebase rechazó un token (otro proyecto, vencido…). Es el mensaje de Firebase, sin el token.
-    alRechazarToken: (e) =>
-      logger.warn(
-        { causa: (e instanceof Error ? e.message : "error").slice(0, 240) },
-        "Acceso: Firebase rechazó un token",
-      ),
-    demoToken: config.demoToken,
-    claveCifrado: config.claveCifrado,
-    blynkHost: config.blynkHost,
-    logo: cargarSimboloLympha(),
-    usuarioBot: config.telegramToken ? config.telegramUsuario : null,
-  }),
+  servicios,
   logger,
 });
 
@@ -78,6 +97,8 @@ const alertas = crearAlertas({
   logger,
 });
 const barrido = crearBucle("barrido", () => alertas.barrido(), config.barridoMs, logger);
+// Control del actuador: apaga los pulsos que llegaron a su fin y vence las solicitudes sin confirmar.
+const barridoControl = crearBucle("control", () => servicios.control.barrido(), 2000, logger);
 
 // Poller de Blynk → Mongo. Se puede apagar con INGESTA_ACTIVA=false (solo API).
 const almacen = crearAlmacenMongo(mongo.db);
@@ -88,7 +109,11 @@ const poller = config.ingestaActiva
         lector: crearLectorBlynk({ clave: config.claveCifrado }),
         catalogo,
         sinDatosS: config.sinDatosS,
-        alCambio: (cambio) => alertas.sincronizar(cambio),
+        alCambio: async (cambio) => {
+          await alertas.sincronizar(cambio);
+          // Regla de seguridad: si hay un pulso en curso y el agua sale de rango, se apaga.
+          await servicios.control.reaccionar(cambio);
+        },
         logger,
       }),
       almacen,
@@ -140,6 +165,7 @@ async function apagar(senal: string) {
   logger.info({ senal }, "apagando");
   await polling?.detener();
   await enviador?.detener();
+  await barridoControl.detener();
   await barrido.detener();
   await poller?.detener();
   await app.close();
@@ -152,6 +178,7 @@ process.on("SIGTERM", () => void apagar("SIGTERM"));
 await app.listen({ port: config.puerto, host: "0.0.0.0" });
 poller?.iniciar();
 barrido.iniciar();
+barridoControl.iniciar();
 enviador?.iniciar();
 logger.info(
   {

@@ -400,6 +400,36 @@ export const TITULO_EVENTO: Record<string, string> = {
   actuador: "Acción del actuador",
 };
 
+/* ---- Actuador (pulso de cloro) ----
+ * Atl solo manda la orden a Blynk: el relevador lo decide el firmware y Atl no ve si actuó. Por eso ningún
+ * texto dice que «se dosificó» o que el agua «quedó bien»: dice qué orden se mandó y qué se detuvo.
+ */
+
+export type MotivoDetencionTexto = "fuera_de_rango" | "sensor" | "sin_datos";
+
+export const MOTIVO_DETENCION: Record<MotivoDetencionTexto, string> = {
+  fuera_de_rango: "el pH salió del rango",
+  sensor: "la lectura del pH no es confiable",
+  sin_datos: "el nodo dejó de enviar datos",
+};
+
+export function textosActuador(a: { nombre: string; simulado: boolean }) {
+  const sim = a.simulado ? " (simulado)" : "";
+  const quien = `«${a.nombre}»${sim}`;
+  return {
+    enviada: (s: number) =>
+      `Pulso de ${s} s: orden enviada a ${quien}. Atl no ve si el relevador actuó: lo decide el firmware.`,
+    terminada: (s: number) => `Pulso de ${s} s terminado: se mandó apagar ${quien}.`,
+    detenidaPersona: `Se detuvo ${quien} antes de tiempo, a petición de una persona responsable.`,
+    detenidaAuto: (m: MotivoDetencionTexto) =>
+      `Se detuvo ${quien} por seguridad: ${MOTIVO_DETENCION[m]}.`,
+    cancelada: "Se canceló la solicitud de pulso: nadie la confirmó.",
+    expirada: "La solicitud de pulso venció sin confirmarse.",
+    rechazada: (motivo: string) => `Se rechazó el pulso: ${motivo}`,
+    fallida: `Atl no pudo mandar la orden de pulso a ${quien}: Blynk no la recibió.`,
+  };
+}
+
 export const DIAGNOSTICO_CALIBRACION: Record<string, string> = {
   buena: "Buena",
   desgastada: "Desgastada",

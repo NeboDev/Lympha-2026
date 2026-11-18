@@ -38,6 +38,27 @@ export type UltimoNodo = {
   sin_datos: boolean;
 };
 
+/**
+ * El actuador (relevador de una bomba o válvula) de un nodo. Sin esto el nodo no tiene control: la web no
+ * ofrece nada y la API lo rechaza. Los enclavamientos de verdad viven en el firmware; esto es lo que Atl
+ * añade encima, nunca en lugar de ellos.
+ */
+export type ConfigActuador = {
+  habilitado: boolean;
+  /** Cómo se llama para la gente, p. ej. «Bomba de cloro». */
+  nombre: string;
+  /** Pin de Blynk del relevador (por omisión el de la plantilla, v8). */
+  pin: string;
+  /** Duración máxima de un pulso que Atl acepta pedir (el firmware tiene la suya). */
+  pulso_max_s: number;
+  /** Tiempo mínimo entre el final de un pulso y el siguiente. */
+  enfriamiento_s: number;
+  /** `true`: no hay relevador real conectado; se ensaya el flujo y todo se rotula «simulado». */
+  simulado: boolean;
+  /** Detener un pulso en curso si el pH sale de rango, la sonda falla o el nodo deja de enviar datos. */
+  auto_detener: boolean;
+};
+
 export type UmbralesNodo = Record<string, { min: number | null; max: number | null }>;
 
 export type NodoDoc = {
@@ -57,5 +78,7 @@ export type NodoDoc = {
   /** Sustituyen a la norma del catálogo para este nodo, si se definen. */
   umbrales?: UmbralesNodo;
   ultimo: UltimoNodo | null;
+  /** Ausente = el nodo no tiene actuador. */
+  actuador?: ConfigActuador;
   creado: Date;
 };

@@ -17,6 +17,7 @@ import { useEspacio } from "../espacio.tsx";
 import { useSesion } from "../sesion/contexto.tsx";
 import { esEnlaceTelegram } from "../util/enlaces.ts";
 import { fechaMx } from "../util/formato.ts";
+import { AjustesActuador } from "./AjustesActuador.tsx";
 
 const TIPOS = [
   { valor: "escuela", texto: "Escuela" },
@@ -76,6 +77,7 @@ export function Comunidad() {
             </li>
           ))}
         </ul>
+        {responsable && (nodos.datos ?? []).map((n) => <AjustesActuador key={n.id} nodo={n} />)}
         {responsable ? (
           <VincularNodo />
         ) : (
