@@ -1,0 +1,10 @@
+{
+  "name": "atl-hackathon",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Atajos para arrancar Atl. El servidor y la web tienen cada uno su package.json.",
+  "scripts": {
+    "dev": "node scripts/dev-todo.mjs"
+  }
+}

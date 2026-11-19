@@ -15,6 +15,7 @@ Briefing para la sesión de Claude que **construye** Atl. Léelo completo antes 
 2. `docs/IDENTIDAD_VISUAL.md` + `design/tokens.css` — marca, paleta, voz, reporte PDF, mensajes.
 3. `docs/PLAN_HACKATON.md` — calendario, demo, criterios de «listo».
 4. `docs/contexto-hackathon.md` — contexto de hardware y firmware ya bosquejado (XIDE, XC01 R5, XN03, XN13, XN44).
+5. `docs/ARQUITECTURA_LYMPHA_ATL.md` (la arquitectura tal como quedó construida, con diagramas) y `docs/METODOLOGIA_DE_DESARROLLO.md` (el método de trabajo: Spec-Driven Development).
 Si algo se contradice, manda: **datos de hardware verificados > ARQUITECTURA > PLAN > IDENTIDAD**. Si el hueco cambia el diseño, **detente y pregunta**; si es menor, decide y anótalo en `docs/decisiones.md` (créalo).
 
 ## 3. Reglas que no se negocian
@@ -36,7 +37,7 @@ Si algo se contradice, manda: **datos de hardware verificados > ARQUITECTURA > P
 - **Qué reutilizar de Lympha (copiando, no importando):** `packages/wqi` (motor puro; solo si ayuda: el semáforo de pH), patrón de vinculación de `apps/server/src/modules/notificaciones/vinculo.ts`, `apps/web/src/estilos.css` (tokens de la familia), `apps/web/public/fuentes/inter-latin.woff2`, `tools/simulator` (idea de escenarios), `apps/web/src/calibracion` (animación y estados de calibración). **Del repo de Kanan** (no está aquí): `reporteGenerator.js` y `telegramBot.js`; pide al dueño la carpeta si hace falta, o reconstruye una versión mínima según `ARQUITECTURA.md` §5.5.
 
 ## 5. Stack
-Node 24 (TypeScript directo, sin build, imports con extensión `.ts`, sin `enum`) · Fastify 5 + `fastify-type-provider-zod` · zod · driver `mongodb` · `firebase-admin` (solo verificar tokens) · `pdfkit` · Vitest · Telegram con `fetch` + long polling (sin librería) · Web: Vite + React + CSS con tokens (sin librería de componentes ni de gráficas; gráfica SVG a mano) · Firmware: Arduino «ESP32S3 Dev Module». **No agregues dependencias fuera de esta lista sin preguntar.**
+Node 24 (TypeScript directo, sin build, imports con extensión `.ts`, sin `enum`) · Fastify 5 + `fastify-type-provider-zod` · zod · driver `mongodb` · `firebase-admin` (solo verificar tokens) · `pdfkit` · Vitest · Telegram con `fetch` + long polling (sin librería) · Web: Vite + React + CSS con tokens (sin librería de componentes; la gráfica de pH usa MUI X Charts (`@mui/x-charts`, con `@mui/material` y `@emotion/*` como dependencias, a petición del dueño del proyecto, 2026-11-18)) · Firmware: Arduino «ESP32S3 Dev Module». **No agregues dependencias fuera de esta lista sin preguntar.**
 
 ## 6. Orden de construcción (cada paso termina con pruebas, lint y typecheck limpios)
 0. **Verificación (no código):** con `curl`, comprobar `getAll`, `update`, `isHardwareConnected` de la HTTP API de Blynk con un token de prueba; anotar forma de la respuesta y límites. Probar conexión a Atlas (o Mongo local). **No avances si esto falla.**
