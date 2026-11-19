@@ -35,7 +35,7 @@ export function crearServicioComunidades(op: OpcionesComunidades) {
   const rolDe = (c: ComunidadDoc, uid: string): Rol | null =>
     c.miembros.find((m) => m.uid === uid)?.rol ?? null;
 
-  return {
+  const servicio = {
     /** Crea una comunidad; quien la crea queda como su responsable. */
     async crear(
       uid: string,
@@ -90,7 +90,15 @@ export function crearServicioComunidades(op: OpcionesComunidades) {
       if (!puedeComo(rol, minimo)) throw new SinPermiso();
       return { comunidad, rol };
     },
+
+    /** Desvincula el chat de Telegram de la comunidad (solo responsables). Es idempotente. */
+    async desvincularTelegram(uid: string, comunidadId: ObjectId): Promise<ComunidadVista> {
+      const { comunidad, rol } = await servicio.acceso(uid, comunidadId, "responsable");
+      await op.almacen.desvincularTelegram(comunidad._id);
+      return vistaDeComunidad({ ...comunidad, telegram: null }, rol);
+    },
   };
+  return servicio;
 }
 
 export type ServicioComunidades = ReturnType<typeof crearServicioComunidades>;

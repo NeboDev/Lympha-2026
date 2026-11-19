@@ -21,7 +21,7 @@ Todo lo que el servidor Atl **espera** de la placa y todo lo que **hace** con lo
 | **V7** | `ph_crudo` | placa → nube | double | **Sí.** pH sin filtrar (la web puede mostrar «crudo vs. filtrado») |
 | **V8** | `bomba` | **nube → placa** | int 1/0 | **Sí.** Lo **escribe el servidor** (pulso de dosificación). Ver §5 |
 | V9 | `modo` | — | int | No hoy (0 manual · 1 automático con enclavamientos; reservado) |
-| V10 | `cal_pct` | placa → nube | double | No se lee hoy; es la pendiente de la sonda como % de Nernst (diagnóstico) |
+| V10 | `cal_pct` | placa → nube | double | **Se lee:** es la pendiente de la sonda como % de Nernst. Al llegar el primer valor, y cada vez que cambie 0.5 puntos o más, Atl lo guarda como una calibración «reportada por el nodo» con su diagnóstico (buena ≥ 95 %, desgastada ≥ 85 %, revisar si menos). Publícalo solo cuando cambie (tras calibrar); `0` o vacío significa «nunca calibrada» y se ignora; se descarta lo que pase de 150 |
 
 Los pines son configurables por nodo (el mapeo vive en el documento del nodo en Mongo y en `parametros.json`); si cambias un número de pin, avísale a Jesús, no lo cambies en silencio.
 

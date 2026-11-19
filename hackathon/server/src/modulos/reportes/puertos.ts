@@ -18,6 +18,8 @@ export type CalibracionDoc = {
   pendiente_pct_nernst: number | null;
   offset_mv: number | null;
   diagnostico: string | null;
+  /** `nodo`: la pendiente la reportó la placa por Blynk. */
+  origen?: "usuario" | "nodo";
 };
 
 /** Eventos del registro que el reporte muestra (las alertas salen de la colección `alertas`). */

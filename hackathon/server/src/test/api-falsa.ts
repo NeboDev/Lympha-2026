@@ -60,13 +60,40 @@ export function crearApiFalsa(
 
   const almacenNodos: AlmacenNodos = {
     async nodo(id) {
-      return nodos.find((n) => n._id.equals(id)) ?? null;
+      return nodos.find((n) => n._id.equals(id) && !n.archivado) ?? null;
     },
     async nodosDeComunidad(id) {
-      return nodos.filter((n) => n.comunidad_id.equals(id));
+      return nodos.filter((n) => n.comunidad_id.equals(id) && !n.archivado);
     },
+    async nodoConArchivados(id) {
+      return nodos.find((n) => n._id.equals(id)) ?? null;
+    },
+    async archivadosDeComunidad(id) {
+      return nodos.filter((n) => n.comunidad_id.equals(id) && n.archivado);
+    },
+    async actualizar(id, cambios) {
+      const n = nodos.find((x) => x._id.equals(id) && !x.archivado);
+      if (!n) return null;
+      if (cambios.nombre !== undefined) n.nombre = cambios.nombre;
+      if (cambios.ubicacion === null) delete n.ubicacion;
+      else if (cambios.ubicacion !== undefined) n.ubicacion = cambios.ubicacion;
+      return n;
+    },
+    async restaurar(id) {
+      const n = nodos.find((x) => x._id.equals(id) && x.archivado);
+      if (!n) return false;
+      delete n.archivado;
+      return true;
+    },
+    async archivar(id, ahora) {
+      const n = nodos.find((x) => x._id.equals(id) && !x.archivado);
+      if (!n) return "no_existe";
+      n.archivado = ahora;
+      return "ok";
+    },
+
     async existeNombre(id, nombre) {
-      return nodos.some((n) => n.comunidad_id.equals(id) && n.nombre === nombre);
+      return nodos.some((n) => n.comunidad_id.equals(id) && n.nombre === nombre && !n.archivado);
     },
     async insertar(n) {
       nodos.push(n);
@@ -112,6 +139,10 @@ export function crearApiFalsa(
         return comunidades.filter((c) =>
           c.miembros.some((m) => m.uid === uid && m.rol === "responsable"),
         ).length;
+      },
+      async desvincularTelegram(id) {
+        const c = comunidades.find((x) => x._id.equals(id));
+        if (c) c.telegram = null;
       },
     },
     reloj: () => new Date(T0),
@@ -217,7 +248,7 @@ export function crearApiFalsa(
 
   const pedir = (
     token: string | null,
-    metodo: "GET" | "POST" | "PUT",
+    metodo: "GET" | "POST" | "PUT" | "DELETE",
     url: string,
     cuerpo?: unknown,
   ) =>

@@ -24,6 +24,10 @@ function escenario() {
       return docs.filter((c) => c.miembros.some((m) => m.uid === uid && m.rol === "responsable"))
         .length;
     },
+    async desvincularTelegram(id) {
+      const c = docs.find((x) => x._id.equals(id));
+      if (c) c.telegram = null;
+    },
   };
   const servicio = crearServicioComunidades({ almacen, reloj: () => new Date(0) });
   return { docs, servicio };
@@ -117,5 +121,28 @@ describe("acceso", () => {
     const id = new ObjectId(v.id);
     expect((await e.servicio.acceso("beto", id, "integrante")).rol).toBe("integrante");
     await expect(e.servicio.acceso("beto", id, "responsable")).rejects.toBeInstanceOf(SinPermiso);
+  });
+});
+
+describe("desvincularTelegram", () => {
+  it("el responsable quita el chat y la vista ya no lo trae; repetirlo no falla", async () => {
+    const e = escenario();
+    const v = await e.servicio.crear("ana", { nombre: "De Ana", tipo: "hogar" });
+    const doc = e.docs[0];
+    if (doc) doc.telegram = { chat_id: 5, titulo: "Grupo", vinculado: new Date(0) };
+    const id = new ObjectId(v.id);
+    const r = await e.servicio.desvincularTelegram("ana", id);
+    expect(r.telegram).toBeNull();
+    expect(e.docs[0]?.telegram).toBeNull();
+    await expect(e.servicio.desvincularTelegram("ana", id)).resolves.toBeDefined();
+  });
+
+  it("un integrante recibe 403 y un ajeno 404", async () => {
+    const e = escenario();
+    const v = await e.servicio.crear("ana", { nombre: "De Ana", tipo: "hogar" });
+    e.docs[0]?.miembros.push({ uid: "beto", rol: "integrante" });
+    const id = new ObjectId(v.id);
+    await expect(e.servicio.desvincularTelegram("beto", id)).rejects.toBeInstanceOf(SinPermiso);
+    await expect(e.servicio.desvincularTelegram("carla", id)).rejects.toBeInstanceOf(NoEncontrado);
   });
 });

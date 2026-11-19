@@ -177,7 +177,8 @@ export function construirContenido(e: EntradaContenido): ContenidoReporte {
 
   const calibraciones: FilaCalibracion[] = e.calibraciones.map((c) => ({
     ts: c.ts,
-    parametro: nombreDe(c.parametro) ?? c.parametro,
+    // Las que reportó la placa (no una persona con buffers) se rotulan, para que la trazabilidad no engañe.
+    parametro: `${nombreDe(c.parametro) ?? c.parametro}${c.origen === "nodo" ? " (del nodo)" : ""}`,
     pendiente:
       c.pendiente_pct_nernst === null ? "—" : `${c.pendiente_pct_nernst.toFixed(1)} % de Nernst`,
     offset: c.offset_mv === null ? "—" : `${c.offset_mv.toFixed(1)} mV`,

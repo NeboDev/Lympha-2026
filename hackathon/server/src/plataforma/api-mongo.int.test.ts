@@ -3,6 +3,7 @@ import { ObjectId } from "mongodb";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { AlertaDoc } from "../modulos/alertas/index.ts";
 import { crearApp } from "../modulos/api/index.ts";
+import { crearServicioCalibraciones } from "../modulos/calibraciones/index.ts";
 import type { ComunidadDoc } from "../modulos/comunidades/index.ts";
 import { crearDocumentoNodo } from "../modulos/nodos/index.ts";
 import {
@@ -239,6 +240,106 @@ describe.skipIf(!activo)("API sobre MongoDB (integración)", () => {
     expect(ev.map((e) => e.mensaje)).toEqual(["nota de la comunidad", "sin datos"]); // recientes primero
     expect(ev[0]?.autor_uid).toBe("ana");
     expect(ev[1]?.autor_uid).toBeNull();
+  });
+
+  it("nodos: archivar oculta el nodo, cierra sus alertas, cancela avisos y conserva las muestras", async () => {
+    const a = crearAlmacenNodosMongo(mongo.db);
+    const com = comunidad("Archivo", [{ uid: "u1", rol: "responsable" }]);
+    await crearAlmacenComunidadesMongo(mongo.db).insertar(com);
+    const nodo = crearDocumentoNodo({
+      comunidadId: com._id,
+      nombre: "A quitar",
+      tokenCifrado: "x",
+      host: "blynk.invalid",
+      catalogo,
+    });
+    await a.insertar(nodo);
+    const ahora = new Date();
+    await mongo.db.collection("muestras").insertOne({ nodo_id: nodo._id, ts: ahora, v: { ph: 7 } });
+    await mongo.db.collection("alertas").insertOne({
+      _id: new ObjectId(),
+      nodo_id: nodo._id,
+      comunidad_id: com._id,
+      estado: "abierta",
+      abierta: ahora,
+      cerrada: null,
+    });
+    await mongo.db.collection("avisos").insertOne({
+      clave: `archivo:${nodo._id.toHexString()}`,
+      nodo_id: nodo._id,
+      estado: "pendiente",
+    });
+
+    // con un pulso pendiente no se toca nada
+    const accion = await mongo.db
+      .collection("acciones_actuador")
+      .insertOne({ nodo_id: nodo._id, estado: "pendiente" });
+    expect(await a.archivar(nodo._id, ahora)).toBe("pulso_activo");
+    expect(await a.nodo(nodo._id)).not.toBeNull();
+    await mongo.db.collection("acciones_actuador").deleteOne({ _id: accion.insertedId });
+
+    expect(await a.archivar(nodo._id, ahora)).toBe("ok");
+    expect(await a.nodo(nodo._id)).toBeNull();
+    expect(await a.nodosDeComunidad(com._id)).toEqual([]);
+    expect(await a.existeNombre(com._id, "A quitar")).toBe(false);
+    expect(await a.archivar(nodo._id, ahora)).toBe("no_existe");
+    // quitados: se listan y se restauran
+    expect((await a.archivadosDeComunidad(com._id)).map((n) => n.nombre)).toEqual(["A quitar"]);
+    expect(await a.actualizar(nodo._id, { nombre: "Nuevo" })).toBeNull();
+    expect(await a.restaurar(nodo._id)).toBe(true);
+    expect(await a.restaurar(nodo._id)).toBe(false);
+    const editado = await a.actualizar(nodo._id, {
+      nombre: "Nuevo",
+      ubicacion: { texto: "Patio" },
+    });
+    expect(editado).toMatchObject({ nombre: "Nuevo", ubicacion: { texto: "Patio" } });
+    expect((await a.actualizar(nodo._id, { ubicacion: null }))?.ubicacion).toBeUndefined();
+    expect(await a.archivar(nodo._id, ahora)).toBe("ok");
+    // el documento y el historial siguen en la base
+    expect(await mongo.db.collection("nodos").countDocuments({ _id: nodo._id })).toBe(1);
+    expect(await mongo.db.collection("muestras").countDocuments({ nodo_id: nodo._id })).toBe(1);
+    expect(
+      await mongo.db.collection("alertas").countDocuments({ nodo_id: nodo._id, estado: "cerrada" }),
+    ).toBe(1);
+    expect(
+      await mongo.db.collection("avisos").countDocuments({ nodo_id: nodo._id, estado: "fallido" }),
+    ).toBe(1);
+  });
+
+  it("calibraciones reportadas por el nodo: se guardan sin puntos ni offset y no se duplican", async () => {
+    const com = comunidad("Sonda", [{ uid: "u1", rol: "responsable" }]);
+    await crearAlmacenComunidadesMongo(mongo.db).insertar(com);
+    const nodo = crearDocumentoNodo({
+      comunidadId: com._id,
+      nombre: "Con sonda",
+      tokenCifrado: "x",
+      host: "blynk.invalid",
+      catalogo,
+    });
+    await crearAlmacenNodosMongo(mongo.db).insertar(nodo);
+    const servicio = crearServicioCalibraciones({
+      almacen: crearAlmacenCalibracionesMongo(mongo.db),
+      nodos: { acceso: async () => ({ nodo }) as never },
+      catalogo,
+    });
+    const ts = new Date();
+    expect(await servicio.registrarReportada(nodo, 96.4, ts)).not.toBeNull();
+    expect(await servicio.registrarReportada(nodo, 96.6, new Date(ts.getTime() + 5000))).toBeNull();
+    const docs = await mongo.db.collection("calibraciones").find({ nodo_id: nodo._id }).toArray();
+    expect(docs).toHaveLength(1);
+    expect(docs[0]).toMatchObject({
+      origen: "nodo",
+      pendiente_pct_nernst: 96.4,
+      offset_mv: null,
+      temp: null,
+      autor_uid: null,
+      diagnostico: "buena",
+    });
+    expect(
+      await mongo.db
+        .collection("eventos")
+        .countDocuments({ nodo_id: nodo._id, tipo: "calibracion" }),
+    ).toBe(1);
   });
 
   it("bitácora y calibraciones se guardan y se listan", async () => {

@@ -36,9 +36,17 @@ type EstadoNodo = {
   ultimo: UltimoNodo | null;
   ventanas: Record<string, Lectura[]>;
   previo: Record<string, Estado>;
+  /** Última pendiente de sonda reportada (% de Nernst); null si el nodo aún no la reporta. */
+  calPct: number | null;
   /** Escrituras que fallaron (Mongo caído): se reintentan en orden en el siguiente ciclo. */
   pendientes: Operacion[];
 };
+
+/** Un cambio en la pendiente de la sonda que el nodo reportó por Blynk. */
+export type CalibracionReportada = { nodo: NodoDoc; pctNernst: number; ts: Date };
+
+/** Cuánto debe cambiar la pendiente reportada (puntos de %) para contarla como una calibración nueva. */
+export const CAL_PCT_CAMBIO_MIN = 0.5;
 
 export type OpcionesIngesta = {
   almacen: AlmacenIngesta;
@@ -55,6 +63,11 @@ export type OpcionesIngesta = {
    * idempotente (las alertas se reconcilian contra la foto del nodo, no cuentan eventos).
    */
   alCambio?: (cambio: CambioNodo) => Promise<void>;
+  /**
+   * Se llama cuando el nodo reporta una pendiente de sonda nueva (V10): la primera vez o si cambió al menos
+   * `CAL_PCT_CAMBIO_MIN` puntos. Va por la misma cola de reintentos; debe ser idempotente.
+   */
+  alCalibracion?: (c: CalibracionReportada) => Promise<void>;
   reloj?: () => Date;
   logger?: LoggerIngesta;
 };
@@ -87,6 +100,7 @@ export function crearIngesta(op: OpcionesIngesta) {
       ultimo: u,
       ventanas: {},
       previo: { ...(u?.estados ?? {}) },
+      calPct: u?.cal_pct ?? null,
       pendientes: [],
     };
     const desde = new Date(reloj().getTime() - ventanaMs);
@@ -249,6 +263,20 @@ export function crearIngesta(op: OpcionesIngesta) {
     const evaluado = evaluarParametros(nodo, est, m);
     const estado = peorEstado(Object.values(evaluado.estados));
 
+    // La pendiente de la sonda: si es nueva o cambió, se registra como calibración reportada por el nodo.
+    let calNueva = est.calPct;
+    let registrarCal: (() => Promise<void>) | null = null;
+    const alCalibracion = op.alCalibracion;
+    if (
+      m.calPct !== null &&
+      (est.calPct === null || Math.abs(m.calPct - est.calPct) >= CAL_PCT_CAMBIO_MIN)
+    ) {
+      const pct = m.calPct;
+      calNueva = pct;
+      est.calPct = pct;
+      if (alCalibracion) registrarCal = () => alCalibracion({ nodo, pctNernst: pct, ts: ahora });
+    }
+
     const doc: MuestraDoc = {
       nodo_id: nodo._id,
       ts: m.ts,
@@ -273,6 +301,7 @@ export function crearIngesta(op: OpcionesIngesta) {
       estable: evaluado.estable,
       ultimo_cambio: m.ts,
       sin_datos: false,
+      ...(calNueva !== null ? { cal_pct: calNueva } : {}),
     };
     est.ultimo = ultimo;
 
@@ -282,6 +311,8 @@ export function crearIngesta(op: OpcionesIngesta) {
         logger.warn({ nodo_id: id, seq: m.seq }, "muestra duplicada: se omite");
     });
     encolar(est, id, "ultimo", () => op.almacen.guardarUltimo(nodo._id, ultimo));
+    // Después de guardar la muestra: si el registro de la calibración falla, no frena la muestra de este ciclo.
+    if (registrarCal) encolar(est, id, "calibración", registrarCal);
     if (r.evento === "reconexion") {
       const evento: EventoIngesta = {
         nodo_id: nodo._id,

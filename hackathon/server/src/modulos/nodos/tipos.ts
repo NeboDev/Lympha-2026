@@ -35,6 +35,8 @@ export type UltimoNodo = {
   estable: boolean | null;
   /** Momento en que `seq` cambió por última vez. */
   ultimo_cambio: Date;
+  /** Última pendiente de la sonda (% de Nernst) que reportó el nodo (V10). Ausente si nunca la ha reportado. */
+  cal_pct?: number;
   sin_datos: boolean;
 };
 
@@ -81,4 +83,9 @@ export type NodoDoc = {
   /** Ausente = el nodo no tiene actuador. */
   actuador?: ConfigActuador;
   creado: Date;
+  /**
+   * Presente = el nodo se quitó (borrado lógico): ya no se sondea, no sale en la API ni genera avisos, pero sus
+   * muestras, alertas y bitácora se conservan como archivo.
+   */
+  archivado?: Date;
 };

@@ -80,6 +80,25 @@ const cuerpoComunidad = z
   })
   .strict();
 
+const ubicacionNodo = z
+  .object({
+    texto: z.string().min(1).max(120),
+    lat: z.number().min(-90).max(90).optional(),
+    lng: z.number().min(-180).max(180).optional(),
+  })
+  .strict();
+
+const cuerpoEdicionNodo = z
+  .object({
+    nombre: z.string().max(200).optional(),
+    /** `null` borra el lugar. */
+    ubicacion: ubicacionNodo.nullable().optional(),
+  })
+  .strict()
+  .refine((c) => c.nombre !== undefined || c.ubicacion !== undefined, {
+    message: "indica el nombre o el lugar",
+  });
+
 const cuerpoNodo = z
   .object({
     nombre: z.string().max(200),
@@ -222,8 +241,38 @@ export function registrarRutas(app: FastifyInstance, s: ServiciosApi): void {
       },
     );
 
+    r.delete("/api/comunidades/:id/telegram", { schema: { params: idParam } }, async (req) => {
+      return s.comunidades.desvincularTelegram(usuarioDe(req).uid, idDe(req.params.id));
+    });
+
     r.get("/api/nodos/:id", { schema: { params: idParam } }, async (req) => {
       return s.nodos.detalle(usuarioDe(req).uid, idDe(req.params.id));
+    });
+
+    r.put(
+      "/api/nodos/:id",
+      { schema: { params: idParam, body: cuerpoEdicionNodo } },
+      async (req) => {
+        const b = req.body;
+        return s.nodos.editar(usuarioDe(req).uid, idDe(req.params.id), {
+          ...(b.nombre !== undefined ? { nombre: b.nombre } : {}),
+          ...(b.ubicacion !== undefined ? { ubicacion: b.ubicacion } : {}),
+        });
+      },
+    );
+
+    r.get("/api/comunidades/:id/nodos-quitados", { schema: { params: idParam } }, async (req) => {
+      return { nodos: await s.nodos.quitados(usuarioDe(req).uid, idDe(req.params.id)) };
+    });
+
+    r.post("/api/nodos/:id/restaurar", { schema: { params: idParam } }, async (req) => {
+      return s.nodos.restaurar(usuarioDe(req).uid, idDe(req.params.id));
+    });
+
+    // Quitar un nodo no borra su historial: se archiva (ver `ServicioNodos.quitar`).
+    r.delete("/api/nodos/:id", { schema: { params: idParam } }, async (req, reply) => {
+      await s.nodos.quitar(usuarioDe(req).uid, idDe(req.params.id));
+      return reply.code(204).send();
     });
 
     r.get(
@@ -277,6 +326,7 @@ export function registrarRutas(app: FastifyInstance, s: ServiciosApi): void {
           pendiente_pct_nernst: c.pendiente_pct_nernst,
           offset_mv: c.offset_mv,
           diagnostico: c.diagnostico,
+          origen: c.origen ?? "usuario",
         })),
       };
     });

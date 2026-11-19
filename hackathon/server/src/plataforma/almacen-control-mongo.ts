@@ -76,7 +76,7 @@ export function crearAlmacenControlMongo(db: Db): AlmacenControl {
     },
 
     async nodo(id) {
-      return nodos.findOne({ _id: id });
+      return nodos.findOne({ _id: id, archivado: { $exists: false } });
     },
 
     async registrarEvento(evento) {

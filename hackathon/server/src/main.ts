@@ -114,6 +114,9 @@ const poller = config.ingestaActiva
           // Regla de seguridad: si hay un pulso en curso y el agua sale de rango, se apaga.
           await servicios.control.reaccionar(cambio);
         },
+        alCalibracion: async ({ nodo, pctNernst, ts }) => {
+          await servicios.calibraciones.registrarReportada(nodo, pctNernst, ts);
+        },
         logger,
       }),
       almacen,

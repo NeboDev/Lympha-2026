@@ -31,6 +31,11 @@ const RUTAS_ESPERADAS = [
   "GET /api/comunidades/:id/nodos",
   "POST /api/comunidades/:id/nodos",
   "POST /api/comunidades/:id/telegram/vinculo",
+  "DELETE /api/comunidades/:id/telegram",
+  "DELETE /api/nodos/:id",
+  "PUT /api/nodos/:id",
+  "POST /api/nodos/:id/restaurar",
+  "GET /api/comunidades/:id/nodos-quitados",
   "GET /api/nodos/:id",
   "GET /api/nodos/:id/muestras",
   "GET /api/nodos/:id/eventos",
@@ -115,6 +120,38 @@ const RUTAS_CON_ID = [
     familia: "comunidad",
     metodo: "POST",
     ruta: (id: string) => `/api/comunidades/${id}/telegram/vinculo`,
+    minimo: "responsable",
+  },
+  {
+    familia: "comunidad",
+    metodo: "DELETE",
+    ruta: (id: string) => `/api/comunidades/${id}/telegram`,
+    minimo: "responsable",
+  },
+  {
+    familia: "comunidad",
+    metodo: "GET",
+    ruta: (id: string) => `/api/comunidades/${id}/nodos-quitados`,
+    minimo: "responsable",
+  },
+  {
+    familia: "nodo",
+    metodo: "PUT",
+    ruta: (id: string) => `/api/nodos/${id}`,
+    cuerpo: { nombre: "San Juan Bosco" },
+    minimo: "responsable",
+  },
+  {
+    familia: "nodo",
+    metodo: "POST",
+    ruta: (id: string) => `/api/nodos/${id}/restaurar`,
+    minimo: "responsable",
+    anaEsperado: 409, // el nodo del escenario no está quitado
+  },
+  {
+    familia: "nodo",
+    metodo: "DELETE",
+    ruta: (id: string) => `/api/nodos/${id}`,
     minimo: "responsable",
   },
   {
@@ -597,6 +634,59 @@ describe("POST /api/comunidades/:id/telegram/vinculo", () => {
     );
     expect(r.statusCode).toBe(503);
     expect(r.json().error).toBe("telegram_no_configurado");
+  });
+});
+
+describe("DELETE /api/nodos/:id y /api/comunidades/:id/telegram", () => {
+  it("quitar un nodo responde 204, el nodo deja de existir y deja de salir en la lista", async () => {
+    const e = await escenario();
+    const r = await e.pedir("token-ana", "DELETE", `/api/nodos/${e.nodoId}`);
+    expect(r.statusCode).toBe(204);
+    expect(r.body).toBe("");
+    const otra = await e.pedir("token-ana", "GET", `/api/nodos/${e.nodoId}`);
+    expect(otra.statusCode).toBe(404);
+    const lista = await e.pedir("token-ana", "GET", `/api/comunidades/${e.comunidadId}/nodos`);
+    expect(lista.json().nodos).toEqual([]);
+  });
+
+  it("editar el nombre y el lugar, quitar, listar los quitados y restaurar", async () => {
+    const e = await escenario();
+    const ruta = `/api/nodos/${e.nodoId}`;
+    const edit = await e.pedir("token-ana", "PUT", ruta, {
+      nombre: "San Juan Bosco",
+      ubicacion: { texto: "Patio" },
+    });
+    expect(edit.statusCode).toBe(200);
+    expect(edit.json()).toMatchObject({ nombre: "San Juan Bosco", ubicacion: { texto: "Patio" } });
+    const vacio = await e.pedir("token-ana", "PUT", ruta, {});
+    expect(vacio.statusCode).toBe(400);
+    const extra = await e.pedir("token-ana", "PUT", ruta, { nombre: "Otro", token_blynk: "x" });
+    expect(extra.statusCode).toBe(400);
+
+    await e.pedir("token-ana", "DELETE", ruta);
+    const quitados = await e.pedir(
+      "token-ana",
+      "GET",
+      `/api/comunidades/${e.comunidadId}/nodos-quitados`,
+    );
+    expect(quitados.json().nodos).toMatchObject([{ id: e.nodoId, nombre: "San Juan Bosco" }]);
+    expect(quitados.body).not.toMatch(/token|cifrado|mapeo/i);
+    expect((await e.pedir("token-ana", "PUT", ruta, { nombre: "Otro" })).statusCode).toBe(404);
+
+    const r = await e.pedir("token-ana", "POST", `${ruta}/restaurar`);
+    expect(r.statusCode).toBe(200);
+    expect(r.json().nombre).toBe("San Juan Bosco");
+    expect((await e.pedir("token-ana", "GET", ruta)).statusCode).toBe(200);
+  });
+
+  it("desvincular Telegram responde la comunidad sin chat", async () => {
+    const e = await escenario();
+    const doc = e.comunidades[0];
+    if (doc) doc.telegram = { chat_id: 9, titulo: "Grupo", vinculado: new Date() };
+    const r = await e.pedir("token-ana", "DELETE", `/api/comunidades/${e.comunidadId}/telegram`);
+    expect(r.statusCode).toBe(200);
+    expect(r.json().telegram).toBeNull();
+    expect(e.comunidades[0]?.telegram).toBeNull();
   });
 });
 

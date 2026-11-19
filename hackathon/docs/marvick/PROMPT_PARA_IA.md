@@ -21,7 +21,7 @@ Resumen de la arquitectura:
 - Pines: V2 ph (calibrado y filtrado), V7 ph_crudo, V4 estado (0 ok, 1 atención, 2 fuera de rango, 3 error de
   sensor), V5 estable (1/0), V6 seq (entero que SUBE en cada muestra; es la señal de vida: si no cambia, el
   sistema dice "sin conexión"), V8 bomba (el SERVIDOR lo escribe: 1 = pulso, 0 = apagar), V1 temperatura,
-  V3 mv, V9 modo, V10 cal_pct (diagnóstico, no se guardan hoy).
+  V3 mv, V9 modo, V10 cal_pct (pendiente de la sonda en % de Nernst; Atl la lee y la guarda como calibración reportada por el nodo; V3 mv no se guarda hoy).
 - Calibración de 2 puntos (buffers pH 4 y 7) guardada en NVS; comandos serial c4, c7, s, r; compensación de
   Nernst por temperatura; validación 0–14 y detección de sensor desconectado.
 

@@ -7,8 +7,9 @@ import {
   type DiagnosticoSonda,
   diagnosticarSonda,
   PARAMETROS_CALIBRABLES,
+  pendienteNernst,
 } from "../../dominio/ph.ts";
-import type { ServicioNodos } from "../nodos/index.ts";
+import type { NodoDoc, ServicioNodos } from "../nodos/index.ts";
 
 /**
  * Registra la calibración de una sonda. Quien calibra es el firmware (con buffers); aquí queda el
@@ -21,13 +22,19 @@ export type CalibracionDoc = {
   nodo_id: ObjectId;
   ts: Date;
   parametro: string;
-  temp: number;
+  /** `usuario`: la registró una persona con sus dos puntos. `nodo`: la placa reportó su pendiente (V10) por Blynk. */
+  origen?: "usuario" | "nodo";
+  /** Nulo cuando la reportó el nodo: solo manda el porcentaje. */
+  temp: number | null;
   puntos: { valor: number; mv: number }[];
+  /** En las del nodo es una estimación a 25 °C a partir del porcentaje. */
   pendiente_mv_por_ph: number;
   pendiente_pct_nernst: number;
-  offset_mv: number;
+  /** Nulo cuando la reportó el nodo. */
+  offset_mv: number | null;
   diagnostico: DiagnosticoSonda;
-  autor_uid: string;
+  /** Nulo cuando la reportó el nodo. */
+  autor_uid: string | null;
 };
 
 export type EventoCalibracion = {
@@ -38,8 +45,8 @@ export type EventoCalibracion = {
   severidad: "info" | "atencion";
   parametro: string;
   mensaje: string;
-  datos: { calibracion_id: string; diagnostico: DiagnosticoSonda };
-  autor_uid: string;
+  datos: { calibracion_id: string; diagnostico: DiagnosticoSonda; origen?: "usuario" | "nodo" };
+  autor_uid: string | null;
 };
 
 export interface AlmacenCalibraciones {
@@ -63,6 +70,8 @@ export type OpcionesCalibraciones = {
 };
 
 export const TEMP_CALIBRACION_DEFECTO_C = 25;
+/** Cuánto debe cambiar la pendiente reportada por el nodo para guardarla como una calibración nueva. */
+const CAMBIO_MIN_PCT = 0.5;
 const MV_MAX = 2000;
 
 const redondear = (n: number) => Math.round(n * 100) / 100;
@@ -150,6 +159,60 @@ export function crearServicioCalibraciones(op: OpcionesCalibraciones) {
         mensaje: `Calibración de ${p.nombre} registrada: diagnóstico «${DIAGNOSTICO_CALIBRACION[diagnostico]}» (${doc.pendiente_pct_nernst.toFixed(1)} % de Nernst).`,
         datos: { calibracion_id: doc._id.toHexString(), diagnostico },
         autor_uid: uid,
+      });
+      return doc;
+    },
+
+    /**
+     * Guarda la pendiente de la sonda que el nodo reportó por Blynk (V10), con su diagnóstico. No la dio una persona,
+     * así que no hay puntos, offset ni temperatura: solo el porcentaje. Si la última calibración reportada por el nodo
+     * ya tiene (casi) ese valor, no hace nada: reintentar o reiniciar el servidor no duplica registros.
+     */
+    async registrarReportada(
+      nodo: NodoDoc,
+      pctNernst: number,
+      ts: Date,
+    ): Promise<CalibracionDoc | null> {
+      const parametro = "ph";
+      const p = op.catalogo.parametros[parametro];
+      if (!p || !nodo.parametros.includes(parametro)) return null;
+      const [ultima] = await op.almacen.listar(nodo._id, 1);
+      if (
+        ultima?.origen === "nodo" &&
+        Math.abs(ultima.pendiente_pct_nernst - pctNernst) < CAMBIO_MIN_PCT
+      ) {
+        return null;
+      }
+      const pendiente = -(pctNernst / 100) * pendienteNernst(TEMP_CALIBRACION_DEFECTO_C);
+      const diagnostico = diagnosticarSonda(
+        { pendienteMvPorPh: pendiente, pendientePctNernst: pctNernst },
+        p.reglas?.sensor_pendiente_min_pct ?? 85,
+        p.reglas?.sensor_pendiente_buena_pct ?? 95,
+      );
+      const doc: CalibracionDoc = {
+        _id: new ObjectId(),
+        nodo_id: nodo._id,
+        ts,
+        parametro,
+        origen: "nodo",
+        temp: null,
+        puntos: [],
+        pendiente_mv_por_ph: redondear(pendiente),
+        pendiente_pct_nernst: redondear(pctNernst),
+        offset_mv: null,
+        diagnostico,
+        autor_uid: null,
+      };
+      await op.almacen.registrar(doc, {
+        nodo_id: nodo._id,
+        comunidad_id: nodo.comunidad_id,
+        ts,
+        tipo: "calibracion",
+        severidad: diagnostico === "buena" ? "info" : "atencion",
+        parametro,
+        mensaje: `La sonda de ${p.nombre} reportó su pendiente: ${doc.pendiente_pct_nernst.toFixed(1)} % de Nernst, diagnóstico «${DIAGNOSTICO_CALIBRACION[diagnostico]}».`,
+        datos: { calibracion_id: doc._id.toHexString(), diagnostico, origen: "nodo" },
+        autor_uid: null,
       });
       return doc;
     },

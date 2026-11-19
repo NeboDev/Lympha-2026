@@ -20,7 +20,12 @@ export type MuestraNueva = {
   crudo: Record<string, number>;
   estadoNodo: number | null;
   estableNodo: boolean | null;
+  /** Pendiente de la sonda (% de Nernst) que reporta el nodo, o null si no la reporta o no es creíble. */
+  calPct: number | null;
 };
+
+/** Una pendiente de sonda creíble: mayor que 0 y no mayor que 150 % (el 0 es «nunca se calibró»). */
+export const CAL_PCT_MAX = 150;
 
 export type ResultadoCiclo =
   | {
@@ -97,6 +102,8 @@ export function decidirCiclo(args: {
   const sesion = reinicio ? estado.sesion + 1 : estado.sesion;
   const estable = numero(snapshot[mapeo.estable.toLowerCase()]);
   const estadoNodo = numero(snapshot[mapeo.estado.toLowerCase()]);
+  const calCruda = mapeo.cal_pct ? numero(snapshot[mapeo.cal_pct.toLowerCase()]) : null;
+  const calPct = calCruda !== null && calCruda > 0 && calCruda <= CAL_PCT_MAX ? calCruda : null;
   return {
     tipo: "muestra",
     muestra: {
@@ -107,6 +114,7 @@ export function decidirCiclo(args: {
       crudo: recoger(snapshot, mapeo.crudos),
       estadoNodo,
       estableNodo: estable === null ? null : estable === 1,
+      calPct,
     },
     evento: estado.sinDatos ? "reconexion" : null,
     reinicio,

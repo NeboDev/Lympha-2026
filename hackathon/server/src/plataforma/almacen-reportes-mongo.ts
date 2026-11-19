@@ -23,7 +23,7 @@ export function crearAlmacenReportesMongo(db: Db): AlmacenReportes {
 
   return {
     async nodo(id) {
-      return nodos.findOne({ _id: id });
+      return nodos.findOne({ _id: id, archivado: { $exists: false } });
     },
 
     async comunidad(id) {

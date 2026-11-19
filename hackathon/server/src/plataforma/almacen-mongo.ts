@@ -15,7 +15,9 @@ export function crearAlmacenMongo(db: Db): AlmacenIngesta {
 
   return {
     async listarNodos() {
-      return nodos.find({ "blynk.token_cifrado": { $exists: true } }).toArray();
+      return nodos
+        .find({ "blynk.token_cifrado": { $exists: true }, archivado: { $exists: false } })
+        .toArray();
     },
 
     async cargarVentana(nodoId: ObjectId, desde: Date) {

@@ -31,6 +31,7 @@ function escenario(opciones: { token?: ResultadoToken } = {}) {
   const comunidades: ComunidadDoc[] = [];
   const nodos: NodoDoc[] = [];
   const consultas: { serie: unknown[][]; eventos: unknown[][] } = { serie: [], eventos: [] };
+  const estado = { pulsoActivo: false };
   let serieDevuelta: PuntoSerie[] = [];
   let alertasDevueltas: AlertaDoc[] = [];
   let eventosDevueltos: EventoNodo[] = [];
@@ -48,16 +49,48 @@ function escenario(opciones: { token?: ResultadoToken } = {}) {
     async contarResponsable() {
       return 0;
     },
+    async desvincularTelegram(id) {
+      const c = comunidades.find((x) => x._id.equals(id));
+      if (c) c.telegram = null;
+    },
   };
   const almacen: AlmacenNodos = {
     async nodo(id) {
-      return nodos.find((n) => n._id.equals(id)) ?? null;
+      return nodos.find((n) => n._id.equals(id) && !n.archivado) ?? null;
     },
     async nodosDeComunidad(id) {
-      return nodos.filter((n) => n.comunidad_id.equals(id));
+      return nodos.filter((n) => n.comunidad_id.equals(id) && !n.archivado);
     },
+    async nodoConArchivados(id) {
+      return nodos.find((n) => n._id.equals(id)) ?? null;
+    },
+    async archivadosDeComunidad(id) {
+      return nodos.filter((n) => n.comunidad_id.equals(id) && n.archivado);
+    },
+    async actualizar(id, cambios) {
+      const n = nodos.find((x) => x._id.equals(id) && !x.archivado);
+      if (!n) return null;
+      if (cambios.nombre !== undefined) n.nombre = cambios.nombre;
+      if (cambios.ubicacion === null) delete n.ubicacion;
+      else if (cambios.ubicacion !== undefined) n.ubicacion = cambios.ubicacion;
+      return n;
+    },
+    async restaurar(id) {
+      const n = nodos.find((x) => x._id.equals(id) && x.archivado);
+      if (!n) return false;
+      delete n.archivado;
+      return true;
+    },
+    async archivar(id, ahora) {
+      const n = nodos.find((x) => x._id.equals(id) && !x.archivado);
+      if (!n) return "no_existe";
+      if (estado.pulsoActivo) return "pulso_activo";
+      n.archivado = ahora;
+      return "ok";
+    },
+
     async existeNombre(id, nombre) {
-      return nodos.some((n) => n.comunidad_id.equals(id) && n.nombre === nombre);
+      return nodos.some((n) => n.comunidad_id.equals(id) && n.nombre === nombre && !n.archivado);
     },
     async insertar(n) {
       nodos.push(n);
@@ -94,6 +127,7 @@ function escenario(opciones: { token?: ResultadoToken } = {}) {
 
   return {
     servicio,
+    estado,
     nodos,
     comunidades,
     consultas,
@@ -409,5 +443,110 @@ describe("eventos", () => {
     const desde = new Date(T0 - 30 * 24 * HORA);
     expect(alertas).toEqual(["alertas", e.nodoId, desde, new Date(T0), 200]);
     expect(eventos).toEqual(["eventos", e.nodoId, e.comunidadId, desde, new Date(T0), 200]);
+  });
+});
+
+describe("quitar", () => {
+  it("archiva el nodo: deja de verse, libera el nombre y conserva el documento", async () => {
+    const e = await conNodo();
+    await e.servicio.quitar("ana", e.nodoId);
+    expect(e.nodos[0]?.archivado).toBeInstanceOf(Date);
+    await expect(e.servicio.detalle("ana", e.nodoId)).rejects.toBeInstanceOf(NoEncontrado);
+    expect(await e.servicio.deComunidad("ana", e.comunidadId)).toEqual([]);
+    // el mismo nombre se puede volver a usar
+    const otra = await e.servicio.alta("ana", e.comunidadId, {
+      nombre: "Tinaco azotea",
+      tokenBlynk: TOKEN,
+    });
+    expect(otra.nombre).toBe("Tinaco azotea");
+  });
+
+  it("solo el responsable puede quitarlo: el integrante recibe 403 y el ajeno 404", async () => {
+    const e = await conNodo();
+    await expect(e.servicio.quitar("beto", e.nodoId)).rejects.toBeInstanceOf(SinPermiso);
+    await expect(e.servicio.quitar("carla", e.nodoId)).rejects.toBeInstanceOf(NoEncontrado);
+    expect(e.nodos[0]?.archivado).toBeUndefined();
+  });
+
+  it("no se quita con un pulso del actuador pendiente o en curso", async () => {
+    const e = await conNodo();
+    e.estado.pulsoActivo = true;
+    await expect(e.servicio.quitar("ana", e.nodoId)).rejects.toBeInstanceOf(Conflicto);
+    expect(e.nodos[0]?.archivado).toBeUndefined();
+  });
+
+  it("quitar dos veces da 404 la segunda", async () => {
+    const e = await conNodo();
+    await e.servicio.quitar("ana", e.nodoId);
+    await expect(e.servicio.quitar("ana", e.nodoId)).rejects.toBeInstanceOf(NoEncontrado);
+  });
+});
+
+describe("editar", () => {
+  it("cambia el nombre y el lugar, y el lugar se puede borrar", async () => {
+    const e = await conNodo();
+    const v = await e.servicio.editar("ana", e.nodoId, {
+      nombre: "  San Juan Bosco ",
+      ubicacion: { texto: "Patio" },
+    });
+    expect(v.nombre).toBe("San Juan Bosco");
+    expect(v.ubicacion).toEqual({ texto: "Patio" });
+    const sin = await e.servicio.editar("ana", e.nodoId, { ubicacion: null });
+    expect(sin.ubicacion).toBeNull();
+    expect(sin.nombre).toBe("San Juan Bosco");
+  });
+
+  it("rechaza nombres cortos y repetidos, pero dejar el mismo nombre no estorba", async () => {
+    const e = await conNodo();
+    await e.servicio.alta("ana", e.comunidadId, { nombre: "Cisterna", tokenBlynk: TOKEN });
+    await expect(e.servicio.editar("ana", e.nodoId, { nombre: "x" })).rejects.toBeInstanceOf(
+      SolicitudInvalida,
+    );
+    await expect(e.servicio.editar("ana", e.nodoId, { nombre: "Cisterna" })).rejects.toBeInstanceOf(
+      Conflicto,
+    );
+    const igual = await e.servicio.editar("ana", e.nodoId, { nombre: "Tinaco azotea" });
+    expect(igual.nombre).toBe("Tinaco azotea");
+  });
+
+  it("solo el responsable: el integrante recibe 403 y el ajeno 404", async () => {
+    const e = await conNodo();
+    await expect(e.servicio.editar("beto", e.nodoId, { nombre: "Otro" })).rejects.toBeInstanceOf(
+      SinPermiso,
+    );
+    await expect(e.servicio.editar("carla", e.nodoId, { nombre: "Otro" })).rejects.toBeInstanceOf(
+      NoEncontrado,
+    );
+  });
+});
+
+describe("quitados y restaurar", () => {
+  it("lista los quitados y los restaura con sus datos", async () => {
+    const e = await conNodo();
+    await e.servicio.quitar("ana", e.nodoId);
+    const lista = await e.servicio.quitados("ana", e.comunidadId);
+    expect(lista.map((n) => n.nombre)).toEqual(["Tinaco azotea"]);
+    const v = await e.servicio.restaurar("ana", e.nodoId);
+    expect(v.nombre).toBe("Tinaco azotea");
+    expect(await e.servicio.quitados("ana", e.comunidadId)).toEqual([]);
+    expect((await e.servicio.deComunidad("ana", e.comunidadId)).length).toBe(1);
+  });
+
+  it("restaurar un nodo que no está quitado es 409; uno ajeno, 404; un integrante, 403", async () => {
+    const e = await conNodo();
+    await expect(e.servicio.restaurar("ana", e.nodoId)).rejects.toBeInstanceOf(Conflicto);
+    await e.servicio.quitar("ana", e.nodoId);
+    await expect(e.servicio.restaurar("carla", e.nodoId)).rejects.toBeInstanceOf(NoEncontrado);
+    await expect(e.servicio.restaurar("beto", e.nodoId)).rejects.toBeInstanceOf(SinPermiso);
+    await expect(e.servicio.quitados("beto", e.comunidadId)).rejects.toBeInstanceOf(SinPermiso);
+  });
+
+  it("no restaura si el nombre ya lo usa otro nodo activo", async () => {
+    const e = await conNodo();
+    await e.servicio.quitar("ana", e.nodoId);
+    await e.servicio.alta("ana", e.comunidadId, { nombre: "Tinaco azotea", tokenBlynk: TOKEN });
+    await expect(e.servicio.restaurar("ana", e.nodoId)).rejects.toMatchObject({
+      codigo: "nodo_repetido",
+    });
   });
 });

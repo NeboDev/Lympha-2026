@@ -7,6 +7,7 @@ import type {
   EventoCalibracion,
 } from "../modulos/calibraciones/index.ts";
 import type { AlmacenComunidades, ComunidadDoc } from "../modulos/comunidades/index.ts";
+import { ESTADOS_ACTIVOS } from "../modulos/control/index.ts";
 import type { AlmacenUsuarios } from "../modulos/identidad/index.ts";
 import type { AlmacenNodos, EventoNodo, NodoDoc, PuntoSerie } from "../modulos/nodos/index.ts";
 
@@ -50,6 +51,9 @@ export function crearAlmacenComunidadesMongo(db: Db): AlmacenComunidades {
     async contarResponsable(uid) {
       return comunidades.countDocuments({ miembros: { $elemMatch: { uid, rol: "responsable" } } });
     },
+    async desvincularTelegram(id) {
+      await comunidades.updateOne({ _id: id }, { $set: { telegram: null } });
+    },
   };
 }
 
@@ -66,6 +70,8 @@ export function crearAlmacenNodosMongo(db: Db): AlmacenNodos {
   const nodos = db.collection<NodoDoc>("nodos");
   const muestras = db.collection("muestras");
   const alertas = db.collection<AlertaDoc>("alertas");
+  const acciones = db.collection("acciones_actuador");
+  const avisos = db.collection("avisos");
   const eventos = db.collection<{
     nodo_id: ObjectId | null;
     comunidad_id: ObjectId;
@@ -77,13 +83,73 @@ export function crearAlmacenNodosMongo(db: Db): AlmacenNodos {
 
   return {
     async nodo(id) {
-      return nodos.findOne({ _id: id });
+      return nodos.findOne({ _id: id, archivado: { $exists: false } });
     },
     async nodosDeComunidad(comunidadId) {
-      return nodos.find({ comunidad_id: comunidadId }).sort({ nombre: 1 }).toArray();
+      return nodos
+        .find({ comunidad_id: comunidadId, archivado: { $exists: false } })
+        .sort({ nombre: 1 })
+        .toArray();
     },
     async existeNombre(comunidadId, nombre) {
-      return (await nodos.countDocuments({ comunidad_id: comunidadId, nombre }, { limit: 1 })) > 0;
+      return (
+        (await nodos.countDocuments(
+          { comunidad_id: comunidadId, nombre, archivado: { $exists: false } },
+          { limit: 1 },
+        )) > 0
+      );
+    },
+    async nodoConArchivados(id) {
+      return nodos.findOne({ _id: id });
+    },
+    async archivadosDeComunidad(comunidadId) {
+      return nodos
+        .find({ comunidad_id: comunidadId, archivado: { $exists: true } })
+        .sort({ archivado: -1 })
+        .toArray();
+    },
+    async actualizar(nodoId, cambios) {
+      const set: Record<string, unknown> = {};
+      const unset: Record<string, ""> = {};
+      if (cambios.nombre !== undefined) set.nombre = cambios.nombre;
+      if (cambios.ubicacion === null) unset.ubicacion = "";
+      else if (cambios.ubicacion !== undefined) set.ubicacion = cambios.ubicacion;
+      const operacion = {
+        ...(Object.keys(set).length > 0 ? { $set: set } : {}),
+        ...(Object.keys(unset).length > 0 ? { $unset: unset } : {}),
+      };
+      return nodos.findOneAndUpdate({ _id: nodoId, archivado: { $exists: false } }, operacion, {
+        returnDocument: "after",
+      });
+    },
+    async restaurar(nodoId) {
+      const r = await nodos.updateOne(
+        { _id: nodoId, archivado: { $exists: true } },
+        { $unset: { archivado: "" } },
+      );
+      return r.modifiedCount === 1;
+    },
+    async archivar(nodoId, ahora) {
+      const activa = await acciones.countDocuments(
+        { nodo_id: nodoId, estado: { $in: [...ESTADOS_ACTIVOS] } },
+        { limit: 1 },
+      );
+      if (activa > 0) return "pulso_activo";
+      const r = await nodos.updateOne(
+        { _id: nodoId, archivado: { $exists: false } },
+        { $set: { archivado: ahora } },
+      );
+      if (r.matchedCount === 0) return "no_existe";
+      // Sin nodo no hay nada que vigilar: las alertas se cierran (sin avisar) y los avisos que esperaban no salen.
+      await alertas.updateMany(
+        { nodo_id: nodoId, estado: "abierta" },
+        { $set: { estado: "cerrada", cerrada: ahora, valor_cierre: null } },
+      );
+      await avisos.updateMany(
+        { nodo_id: nodoId, estado: "pendiente" },
+        { $set: { estado: "fallido", bloqueado_hasta: null, ultimo_error: "nodo quitado" } },
+      );
+      return "ok";
     },
     async insertar(nodo) {
       await nodos.insertOne({ ...nodo });

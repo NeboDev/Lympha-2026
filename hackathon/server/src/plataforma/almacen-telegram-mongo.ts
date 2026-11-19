@@ -72,7 +72,10 @@ export function crearAlmacenTelegramMongo(db: Db): AlmacenTelegram {
     },
 
     async nodosDeComunidad(comunidadId) {
-      return nodos.find({ comunidad_id: comunidadId }).sort({ creado: 1 }).toArray();
+      return nodos
+        .find({ comunidad_id: comunidadId, archivado: { $exists: false } })
+        .sort({ creado: 1 })
+        .toArray();
     },
   };
 }

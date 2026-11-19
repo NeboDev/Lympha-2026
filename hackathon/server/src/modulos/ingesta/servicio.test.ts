@@ -7,6 +7,7 @@ import type { Estado } from "../evaluacion/index.ts";
 import { crearDocumentoNodo, type NodoDoc, type UltimoNodo } from "../nodos/index.ts";
 import type {
   AlmacenIngesta,
+  CalibracionReportada,
   EventoIngesta,
   LectorNodo,
   MuestraDoc,
@@ -102,7 +103,13 @@ function lectorDeEscenario(nombre: NombreEscenario, reloj: () => Date): LectorNo
   };
 }
 
-function entorno(opciones: { sinDatosS?: number; maxPendientes?: number } = {}) {
+function entorno(
+  opciones: {
+    sinDatosS?: number;
+    maxPendientes?: number;
+    alCalibracion?: (c: CalibracionReportada) => Promise<void>;
+  } = {},
+) {
   let ahoraMs = T0;
   const reloj = () => new Date(ahoraMs);
   const nodo = nodoDePrueba();
@@ -120,6 +127,7 @@ function entorno(opciones: { sinDatosS?: number; maxPendientes?: number } = {}) 
       catalogo,
       sinDatosS: opciones.sinDatosS ?? 60,
       maxPendientes: opciones.maxPendientes,
+      ...(opciones.alCalibracion ? { alCalibracion: opciones.alCalibracion } : {}),
       reloj,
       logger,
     });
@@ -438,5 +446,126 @@ describe("poller", () => {
     await vi.waitFor(() => expect(ciclo).toHaveBeenCalledTimes(1));
     await poller.detener();
     expect(ciclo).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("pendiente de la sonda reportada por el nodo (V10)", () => {
+  /** Un nodo que publica cada vez un seq nuevo y la pendiente que se le diga. */
+  function lectorConPendiente() {
+    let seq = 0;
+    const estado: { cal: number | string | undefined } = { cal: undefined };
+    const lector: LectorNodo = {
+      async leer() {
+        seq++;
+        return {
+          v2: 7.1,
+          v7: 7.15,
+          v4: 0,
+          v5: 1,
+          v6: seq,
+          ...(estado.cal === undefined ? {} : { v10: estado.cal }),
+        };
+      },
+    };
+    return { lector, estado };
+  }
+
+  it("la primera pendiente creíble se registra y solo se vuelve a registrar si cambia", async () => {
+    const llamadas: CalibracionReportada[] = [];
+    const e = entorno({
+      alCalibracion: async (c) => {
+        llamadas.push(c);
+      },
+    });
+    const { lector, estado } = lectorConPendiente();
+    const ingesta = e.nuevaIngesta(lector);
+
+    estado.cal = undefined; // el nodo aún no la reporta
+    e.irA(0);
+    await ingesta.ciclo(e.nodo);
+    expect(llamadas).toHaveLength(0);
+
+    estado.cal = 96.4;
+    e.irA(5);
+    await ingesta.ciclo(e.nodo);
+    expect(llamadas).toHaveLength(1);
+    expect(llamadas[0]).toMatchObject({ pctNernst: 96.4, ts: new Date(T0 + 5000) });
+
+    // mismo valor o una variación de ruido (< 0.5 puntos): nada
+    for (const [t, v] of [
+      [10, 96.4],
+      [15, 96.7],
+    ] as const) {
+      estado.cal = v;
+      e.irA(t);
+      await ingesta.ciclo(e.nodo);
+    }
+    expect(llamadas).toHaveLength(1);
+
+    // una calibración nueva de verdad
+    estado.cal = 88.2;
+    e.irA(20);
+    await ingesta.ciclo(e.nodo);
+    expect(llamadas.map((c) => c.pctNernst)).toEqual([96.4, 88.2]);
+    expect(e.almacen.ultimos.get(e.nodo._id.toHexString())?.cal_pct).toBe(88.2);
+  });
+
+  it("ignora valores sin sentido: cero (nunca calibrada), negativos, enormes o texto", async () => {
+    const llamadas: CalibracionReportada[] = [];
+    const e = entorno({
+      alCalibracion: async (c) => {
+        llamadas.push(c);
+      },
+    });
+    const { lector, estado } = lectorConPendiente();
+    const ingesta = e.nuevaIngesta(lector);
+    let t = 0;
+    for (const cal of [0, -5, 400, "no es numero"]) {
+      estado.cal = cal;
+      t += 5;
+      e.irA(t);
+      await ingesta.ciclo(e.nodo);
+    }
+    expect(llamadas).toHaveLength(0);
+    expect(e.almacen.ultimos.get(e.nodo._id.toHexString())?.cal_pct).toBeUndefined();
+  });
+
+  it("al reiniciar el servidor no repite una pendiente que ya tenía guardada", async () => {
+    const llamadas: CalibracionReportada[] = [];
+    const e = entorno({
+      alCalibracion: async (c) => {
+        llamadas.push(c);
+      },
+    });
+    const { lector, estado } = lectorConPendiente();
+    estado.cal = 95;
+    e.irA(0);
+    await e.nuevaIngesta(lector).ciclo(e.nodo);
+    expect(llamadas).toHaveLength(1);
+
+    // otro proceso: parte de lo guardado en la base
+    const [reiniciado] = await e.almacen.listarNodos();
+    e.irA(5);
+    await e.nuevaIngesta(lector).ciclo(reiniciado as NodoDoc);
+    expect(llamadas).toHaveLength(1);
+  });
+
+  it("si el registro falla, se reintenta sin perder la muestra", async () => {
+    let intentos = 0;
+    const e = entorno({
+      alCalibracion: async () => {
+        intentos++;
+        if (intentos === 1) throw new Error("Mongo caído");
+      },
+    });
+    const { lector, estado } = lectorConPendiente();
+    estado.cal = 95;
+    const ingesta = e.nuevaIngesta(lector);
+    e.irA(0);
+    await ingesta.ciclo(e.nodo);
+    expect(e.almacen.muestras).toHaveLength(1);
+    e.irA(5);
+    await ingesta.ciclo(e.nodo);
+    expect(intentos).toBe(2);
   });
 });

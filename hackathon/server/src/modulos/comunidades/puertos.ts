@@ -22,6 +22,8 @@ export interface AlmacenComunidades {
   deUsuario(uid: string): Promise<ComunidadDoc[]>;
   /** Cuántas comunidades tiene la persona como responsable (para ponerle un tope). */
   contarResponsable(uid: string): Promise<number>;
+  /** Borra el chat vinculado (deja `telegram: null`). */
+  desvincularTelegram(id: ObjectId): Promise<void>;
 }
 
 /** Lo que la API muestra de una comunidad. */

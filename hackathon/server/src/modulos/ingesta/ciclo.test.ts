@@ -127,3 +127,20 @@ describe("decidirCiclo", () => {
     expect(ciclo(guardado, foto(43), 5).tipo).toBe("muestra");
   });
 });
+
+describe("pendiente de la sonda (V10) en la muestra", () => {
+  it("la lee del pin de cal_pct y descarta lo que no es creíble", () => {
+    const calDe = (v: number | string) => {
+      const r = ciclo(ESTADO_CICLO_INICIAL, foto(10, { v10: v }), 0);
+      return r.tipo === "muestra" ? r.muestra.calPct : "no es muestra";
+    };
+    expect(calDe(96.4)).toBe(96.4);
+    expect(calDe("97.5")).toBe(97.5);
+    expect(calDe(0)).toBeNull();
+    expect(calDe(-3)).toBeNull();
+    expect(calDe(151)).toBeNull();
+    expect(calDe("abc")).toBeNull();
+    const sin = ciclo(ESTADO_CICLO_INICIAL, foto(10), 0);
+    expect(sin.tipo === "muestra" && sin.muestra.calPct).toBeNull();
+  });
+});

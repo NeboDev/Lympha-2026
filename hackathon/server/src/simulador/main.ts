@@ -15,6 +15,7 @@ import {
 const PIN_ESTADO = "v4";
 const PIN_ESTABLE = "v5";
 const PIN_SEQ = "v6";
+const PIN_CAL_PCT = "v10";
 const MAX_ERRORES_SEGUIDOS = 5;
 
 const AYUDA = `Simulador de nodo Atl: escribe ph, ph_crudo, estado, estable y seq en Blynk.
@@ -26,6 +27,7 @@ Uso: pnpm simulador --escenario <nombre> [opciones]
   --intervalo-s <n>      segundos entre escrituras (por defecto: 5)
   --velocidad <x>        comprime el tiempo del escenario (por defecto: 1)
   --duracion-s <n>       termina tras n segundos reales (por defecto: duración del escenario / velocidad)
+  --cal-pct <n>          escribe también la pendiente de la sonda (V10, % de Nernst, p. ej. 96.5)
   --sin-escribir         solo imprime lo que escribiría (no usa la red ni el token)
 
 El token se toma de BLYNK_TOKEN_PRUEBA en server/.env y nunca se imprime.`;
@@ -37,6 +39,7 @@ const { values } = parseArgs({
     "intervalo-s": { type: "string", default: "5" },
     velocidad: { type: "string", default: "1" },
     "duracion-s": { type: "string" },
+    "cal-pct": { type: "string" },
     "sin-escribir": { type: "boolean", default: false },
     ayuda: { type: "boolean", default: false },
   },
@@ -52,6 +55,8 @@ function numeroPositivo(nombre: string, texto: string | undefined): number | nul
   }
   return n;
 }
+
+const calPct = numeroPositivo("cal-pct", values["cal-pct"]);
 
 if (values.ayuda) {
   console.log(AYUDA);
@@ -134,6 +139,7 @@ while (!parar) {
           [PIN_ESTADO]: m.estado,
           [PIN_ESTABLE]: m.estable ? 1 : 0,
           [PIN_SEQ]: seq,
+          ...(calPct === null ? {} : { [PIN_CAL_PCT]: calPct }),
         });
         erroresSeguidos = 0;
         console.log(linea);

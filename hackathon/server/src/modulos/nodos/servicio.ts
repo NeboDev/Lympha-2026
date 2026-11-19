@@ -11,7 +11,13 @@ import { detalleAlerta, tituloAlerta } from "../../dominio/frases.ts";
 import type { AlertaDoc } from "../alertas/index.ts";
 import type { ServicioComunidades } from "../comunidades/index.ts";
 import { crearDocumentoNodo } from "./nodo.ts";
-import type { AlmacenNodos, ComprobadorToken, EventoNodo, PuntoSerie } from "./puertos.ts";
+import type {
+  AlmacenNodos,
+  CambiosNodo,
+  ComprobadorToken,
+  EventoNodo,
+  PuntoSerie,
+} from "./puertos.ts";
 import type { NodoDoc, UltimoNodo } from "./tipos.ts";
 
 export type OpcionesNodos = {
@@ -280,6 +286,104 @@ export function crearServicioNodos(op: OpcionesNodos) {
       await op.almacen.insertar(nodo);
       // El token es válido aunque la placa esté apagada: se guarda y se avisa si no está conectada.
       return { ...vista(nodo, rol), conectado: r === "conectado" };
+    },
+
+    /**
+     * Quita el nodo (solo responsables): deja de sondearse y de avisar, pero conserva sus datos como archivo.
+     * Un nodo quitado se ve como inexistente. No se puede quitar con un pulso del actuador en marcha.
+     */
+    async quitar(uid: string, nodoId: ObjectId): Promise<void> {
+      const { nodo } = await acceso(uid, nodoId, "responsable");
+      const r = await op.almacen.archivar(nodo._id, reloj());
+      if (r === "pulso_activo") {
+        throw new Conflicto(
+          "pulso_en_curso",
+          "Hay un pulso del actuador pendiente o en curso. Detenlo o espera a que termine antes de quitar el nodo.",
+        );
+      }
+      if (r === "no_existe") throw new NoEncontrado("No encontramos ese nodo.");
+    },
+
+    /** Cambia el nombre y/o el lugar de un nodo (solo responsables). */
+    async editar(uid: string, nodoId: ObjectId, datos: CambiosNodo): Promise<NodoVista> {
+      const { nodo, rol } = await acceso(uid, nodoId, "responsable");
+      const cambios: CambiosNodo = {};
+      if (datos.nombre !== undefined) {
+        const nombre = datos.nombre.trim();
+        if (nombre.length < 2 || nombre.length > 80) {
+          throw new SolicitudInvalida(
+            "nombre_invalido",
+            "El nombre debe tener de 2 a 80 caracteres.",
+          );
+        }
+        if (nombre !== nodo.nombre) {
+          if (await op.almacen.existeNombre(nodo.comunidad_id, nombre)) {
+            throw new Conflicto("nodo_repetido", "Ya hay un nodo con ese nombre en la comunidad.");
+          }
+          cambios.nombre = nombre;
+        }
+      }
+      if (datos.ubicacion !== undefined) {
+        cambios.ubicacion = datos.ubicacion === null ? null : datos.ubicacion;
+      }
+      if (Object.keys(cambios).length === 0) return vista(nodo, rol);
+      const nuevo = await op.almacen.actualizar(nodo._id, cambios);
+      if (!nuevo) throw new NoEncontrado("No encontramos ese nodo.");
+      return vista(nuevo, rol);
+    },
+
+    /** Los nodos quitados de una comunidad (solo responsables), para poder restaurarlos. */
+    async quitados(uid: string, comunidadId: ObjectId) {
+      await op.comunidades.acceso(uid, comunidadId, "responsable");
+      const lista = await op.almacen.archivadosDeComunidad(comunidadId);
+      return lista.map((n) => ({
+        id: n._id.toHexString(),
+        nombre: n.nombre,
+        ubicacion: n.ubicacion ?? null,
+        quitado: n.archivado ?? n.creado,
+      }));
+    },
+
+    /** Devuelve un nodo quitado a la comunidad (solo responsables). Sus datos viejos siguen ahí. */
+    async restaurar(uid: string, nodoId: ObjectId): Promise<NodoVista> {
+      const nodo = await op.almacen.nodoConArchivados(nodoId);
+      if (!nodo) throw new NoEncontrado("No encontramos ese nodo.");
+      let rol: Rol;
+      try {
+        rol = (await op.comunidades.acceso(uid, nodo.comunidad_id, "responsable")).rol;
+      } catch (e) {
+        // Igual que `acceso`: un nodo ajeno se ve como uno inexistente.
+        if (e instanceof NoEncontrado) throw new NoEncontrado("No encontramos ese nodo.");
+        throw e;
+      }
+      if (!nodo.archivado) {
+        throw new Conflicto(
+          "nodo_no_quitado",
+          "Ese nodo no está quitado: ya está en la comunidad.",
+        );
+      }
+      if (
+        (await op.almacen.nodosDeComunidad(nodo.comunidad_id)).length >= MAX_NODOS_POR_COMUNIDAD
+      ) {
+        throw new Conflicto(
+          "demasiados_nodos",
+          `Una comunidad admite hasta ${MAX_NODOS_POR_COMUNIDAD} nodos.`,
+        );
+      }
+      if (await op.almacen.existeNombre(nodo.comunidad_id, nodo.nombre)) {
+        throw new Conflicto(
+          "nodo_repetido",
+          "Ya hay otro nodo con ese nombre. Cámbiale el nombre a ese primero y vuelve a restaurar.",
+        );
+      }
+      if (!(await op.almacen.restaurar(nodo._id))) {
+        throw new Conflicto(
+          "nodo_no_quitado",
+          "Ese nodo no está quitado: ya está en la comunidad.",
+        );
+      }
+      const { archivado: _quitado, ...activo } = nodo;
+      return vista(activo, rol);
     },
 
     async detalle(uid: string, nodoId: ObjectId): Promise<NodoVista> {

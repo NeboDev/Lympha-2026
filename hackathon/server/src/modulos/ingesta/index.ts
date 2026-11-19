@@ -15,6 +15,8 @@ export type {
   Snapshot,
 } from "./puertos.ts";
 export {
+  CAL_PCT_CAMBIO_MIN,
+  type CalibracionReportada,
   crearIngesta,
   crearPoller,
   esperaTrasFallos,

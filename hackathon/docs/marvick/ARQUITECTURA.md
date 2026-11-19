@@ -69,7 +69,7 @@ Reglas de frontera: cada módulo expone `index.ts` y nadie importa archivos inte
 
 ## 7. Qué no está hecho o no se probó
 - Firmware contra este servidor, relevador real y alarma local sin red (**tu parte**).
-- Temperatura (`V1`), `mv` (`V3`) y `cal_pct` (`V10`) no se guardan en Mongo hoy; se pueden añadir como parámetros nuevos al catálogo si el reto lo pide.
+- Temperatura (`V1`) y `mv` (`V3`) no se guardan en Mongo hoy; `cal_pct` (`V10`) sí se lee: queda como calibración «reportada por el nodo» (ver `docs/decisiones.md`); se pueden añadir como parámetros nuevos al catálogo si el reto lo pide.
 - Botones de confirmación en Telegram, escaneo de QR, asistente de calibración en la web, instalación como PWA.
 - Grupos de Telegram, varias personas a la vez, reportes de 90 días con muchos datos y comportamiento tras horas de ejecución (el polling de Telegram se atoró una vez tras suspender el equipo).
 - Despliegue en un servidor real: todo corre en la laptop de Jesús; plan B de base de datos (Mongo local en Docker) sin probar.
