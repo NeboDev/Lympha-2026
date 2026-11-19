@@ -286,14 +286,17 @@ function UltimaCalibracion({ nodoId }: { nodoId: string }) {
               {ultima.pendiente_pct_nernst.toFixed(1)} % de Nernst)
             </p>
             <p className="nota">
-              {fechaMx(ultima.ts)}. Mientras más cerca de 100 %, mejor responde la sonda.
+              {fechaMx(ultima.ts)}
+              {ultima.origen === "nodo" ? " · la reportó el propio nodo" : ""}. Mientras más cerca
+              de 100 %, mejor responde la sonda.
             </p>
           </>
         ) : (
           <>
             <p className="mini-titulo">Sin calibraciones registradas</p>
             <p className="nota">
-              Cuando se calibre la sonda, el resultado aparecerá aquí y en el reporte.
+              Cuando el nodo reporte la pendiente de su sonda (o se registre una calibración),
+              aparecerá aquí y en el reporte.
             </p>
           </>
         )}

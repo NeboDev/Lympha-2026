@@ -63,6 +63,14 @@ describe("pedir", () => {
     expect(con?.body).toBe('{"x":1}');
   });
 
+  it("un DELETE sin cuerpo no lleva content-type y un 204 se acepta sin leer JSON", async () => {
+    const e = escenario([new Response(null, { status: 204 })]);
+    const r = await e.cliente.pedir("/api/nodos/1", { metodo: "DELETE", esquema: z.undefined() });
+    expect(r).toBeUndefined();
+    expect(e.llamadas[0]?.init.method).toBe("DELETE");
+    expect(cab(e, 0)["content-type"]).toBeUndefined();
+  });
+
   it("si el servidor cambia de forma, falla en vez de mostrar datos a medias", async () => {
     const e = escenario([json({ n: "no es número", cuando: "x" })]);
     await expect(e.cliente.pedir("/api/yo", { esquema })).rejects.toThrow();

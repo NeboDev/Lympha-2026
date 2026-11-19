@@ -31,7 +31,7 @@ export type OpcionesCliente = {
 };
 
 export type Peticion<E extends z.ZodTypeAny> = {
-  metodo?: "GET" | "POST" | "PUT";
+  metodo?: "GET" | "POST" | "PUT" | "DELETE";
   cuerpo?: unknown;
   /** Esquema de la respuesta. */
   esquema: E;
@@ -63,13 +63,13 @@ export function crearCliente(opciones: OpcionesCliente): Cliente {
 
   async function enviar(
     ruta: string,
-    metodo: "GET" | "POST" | "PUT",
+    metodo: "GET" | "POST" | "PUT" | "DELETE",
     cuerpo: unknown,
     signal: AbortSignal | undefined,
     accept: string,
   ): Promise<Response> {
     const headers: Record<string, string> = { accept };
-    // Un POST sin cuerpo NO debe llevar content-type: application/json (Fastify responde 400).
+    // Un POST (o DELETE) sin cuerpo NO debe llevar content-type: application/json (Fastify responde 400).
     if (cuerpo !== undefined) headers["content-type"] = "application/json";
     const token = await opciones.obtenerToken();
     if (token) headers.authorization = `Bearer ${token}`;
@@ -96,7 +96,8 @@ export function crearCliente(opciones: OpcionesCliente): Cliente {
   return {
     async pedir(ruta, p) {
       const r = await enviar(ruta, p.metodo ?? "GET", p.cuerpo, p.signal, "application/json");
-      return p.esquema.parse(await r.json());
+      // 204 (p. ej. al quitar un nodo): no hay cuerpo; el esquema de esas llamadas es `sinContenido`.
+      return p.esquema.parse(r.status === 204 ? undefined : await r.json());
     },
     async descargar(ruta, p = {}) {
       const r = await enviar(ruta, p.metodo ?? "GET", p.cuerpo, p.signal, "application/pdf");

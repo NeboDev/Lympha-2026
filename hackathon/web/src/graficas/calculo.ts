@@ -87,6 +87,38 @@ export function descripcionGrafica(
   return `${nombre} entre ${valorLegible(lo, decimales)} y ${valorLegible(hi, decimales)} en ${periodo}.`;
 }
 
+export type DatosLinea = {
+  /** Instantes (uno por punto y uno extra en cada hueco). */
+  t: Date[];
+  prom: (number | null)[];
+  min: (number | null)[];
+  max: (number | null)[];
+};
+
+/**
+ * Los puntos como arreglos paralelos para una gráfica de líneas. En cada hueco (el nodo no envió datos) se mete un
+ * punto vacío (`null`) para que la línea se corte y no se invente lo que no se midió.
+ */
+export function datosParaLinea(puntos: readonly PuntoGrafica[], pasoMs: number): DatosLinea {
+  const salida: DatosLinea = { t: [], prom: [], min: [], max: [] };
+  tramos(puntos, pasoMs).forEach((tramo, i, todos) => {
+    for (const p of tramo) {
+      salida.t.push(new Date(p.t));
+      salida.prom.push(p.prom);
+      salida.min.push(p.min);
+      salida.max.push(p.max);
+    }
+    const ultimo = tramo.at(-1);
+    if (ultimo && i < todos.length - 1) {
+      salida.t.push(new Date(ultimo.t + pasoMs));
+      salida.prom.push(null);
+      salida.min.push(null);
+      salida.max.push(null);
+    }
+  });
+  return salida;
+}
+
 /** Etiquetas del eje X: inicio, mitad y fin (hora si el periodo es corto; si no, solo el día). */
 export function marcasX(desde: Date, hasta: Date): { t: number; texto: string }[] {
   const corto = hasta.getTime() - desde.getTime() <= 2 * 86_400_000;

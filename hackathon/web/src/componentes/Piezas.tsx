@@ -1,23 +1,37 @@
 import { type ReactNode, useEffect, useState } from "react";
+import logo from "../assets/lympha-logo.svg";
+import logoOscuro from "../assets/lympha-logo-oscuro.svg";
+import simbolo from "../assets/lympha-simbolo.svg";
+import simboloOscuro from "../assets/lympha-simbolo-oscuro.svg";
 import { haceLegible } from "../util/formato.ts";
 import { ESTADOS_UI, type EstadoVisual } from "./estados.ts";
 import { Icono } from "./Iconos.tsx";
 
-/** Símbolo de Atl (gota Talavera con anillo y destello). Boceto de hackathon: design/logo-atl.svg. */
-export function Marca({ tamano = 32 }: { tamano?: number }) {
+/**
+ * Marca de Lympha. «simbolo» es solo el isotipo (decorativo: el nombre va al lado en texto); «logo» es el símbolo con
+ * el nombre y sí lleva texto alternativo. Cada uno trae su variante para fondo oscuro, que sigue al tema del sistema.
+ */
+export function Marca({
+  variante = "simbolo",
+  ancho,
+}: {
+  variante?: "simbolo" | "logo";
+  ancho: number;
+}) {
+  const [claro, oscuro, proporcion] =
+    variante === "logo" ? [logo, logoOscuro, 786 / 960] : [simbolo, simboloOscuro, 534 / 640];
   return (
-    <svg width={tamano} height={tamano} viewBox="0 0 64 64" role="img" aria-label="Atl">
-      <path d="M32 4C32 4 12 26 12 40a20 20 0 0 0 40 0C52 26 32 4 32 4Z" fill="var(--talavera)" />
-      <circle cx="32" cy="40" r="11" fill="none" stroke="var(--bg)" strokeWidth="2.5" />
-      <circle cx="32" cy="40" r="4" fill="var(--agua)" />
-      <path
-        d="M21 36c1-4 4-8 7-11"
-        fill="none"
-        stroke="var(--agua)"
-        strokeWidth="2.5"
-        strokeLinecap="round"
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcSet={oscuro} />
+      <img
+        className="marca-img"
+        src={claro}
+        alt=""
+        width={ancho}
+        height={Math.round(ancho * proporcion)}
+        decoding="async"
       />
-    </svg>
+    </picture>
   );
 }
 

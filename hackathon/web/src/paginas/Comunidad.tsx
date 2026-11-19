@@ -7,7 +7,11 @@ import {
   enlaceTelegram,
   comunidad as esquemaComunidad,
   eventos as esquemaEventos,
+  nodo as esquemaNodo,
   nota as esquemaNota,
+  type Nodo,
+  nodosQuitados,
+  sinContenido,
 } from "../api/tipos.ts";
 import { useConsulta } from "../api/use-consulta.ts";
 import { estadoVisual } from "../componentes/estados.ts";
@@ -74,10 +78,17 @@ export function Comunidad() {
                 </span>
               </div>
               <Insignia estado={estadoVisual(n)} />
+              {responsable && (
+                <div className="quitar acciones">
+                  <EditarNodo nodo={n} />
+                  <QuitarNodo nodoId={n.id} nombre={n.nombre} />
+                </div>
+              )}
             </li>
           ))}
         </ul>
         {responsable && (nodos.datos ?? []).map((n) => <AjustesActuador key={n.id} nodo={n} />)}
+        {responsable ? <NodosQuitados comunidadId={comunidad.id} /> : null}
         {responsable ? (
           <VincularNodo />
         ) : (
@@ -89,6 +100,243 @@ export function Comunidad() {
       {nodo ? <Bitacora nodoId={nodo.id} nodoNombre={nodo.nombre} /> : null}
       <OtraComunidad />
     </>
+  );
+}
+
+/**
+ * Una acción que no se deshace a la ligera, en dos pasos: el botón y luego una pregunta clara con «Sí» y «Cancelar».
+ * Si falla, dice qué pasó y deja volver a intentar.
+ */
+function AccionConfirmada({
+  etiqueta,
+  pregunta,
+  confirmar,
+  alConfirmar,
+}: {
+  etiqueta: string;
+  pregunta: string;
+  confirmar: string;
+  alConfirmar: () => Promise<void>;
+}) {
+  const [abierto, setAbierto] = useState(false);
+  const [enCurso, setEnCurso] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function ejecutar() {
+    setError(null);
+    setEnCurso(true);
+    try {
+      await alConfirmar();
+      setAbierto(false);
+    } catch (e) {
+      setError(mensajeDeError(e));
+    } finally {
+      setEnCurso(false);
+    }
+  }
+
+  if (!abierto) {
+    return (
+      <button
+        type="button"
+        className="boton boton-secundario boton-chico"
+        onClick={() => setAbierto(true)}
+      >
+        <Icono nombre="papelera" tamano={16} /> {etiqueta}
+      </button>
+    );
+  }
+  return (
+    <div className="confirmar">
+      <p>{pregunta}</p>
+      {error && <Aviso tipo="error">{error}</Aviso>}
+      <div className="acciones">
+        <button
+          type="button"
+          className="boton boton-peligro boton-chico"
+          onClick={() => void ejecutar()}
+          disabled={enCurso}
+        >
+          {enCurso ? "Un momento…" : confirmar}
+        </button>
+        <button
+          type="button"
+          className="boton boton-secundario boton-chico"
+          onClick={() => {
+            setAbierto(false);
+            setError(null);
+          }}
+          disabled={enCurso}
+        >
+          Cancelar
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** Cambiar el nombre y el lugar de un nodo (solo responsables). */
+function EditarNodo({ nodo }: { nodo: Nodo }) {
+  const { api } = useSesion();
+  const { recargar } = useEspacio();
+  const [abierto, setAbierto] = useState(false);
+  const [nombre, setNombre] = useState(nodo.nombre);
+  const [lugar, setLugar] = useState(nodo.ubicacion?.texto ?? "");
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  function abrir() {
+    setNombre(nodo.nombre);
+    setLugar(nodo.ubicacion?.texto ?? "");
+    setError(null);
+    setAbierto(true);
+  }
+
+  async function guardar(e: FormEvent) {
+    e.preventDefault();
+    const cuerpo: { nombre?: string; ubicacion?: { texto: string } | null } = {};
+    if (nombre.trim() !== nodo.nombre) cuerpo.nombre = nombre.trim();
+    if (lugar.trim() !== (nodo.ubicacion?.texto ?? "")) {
+      cuerpo.ubicacion = lugar.trim() === "" ? null : { texto: lugar.trim() };
+    }
+    if (Object.keys(cuerpo).length === 0) {
+      setAbierto(false);
+      return;
+    }
+    setError(null);
+    setGuardando(true);
+    try {
+      await api.pedir(`/api/nodos/${nodo.id}`, { metodo: "PUT", cuerpo, esquema: esquemaNodo });
+      setAbierto(false);
+      recargar();
+    } catch (err) {
+      setError(mensajeDeError(err));
+    } finally {
+      setGuardando(false);
+    }
+  }
+
+  if (!abierto) {
+    return (
+      <button type="button" className="boton boton-secundario boton-chico" onClick={abrir}>
+        <Icono nombre="lapiz" tamano={16} /> Editar
+      </button>
+    );
+  }
+  return (
+    <form className="formulario confirmar" onSubmit={guardar}>
+      <label>
+        Nombre del nodo
+        <input
+          value={nombre}
+          onChange={(e) => setNombre(e.target.value)}
+          required
+          minLength={2}
+          maxLength={80}
+        />
+      </label>
+      <label>
+        ¿Dónde está? (opcional)
+        <input
+          value={lugar}
+          onChange={(e) => setLugar(e.target.value)}
+          placeholder="Azotea, edificio B"
+          maxLength={120}
+        />
+      </label>
+      {error && <Aviso tipo="error">{error}</Aviso>}
+      <div className="acciones">
+        <button type="submit" className="boton boton-primario boton-chico" disabled={guardando}>
+          {guardando ? "Guardando…" : "Guardar"}
+        </button>
+        <button
+          type="button"
+          className="boton boton-secundario boton-chico"
+          onClick={() => setAbierto(false)}
+          disabled={guardando}
+        >
+          Cancelar
+        </button>
+      </div>
+    </form>
+  );
+}
+
+/** Los nodos que se quitaron: siguen guardados como archivo y se pueden devolver a la comunidad. */
+function NodosQuitados({ comunidadId }: { comunidadId: string }) {
+  const { api } = useSesion();
+  const { nodos, recargar, elegirNodo } = useEspacio();
+  const lista = useConsulta(
+    (signal) =>
+      api.pedir(`/api/comunidades/${comunidadId}/nodos-quitados`, {
+        esquema: nodosQuitados,
+        signal,
+      }),
+    // Al quitar o restaurar, la lista de nodos activos cambia y esta se vuelve a pedir.
+    [api, comunidadId, nodos.datos?.length],
+  );
+  const [restaurando, setRestaurando] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const quitados = lista.datos?.nodos ?? [];
+  if (quitados.length === 0) return null;
+
+  async function restaurar(id: string) {
+    setError(null);
+    setRestaurando(id);
+    try {
+      await api.pedir(`/api/nodos/${id}/restaurar`, { metodo: "POST", esquema: esquemaNodo });
+      elegirNodo(id);
+      recargar();
+    } catch (err) {
+      setError(mensajeDeError(err));
+    } finally {
+      setRestaurando(null);
+    }
+  }
+
+  return (
+    <details>
+      <summary>Nodos quitados ({quitados.length})</summary>
+      <p className="nota">
+        Siguen guardados como archivo. Al restaurar uno vuelve a vigilarse y conserva su historial.
+      </p>
+      {error && <Aviso tipo="error">{error}</Aviso>}
+      <ul className="lista">
+        {quitados.map((q) => (
+          <li key={q.id} className="fila-nodo">
+            <div>
+              <strong>{q.nombre}</strong>
+              {q.ubicacion && <span className="nota">{q.ubicacion.texto}</span>}
+              <span className="nota">Quitado el {fechaMx(q.quitado)}</span>
+            </div>
+            <button
+              type="button"
+              className="boton boton-secundario boton-chico"
+              onClick={() => void restaurar(q.id)}
+              disabled={restaurando !== null}
+            >
+              {restaurando === q.id ? "Restaurando…" : "Restaurar"}
+            </button>
+          </li>
+        ))}
+      </ul>
+    </details>
+  );
+}
+
+function QuitarNodo({ nodoId, nombre }: { nodoId: string; nombre: string }) {
+  const { api } = useSesion();
+  const { recargar } = useEspacio();
+  return (
+    <AccionConfirmada
+      etiqueta="Quitar este nodo"
+      pregunta={`¿Quitar «${nombre}»? Dejará de vigilarse y de mandar avisos. Su historial se conserva como archivo, pero ya no aparecerá en la app ni en los reportes.`}
+      confirmar="Sí, quitar el nodo"
+      alConfirmar={async () => {
+        await api.pedir(`/api/nodos/${nodoId}`, { metodo: "DELETE", esquema: sinContenido });
+        recargar();
+      }}
+    />
   );
 }
 
@@ -259,6 +507,9 @@ function SeccionTelegram({ comunidad }: { comunidad: ComunidadTipo }) {
           </a>
         </Aviso>
       )}
+      {responsable && comunidad.telegram ? (
+        <DesvincularTelegram comunidadId={comunidad.id} />
+      ) : null}
       {responsable ? (
         <button
           type="button"
@@ -277,6 +528,25 @@ function SeccionTelegram({ comunidad }: { comunidad: ComunidadTipo }) {
         <p className="nota">Solo quien es responsable puede vincular Telegram.</p>
       )}
     </section>
+  );
+}
+
+function DesvincularTelegram({ comunidadId }: { comunidadId: string }) {
+  const { api } = useSesion();
+  const { recargar } = useEspacio();
+  return (
+    <AccionConfirmada
+      etiqueta="Desvincular Telegram"
+      pregunta="¿Desvincular este chat? Dejarás de recibir ahí las alertas y los reportes. Puedes volver a vincularlo cuando quieras."
+      confirmar="Sí, desvincular"
+      alConfirmar={async () => {
+        await api.pedir(`/api/comunidades/${comunidadId}/telegram`, {
+          metodo: "DELETE",
+          esquema: esquemaComunidad,
+        });
+        recargar();
+      }}
+    />
   );
 }
 

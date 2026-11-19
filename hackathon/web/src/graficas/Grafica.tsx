@@ -1,23 +1,48 @@
+import { createTheme, ThemeProvider } from "@mui/material/styles";
+import {
+  axisClasses,
+  ChartsReferenceLine,
+  LineChart,
+  useDrawingArea,
+  useYScale,
+} from "@mui/x-charts";
+import { lineClasses } from "@mui/x-charts/LineChart";
 import type { Parametro, Serie } from "../api/tipos.ts";
 import { valorLegible } from "../util/formato.ts";
-import {
-  descripcionGrafica,
-  dominioY,
-  escala,
-  marcasX,
-  marcasY,
-  puntosDe,
-  tramos,
-} from "./calculo.ts";
+import { datosParaLinea, descripcionGrafica, dominioY, puntosDe, tramos } from "./calculo.ts";
+import { formatoEjeX } from "./ejes.ts";
 
-const ANCHO = 640;
-const ALTO = 240;
-const M = { izq: 44, der: 12, arr: 12, abajo: 28 };
+/** El tema de MUI sigue al del sistema (claro u oscuro) y usa la tipografía de la app. */
+const TEMA = createTheme({
+  colorSchemes: { light: true, dark: true },
+  typography: { fontFamily: "var(--font-sans)" },
+});
+
+/** La franja de la norma (por ejemplo pH 6.5 a 8.5), dibujada con el tono «en rango». */
+function FranjaNorma({ min, max }: { min: number | null; max: number | null }) {
+  const area = useDrawingArea();
+  const escalaY = useYScale<"linear">();
+  const [d0, d1] = escalaY.domain() as [number, number];
+  const arriba = escalaY(Math.min(max ?? d1, d1));
+  const abajo = escalaY(Math.max(min ?? d0, d0));
+  if (!(abajo > arriba)) return null;
+  return (
+    <rect
+      x={area.left}
+      y={arriba}
+      width={area.width}
+      height={abajo - arriba}
+      fill="var(--good)"
+      fillOpacity={0.16}
+      pointerEvents="none"
+    />
+  );
+}
 
 /**
- * Gráfica de un parámetro hecha a mano en SVG: la línea del promedio, una banda con el mínimo y el máximo
- * de cada tramo y la franja de la norma. La línea se corta donde el nodo no envió datos (no se interpola).
- * Trae una descripción en texto para quien no ve la imagen.
+ * Gráfica de un parámetro con MUI X Charts: la línea del promedio, el mínimo y el máximo de cada tramo y la franja
+ * de la norma. La línea se corta donde el nodo no envió datos (no se interpola). Trae una descripción en texto
+ * para quien no ve la imagen.
  */
 export function Grafica({ serie, parametro }: { serie: Serie; parametro: Parametro }) {
   const puntos = puntosDe(serie, parametro.id);
@@ -34,112 +59,85 @@ export function Grafica({ serie, parametro }: { serie: Serie; parametro: Paramet
 
   const norma = parametro.norma;
   const [lo, hi] = dominioY(puntos, norma);
-  const x = escala(serie.desde.getTime(), serie.hasta.getTime(), M.izq, ANCHO - M.der);
-  const y = escala(lo, hi, ALTO - M.abajo, M.arr);
   const pasoMs = serie.paso_s * 1000;
-  const lineas = tramos(puntos, pasoMs);
-  const hayHuecos = lineas.length > 1;
-
-  const trayecto = (pts: { t: number; v: number }[]) =>
-    pts.map((p, i) => `${i === 0 ? "M" : "L"}${x(p.t).toFixed(1)} ${y(p.v).toFixed(1)}`).join(" ");
-
-  const franjaArriba = norma?.max != null ? Math.max(y(norma.max), M.arr) : M.arr;
-  const franjaAbajo = norma?.min != null ? Math.min(y(norma.min), ALTO - M.abajo) : ALTO - M.abajo;
+  const datos = datosParaLinea(puntos, pasoMs);
+  const hayHuecos = tramos(puntos, pasoMs).length > 1;
+  const formato = (v: number | null) => (v == null ? "" : valorLegible(v, parametro.decimales));
+  // Un punto aislado (sin vecinos) no formaría línea: se marca para que se vea.
+  const aislado = (i: number) => datos.prom[i - 1] == null && datos.prom[i + 1] == null;
 
   return (
     <figure className="grafica">
-      <svg viewBox={`0 0 ${ANCHO} ${ALTO}`} role="img" aria-label={descripcion}>
-        {norma && franjaAbajo > franjaArriba && (
-          <rect
-            x={M.izq}
-            y={franjaArriba}
-            width={ANCHO - M.izq - M.der}
-            height={franjaAbajo - franjaArriba}
-            fill="var(--good-soft)"
-          />
-        )}
-        {marcasY(lo, hi).map((v) => (
-          <g key={v}>
-            <line
-              x1={M.izq}
-              x2={ANCHO - M.der}
-              y1={y(v)}
-              y2={y(v)}
-              stroke="var(--line)"
-              strokeWidth="1"
-            />
-            <text x={M.izq - 6} y={y(v) + 4} textAnchor="end" className="grafica-eje">
-              {valorLegible(v, v % 1 === 0 ? 0 : 1)}
-            </text>
-          </g>
-        ))}
-        {[norma?.min, norma?.max].map((lim) =>
-          lim == null ? null : (
-            <line
-              key={lim}
-              x1={M.izq}
-              x2={ANCHO - M.der}
-              y1={y(lim)}
-              y2={y(lim)}
-              stroke="var(--text-2)"
-              strokeWidth="1"
-              strokeDasharray="5 4"
-            />
-          ),
-        )}
-        {lineas.map((t) => {
-          const banda = [
-            ...t.map((p) => ({ t: p.t, v: p.max })),
-            ...[...t].reverse().map((p) => ({ t: p.t, v: p.min })),
-          ];
-          return (
-            <path
-              key={`b${t[0]?.t}`}
-              d={`${trayecto(banda)} Z`}
-              fill="var(--talavera)"
-              opacity="0.14"
-            />
-          );
-        })}
-        {lineas.map((t) =>
-          t.length === 1 ? (
-            <g key={`p${t[0]?.t}`}>
-              <line
-                x1={x(t[0]?.t ?? 0)}
-                x2={x(t[0]?.t ?? 0)}
-                y1={y(t[0]?.min ?? 0)}
-                y2={y(t[0]?.max ?? 0)}
-                stroke="var(--talavera)"
-                strokeWidth="3"
-                strokeLinecap="round"
-                opacity="0.4"
+      <ThemeProvider theme={TEMA}>
+        <LineChart
+          height={260}
+          margin={{ top: 12, right: 16, bottom: 8, left: 4 }}
+          hideLegend
+          skipAnimation
+          grid={{ horizontal: true }}
+          xAxis={[
+            {
+              data: datos.t,
+              scaleType: "time",
+              min: serie.desde,
+              max: serie.hasta,
+              tickNumber: 4,
+              valueFormatter: (d: Date, contexto) =>
+                formatoEjeX(d, serie.desde, serie.hasta, contexto.location === "tooltip"),
+            },
+          ]}
+          yAxis={[{ min: lo, max: hi, width: 44 }]}
+          series={[
+            {
+              id: "max",
+              label: "Máximo",
+              data: datos.max,
+              color: "var(--line-strong)",
+              curve: "linear",
+              showMark: false,
+              valueFormatter: formato,
+            },
+            {
+              id: "min",
+              label: "Mínimo",
+              data: datos.min,
+              color: "var(--line-strong)",
+              curve: "linear",
+              showMark: false,
+              valueFormatter: formato,
+            },
+            {
+              id: "prom",
+              label: parametro.nombre,
+              data: datos.prom,
+              color: "var(--brand)",
+              curve: "linear",
+              showMark: ({ index }: { index: number }) => aislado(index),
+              valueFormatter: formato,
+            },
+          ]}
+          sx={{
+            [`& .${axisClasses.tickLabel}`]: {
+              fill: "var(--text-2)",
+              fontVariantNumeric: "tabular-nums",
+            },
+            [`& .${axisClasses.line}, & .${axisClasses.tick}`]: { stroke: "var(--line-strong)" },
+            "& .MuiChartsGrid-line": { stroke: "var(--line)" },
+            [`& .${lineClasses.line}`]: { strokeWidth: 2 },
+          }}
+        >
+          {norma && <FranjaNorma min={norma.min} max={norma.max} />}
+          {[norma?.min, norma?.max].map((lim) =>
+            lim == null ? null : (
+              <ChartsReferenceLine
+                key={lim}
+                y={lim}
+                lineStyle={{ stroke: "var(--text-2)", strokeDasharray: "5 4", strokeWidth: 1 }}
               />
-              <circle cx={x(t[0]?.t ?? 0)} cy={y(t[0]?.prom ?? 0)} r="3" fill="var(--talavera)" />
-            </g>
-          ) : (
-            <path
-              key={`l${t[0]?.t}`}
-              d={trayecto(t.map((p) => ({ t: p.t, v: p.prom })))}
-              fill="none"
-              stroke="var(--talavera)"
-              strokeWidth="2"
-              strokeLinejoin="round"
-              strokeLinecap="round"
-            />
-          ),
-        )}
-        {marcasX(serie.desde, serie.hasta).map((m, i) => (
-          <text
-            key={m.t}
-            x={x(m.t)}
-            y={ALTO - 8}
-            textAnchor={i === 0 ? "start" : i === 2 ? "end" : "middle"}
-            className="grafica-eje"
-          >
-            {m.texto}
-          </text>
-        ))}
-      </svg>
+            ),
+          )}
+        </LineChart>
+      </ThemeProvider>
       <figcaption>
         {descripcion}
         {norma ? " La franja verde es el rango recomendado." : ""}

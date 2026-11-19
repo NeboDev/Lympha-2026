@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { FondoOlas } from "../componentes/FondoOlas.tsx";
 import { Aviso, Marca } from "../componentes/Piezas.tsx";
 import { CONFIG } from "../config.ts";
 import { useSesion } from "../sesion/contexto.tsx";
@@ -19,35 +20,41 @@ export function Entrar() {
 
   return (
     <main className="entrar">
+      <FondoOlas />
       <div className="entrar-marca">
-        <Marca tamano={72} />
-        <h1>Atl</h1>
+        <h1>
+          <Marca variante="logo" ancho={200} />
+          <span className="solo-lectores">Lympha Atl</span>
+        </h1>
+        <p className="entrar-producto">Atl</p>
         <p className="lead">El agua de tu comunidad, a la vista de todos.</p>
       </div>
 
-      {CONFIG.problemas.length > 0 && (
-        <Aviso tipo="error">
-          Falta configurar la web: {CONFIG.problemas.join(", ")}. Llena esas variables en{" "}
-          <code>web/.env</code> y reinicia <code>pnpm dev</code>.
-        </Aviso>
-      )}
-      {error && <Aviso tipo="error">{error}</Aviso>}
-      {sesion.motivo && <Aviso tipo="error">{sesion.motivo}</Aviso>}
-
-      <div className="entrar-acciones">
-        <button
-          type="button"
-          className="boton boton-primario"
-          onClick={conGoogle}
-          disabled={!sesion.puedeGoogle || entrando}
-        >
-          {entrando ? "Abriendo Google…" : "Entrar con Google"}
-        </button>
-        {sesion.puedeDemo && (
-          <button type="button" className="boton boton-secundario" onClick={sesion.entrarDemo}>
-            Entrar como demostración
-          </button>
+      <div className="tarjeta entrar-tarjeta">
+        {CONFIG.problemas.length > 0 && (
+          <Aviso tipo="error">
+            Falta configurar la web: {CONFIG.problemas.join(", ")}. Llena esas variables en{" "}
+            <code>web/.env</code> y reinicia <code>pnpm dev</code>.
+          </Aviso>
         )}
+        {error && <Aviso tipo="error">{error}</Aviso>}
+        {sesion.motivo && <Aviso tipo="error">{sesion.motivo}</Aviso>}
+
+        <div className="entrar-acciones">
+          <button
+            type="button"
+            className="boton boton-primario"
+            onClick={conGoogle}
+            disabled={!sesion.puedeGoogle || entrando}
+          >
+            {entrando ? "Abriendo Google…" : "Entrar con Google"}
+          </button>
+          {sesion.puedeDemo && (
+            <button type="button" className="boton boton-secundario" onClick={sesion.entrarDemo}>
+              Entrar como demostración
+            </button>
+          )}
+        </div>
       </div>
 
       <p className="nota">Atl no certifica el agua; te ayuda a vigilarla y a documentarla.</p>

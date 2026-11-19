@@ -13,6 +13,9 @@ const POR_CODIGO: Record<string, string> = {
   blynk_no_responde: "Blynk no respondió. Revisa tu internet e inténtalo de nuevo en un momento.",
   nodo_repetido: "Ya hay un nodo con ese nombre en la comunidad. Elige otro.",
   demasiados_nodos: "Esta comunidad ya tiene el máximo de nodos.",
+  nodo_no_quitado: "Ese nodo ya está en la comunidad.",
+  pulso_en_curso:
+    "Hay un pulso de la bomba pendiente o en curso. Detenlo o espera a que termine y vuelve a intentar.",
   demasiadas_comunidades: "Ya eres responsable del máximo de comunidades.",
   nombre_invalido: "El nombre debe tener entre 2 y 80 caracteres.",
   texto_invalido: "La nota debe tener entre 1 y 500 caracteres.",

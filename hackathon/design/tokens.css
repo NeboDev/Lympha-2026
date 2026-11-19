@@ -1,6 +1,7 @@
-/* Atl — tokens de diseño. Una sola fuente de verdad para la web, los reportes y los avisos.
-   Contrastes calculados (WCAG): ver docs/IDENTIDAD_VISUAL.md §3.
-   Regla: el color de estado comunica SOLO el estado del agua; el azul Talavera es para acciones, enlaces y foco.
+/* Lympha Atl — tokens de diseño. Una sola fuente de verdad para la web (los reportes y los avisos llevan los suyos).
+   Estilo de la familia Lympha (docs/marca/DESIGN.md): lienzo cáscara de huevo, tarjetas planas en tono arena, tinta negra
+   para las acciones (el color de marca ES la tinta; el turquesa del logo solo vive en el logo) y botones en píldora.
+   Regla: el color de estado comunica SOLO el estado del agua; la tinta es para acciones, enlaces y foco.
    El estado nunca va solo en color: siempre símbolo + palabra. */
 
 @font-face {
@@ -8,31 +9,33 @@
   font-style: normal;
   font-weight: 100 900;
   font-display: swap;
-  /* Copiar de apps/web/public/fuentes/inter-latin.woff2 (Inter variable, OFL 1.1) */
+  /* Inter variable (OFL 1.1), autoalojada: sin CDN. Subconjunto latino. */
   src: url("/fuentes/inter-latin.woff2") format("woff2");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
 :root {
-  /* Identidad */
-  --talavera: #1f4fa3; /* marca: acciones, enlaces, foco */
-  --talavera-osc: #16397a; /* hover / presionado */
-  --agua: #cfe8ee; /* relleno suave, gráficas de fondo */
-  --manantial: #1b7a78; /* acento secundario (texto AA sobre cal) */
-  --barro: #9a4423; /* calidez humana: bitácora, llamadas a la comunidad (texto AA) */
-  --barro-claro: #f3d9cb; /* relleno suave de barro */
+  /* Marca (tinta) */
+  --brand: #000000; /* acciones, enlaces, foco */
+  --brand-fill: #000000;
+  --brand-press: #2b2926; /* hover / presionado */
+  --brand-text: #000000;
+  --brand-soft: #ebe8e4;
+  --on-brand: #fdfcfc;
 
   /* Superficies y texto (claro) */
-  --bg: #fbf8f2; /* cal: lienzo cálido, no blanco clínico */
-  --surface: #f2ebdd; /* arena: tarjetas planas */
-  --surface-2: #e3dac8; /* piedra: líneas, placas de icono */
-  --text: #14233a; /* tinta */
-  --text-2: #566175; /* humo */
-  --line: #e3dac8;
-  --line-strong: #8a8478;
-  --on-brand: #ffffff;
-  --scrim: rgb(20 35 58 / 0.45);
+  --bg: #fdfcfc; /* cáscara de huevo: lienzo cálido, no blanco clínico */
+  --surface: #f5f3f1; /* arena: tarjetas planas */
+  --surface-2: #ebe8e4; /* piedra: líneas, placas de icono */
+  --text: #000000;
+  --text-2: #6b655d; /* humo */
+  --line: #ebe8e4;
+  --line-strong: #8f8981;
+  --scrim: rgb(15 18 22 / 0.45);
 
-  /* Semáforo (mismos valores que Lympha, para coherencia de familia) */
+  /* Semáforo (mismos valores que Lympha) */
   --good: #5dc756;
   --fair: #ffda26;
   --poor: #ff7136;
@@ -40,16 +43,24 @@
   --none: #9aa0a6;
   --on-state: #101317; /* texto sobre un relleno de estado: siempre oscuro */
 
-  --good-soft: color-mix(in srgb, var(--good) 16%, var(--surface));
-  --fair-soft: color-mix(in srgb, var(--fair) 22%, var(--surface));
-  --poor-soft: color-mix(in srgb, var(--poor) 16%, var(--surface));
-  --crit-soft: color-mix(in srgb, var(--crit) 12%, var(--surface));
-  --none-soft: color-mix(in srgb, var(--none) 18%, var(--surface));
+  --good-soft: color-mix(in srgb, var(--good) 14%, var(--surface));
+  --fair-soft: color-mix(in srgb, var(--fair) 20%, var(--surface));
+  --poor-soft: color-mix(in srgb, var(--poor) 15%, var(--surface));
+  --crit-soft: color-mix(in srgb, var(--crit) 11%, var(--surface));
+  --none-soft: color-mix(in srgb, var(--none) 16%, var(--surface));
 
   /* Escala de pH (papel indicador) */
   --ph-acido: #e5674a; /* ≈ pH 4 */
   --ph-neutro: #5fb877; /* ≈ pH 7 */
   --ph-basico: #6b7fe0; /* ≈ pH 10 */
+
+  /* Alias de la primera versión (Talavera): los nombres siguen existiendo, ahora apuntan a la tinta. */
+  --talavera: var(--brand);
+  --talavera-osc: var(--brand-press);
+  --manantial: var(--brand);
+  --barro: #44403b; /* bitácora y llamadas a la comunidad: grafito cálido (texto AA sobre arena) */
+  --barro-claro: var(--surface-2);
+  --agua: var(--surface-2);
 
   /* Tipografía */
   --font-sans: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
@@ -61,7 +72,7 @@
   --text-lead: 20px;
   --text-heading: 32px;
   --text-display: 48px;
-  --leading-body: 1.55;
+  --leading-body: 1.5;
   --tracking-title: -0.02em;
 
   /* Espacio, forma y elevación */
@@ -77,8 +88,7 @@
   --radius-input: 10px;
   --radius-pill: 9999px;
   --shadow-1: none;
-  --shadow-2:
-    0 0 1px rgb(20 35 58 / 0.4), 0 1px 1px rgb(20 35 58 / 0.04), 0 2px 4px rgb(20 35 58 / 0.04);
+  --shadow-2: 0 0 1px rgb(0 0 0 / 0.4), 0 1px 1px rgb(0 0 0 / 0.04), 0 2px 4px rgb(0 0 0 / 0.04);
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
   --tap-min: 44px; /* objetivo táctil mínimo */
 
@@ -87,26 +97,26 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --talavera: #7fa6f2;
-    --talavera-osc: #a5c0f6;
-    --agua: #1d3a52;
-    --manantial: #62c7c3;
-    --barro: #e58a62;
-    --barro-claro: #3a2a22;
-    --bg: #0b1626;
-    --surface: #13233a;
-    --surface-2: #1c3150;
-    --text: #f3eee4;
-    --text-2: #9da9bc;
-    --line: #243a5a;
-    --line-strong: #6c7b92;
-    --on-brand: #0b1626;
+    --bg: #0a0c0c;
+    --surface: #141717;
+    --surface-2: #1e2222;
+    --text: #fdfcfc;
+    --text-2: #a59f97;
+    --line: #262b2b;
+    --line-strong: #666c69;
     --scrim: rgb(0 0 0 / 0.6);
-    --good-soft: color-mix(in srgb, var(--good) 10%, var(--surface));
-    --fair-soft: color-mix(in srgb, var(--fair) 10%, var(--surface));
-    --poor-soft: color-mix(in srgb, var(--poor) 11%, var(--surface));
-    --crit-soft: color-mix(in srgb, var(--crit) 13%, var(--surface));
-    --none-soft: color-mix(in srgb, var(--none) 12%, var(--surface));
+    --brand: #fdfcfc;
+    --brand-fill: #fdfcfc;
+    --brand-press: #d9d6d2;
+    --brand-text: #fdfcfc;
+    --brand-soft: #262b2b;
+    --on-brand: #0a0c0c;
+    --barro: #d4cfc8;
+    --good-soft: color-mix(in srgb, var(--good) 8%, var(--surface));
+    --fair-soft: color-mix(in srgb, var(--fair) 8%, var(--surface));
+    --poor-soft: color-mix(in srgb, var(--poor) 9%, var(--surface));
+    --crit-soft: color-mix(in srgb, var(--crit) 11%, var(--surface));
+    --none-soft: color-mix(in srgb, var(--none) 10%, var(--surface));
     --shadow-2: 0 2px 4px rgb(0 0 0 / 0.4), 0 12px 32px rgb(0 0 0 / 0.4);
     color-scheme: dark;
   }
@@ -133,6 +143,6 @@ h3 {
   letter-spacing: var(--tracking-title);
 }
 :focus-visible {
-  outline: 3px solid var(--talavera);
-  outline-offset: 2px;
+  outline: 3px solid var(--brand);
+  outline-offset: 3px;
 }

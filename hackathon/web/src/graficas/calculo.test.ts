@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Serie } from "../api/tipos.ts";
 import {
+  datosParaLinea,
   descripcionGrafica,
   dominioY,
   escala,
@@ -138,5 +139,21 @@ describe("marcasX", () => {
     const m = marcasX(new Date(hasta.getTime() - 7 * 86_400_000), hasta);
     expect(m[2]?.texto).toMatch(/19/);
     expect(m[2]?.texto).not.toMatch(/:/);
+  });
+});
+
+describe("datosParaLinea", () => {
+  const P = (t: number, v: number) => ({ t, prom: v, min: v - 0.1, max: v + 0.1 });
+
+  it("mete un punto vacío en cada hueco para cortar la línea", () => {
+    const r = datosParaLinea([P(0, 7), P(60_000, 7.1), P(600_000, 6.9)], 60_000);
+    expect(r.prom).toEqual([7, 7.1, null, 6.9]);
+    expect(r.min[2]).toBeNull();
+    expect(r.max[2]).toBeNull();
+    expect(r.t.map((d) => d.getTime())).toEqual([0, 60_000, 120_000, 600_000]);
+  });
+
+  it("sin huecos no agrega nada", () => {
+    expect(datosParaLinea([P(0, 7), P(60_000, 7)], 60_000).prom).toEqual([7, 7]);
   });
 });

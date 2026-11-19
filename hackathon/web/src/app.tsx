@@ -69,89 +69,96 @@ function Marco() {
 
   return (
     <div className="marco">
-      <header className="barra">
-        <div className="barra-marca">
-          <Marca tamano={28} />
-          <span className="barra-nombre">Atl</span>
-        </div>
-        <div className="barra-selectores">
-          {comunidades.length > 1 && (
-            <label className="selector">
-              <span className="solo-lectores">Comunidad</span>
-              <select value={comunidad?.id} onChange={(e) => elegirComunidad(e.target.value)}>
-                {comunidades.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.nombre}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
-          {(nodos.datos?.length ?? 0) > 1 && (
-            <label className="selector">
-              <span className="solo-lectores">Nodo</span>
-              <select value={nodo?.id} onChange={(e) => elegirNodo(e.target.value)}>
-                {(nodos.datos ?? []).map((n) => (
-                  <option key={n.id} value={n.id}>
-                    {n.nombre}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
-        </div>
-        <button
-          type="button"
-          className="boton-icono"
-          onClick={() => void sesion.salir()}
-          title="Salir"
-          aria-label={`Salir${persona?.nombre ? ` (${persona.nombre})` : ""}`}
-        >
-          <Icono nombre="salir" />
-        </button>
-      </header>
+      <div className="lateral">
+        <header className="barra">
+          <div className="barra-marca">
+            <Marca ancho={34} />
+            <span>Lympha Atl</span>
+          </div>
+          <div className="barra-selectores">
+            {comunidades.length > 1 && (
+              <label className="selector">
+                <span className="solo-lectores">Comunidad</span>
+                <select value={comunidad?.id} onChange={(e) => elegirComunidad(e.target.value)}>
+                  {comunidades.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.nombre}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            {(nodos.datos?.length ?? 0) > 1 && (
+              <label className="selector">
+                <span className="solo-lectores">Nodo</span>
+                <select value={nodo?.id} onChange={(e) => elegirNodo(e.target.value)}>
+                  {(nodos.datos ?? []).map((n) => (
+                    <option key={n.id} value={n.id}>
+                      {n.nombre}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+          </div>
+          <button
+            type="button"
+            className="boton-icono boton-salir"
+            onClick={() => void sesion.salir()}
+            title="Salir"
+            aria-label={`Salir${persona?.nombre ? ` (${persona.nombre})` : ""}`}
+          >
+            <Icono nombre="salir" />
+            <span className="salir-texto" aria-hidden="true">
+              Salir
+            </span>
+          </button>
+        </header>
 
-      {sesion.estado.tipo === "dentro" && sesion.estado.demo && (
-        <p className="franja-demo" role="status">
-          Estás en la cuenta de demostración.
-        </p>
-      )}
-
-      <main className="contenido" id="contenido">
-        {!comunidad ? (
-          <section className="tarjeta">
-            <h1>Crea tu comunidad</h1>
-            <p className="nota">
-              Una comunidad agrupa a quienes vigilan el mismo agua: una escuela, un comité, un
-              hogar. Después podrás vincular su nodo y su Telegram.
-            </p>
-            <NuevaComunidad />
-          </section>
-        ) : ruta === "agua" ? (
-          <MiAgua alIr={ir} />
-        ) : ruta === "reportes" ? (
-          <Reportes />
-        ) : (
-          <Comunidad />
+        {comunidad && (
+          <nav className="pestanas" aria-label="Secciones">
+            {PESTANAS.map((p) => (
+              <button
+                key={p.ruta}
+                type="button"
+                className={p.ruta === ruta ? "pestana pestana-activa" : "pestana"}
+                aria-current={p.ruta === ruta ? "page" : undefined}
+                onClick={() => ir(p.ruta)}
+              >
+                <Icono nombre={p.icono} />
+                <span>{p.texto}</span>
+              </button>
+            ))}
+          </nav>
         )}
-      </main>
+      </div>
 
-      {comunidad && (
-        <nav className="pestanas" aria-label="Secciones">
-          {PESTANAS.map((p) => (
-            <button
-              key={p.ruta}
-              type="button"
-              className={p.ruta === ruta ? "pestana pestana-activa" : "pestana"}
-              aria-current={p.ruta === ruta ? "page" : undefined}
-              onClick={() => ir(p.ruta)}
-            >
-              <Icono nombre={p.icono} />
-              <span>{p.texto}</span>
-            </button>
-          ))}
-        </nav>
-      )}
+      <div className="cuerpo">
+        {sesion.estado.tipo === "dentro" && sesion.estado.demo && (
+          <p className="franja-demo" role="status">
+            Estás en la cuenta de demostración.
+          </p>
+        )}
+
+        <main className="contenido" id="contenido">
+          {!comunidad ? (
+            <section className="tarjeta">
+              <h1>Crea tu comunidad</h1>
+              <p className="nota">
+                Una comunidad agrupa a quienes vigilan el mismo agua: una escuela, un comité, un
+                hogar. Después podrás vincular su nodo y su Telegram.
+              </p>
+              <NuevaComunidad />
+            </section>
+          ) : ruta === "agua" ? (
+            <MiAgua alIr={ir} />
+          ) : ruta === "reportes" ? (
+            <Reportes />
+          ) : (
+            <Comunidad />
+          )}
+        </main>
+      </div>
     </div>
   );
 }

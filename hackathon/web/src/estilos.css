@@ -1,4 +1,6 @@
-/* Atl web. Todo el color, la tipografía y el espacio salen de design/tokens.css (fuente de verdad). */
+/* Lympha Atl web. Todo el color, la tipografía y el espacio salen de design/tokens.css (fuente de verdad).
+   Aspecto de la familia Lympha (apps/web): cáscara de huevo, tarjetas planas en arena con borde fino, tinta negra
+   para las acciones, botones en píldora, títulos ligeros y barra lateral en pantallas anchas. Sin librerías de estilos. */
 @import "../../design/tokens.css";
 
 *,
@@ -7,35 +9,51 @@
   box-sizing: border-box;
 }
 
+:root {
+  --ico-error: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cpath d='M12 8v4M12 16h.01'/%3E%3C/svg%3E");
+  --ancho-lateral: 16rem;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* El fondo lo pinta <html> (tokens.css): el cuerpo es transparente para que el lienzo de olas del acceso se vea. */
 body {
   margin: 0;
   min-height: 100dvh;
-  background: var(--bg);
+  background: transparent;
   color: var(--text);
   font-family: var(--font-sans);
   font-size: var(--text-body);
   line-height: var(--leading-body);
-  -webkit-text-size-adjust: 100%;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 h1,
 h2,
 h3 {
   margin: 0 0 var(--sp-2);
-  line-height: 1.2;
+  line-height: 1.15;
+  text-wrap: balance;
+  font-weight: var(--peso-titulo);
+  letter-spacing: var(--tracking-title);
 }
 h1 {
   font-size: var(--text-heading);
 }
 h2 {
-  font-size: var(--text-lead);
+  font-size: 1.375rem;
 }
 h3 {
-  font-size: var(--text-body);
+  font-size: 1.125rem;
   font-weight: 500;
 }
 p {
   margin: 0 0 var(--sp-3);
+  text-wrap: pretty;
 }
 code {
   font-family: var(--font-mono);
@@ -45,7 +63,16 @@ code {
   border-radius: 6px;
 }
 a {
-  color: var(--talavera);
+  color: var(--brand-text);
+  text-underline-offset: 3px;
+}
+::selection {
+  background: color-mix(in srgb, var(--brand) 32%, transparent);
+}
+:focus-visible {
+  outline: 3px solid var(--brand);
+  outline-offset: 3px;
+  border-radius: 8px;
 }
 
 .solo-lectores {
@@ -66,11 +93,39 @@ a {
   color: var(--text-2);
 }
 
-/* ---- Marco de la aplicación ---- */
+/* ---- Marca ---- */
+.marca-img {
+  display: block;
+}
+
+/* ---- Fondo de olas del acceso (decorativo) ---- */
+.fondo-olas {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+/* ---- Marco de la aplicación ----
+   Teléfono: barra superior con la marca y las pestañas abajo (al alcance del pulgar).
+   Pantalla ancha (≥ 1024 px): barra lateral con la marca, los selectores, las secciones y «Salir». */
 .marco {
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
+}
+.lateral {
+  display: contents;
+}
+/* El espacio de abajo deja libre la barra de pestañas fija del teléfono. */
+.cuerpo {
+  flex: 1;
+  padding-bottom: calc(56px + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
 }
 .barra {
   position: sticky;
@@ -80,18 +135,19 @@ a {
   align-items: center;
   gap: var(--sp-3);
   padding: var(--sp-2) var(--sp-4);
-  background: var(--bg);
+  background: var(--surface);
   border-bottom: 1px solid var(--line);
 }
 .barra-marca {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: var(--sp-2);
-}
-.barra-nombre {
+  gap: 10px;
+  min-height: var(--tap-min);
   font-size: var(--text-lead);
-  font-weight: var(--peso-titulo);
-  letter-spacing: var(--tracking-title);
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  white-space: nowrap;
 }
 .barra-selectores {
   flex: 1;
@@ -103,31 +159,39 @@ a {
 .boton-icono {
   min-width: var(--tap-min);
   min-height: var(--tap-min);
-  display: inline-grid;
-  place-items: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
   border: 0;
   border-radius: var(--radius-pill);
   background: transparent;
   color: var(--text);
+  font: inherit;
+  font-weight: 600;
   cursor: pointer;
 }
 .boton-icono:hover {
-  background: var(--surface);
+  background: var(--surface-2);
+}
+.salir-texto {
+  display: none;
 }
 .franja-demo {
   margin: 0;
   padding: var(--sp-1) var(--sp-4);
   text-align: center;
   font-size: var(--text-body-sm);
-  background: var(--barro-claro);
-  color: var(--barro);
+  background: var(--surface-2);
+  color: var(--text);
+  border-bottom: 1px solid var(--line);
 }
 .contenido {
   flex: 1;
   width: 100%;
-  max-width: 720px;
+  max-width: 48rem;
   margin: 0 auto;
-  padding: var(--sp-4) var(--sp-4) calc(var(--tap-min) + var(--sp-7));
+  padding: var(--sp-5) var(--sp-4);
 }
 .centro {
   max-width: 480px;
@@ -139,49 +203,49 @@ a {
 .encabezado-nodo {
   margin-bottom: var(--sp-4);
 }
-.encabezado-nodo h1 {
-  font-weight: var(--peso-titulo);
-  letter-spacing: var(--tracking-title);
-}
 
-/* ---- Navegación inferior (móvil primero) ---- */
+/* ---- Navegación (móvil primero) ---- */
 .pestanas {
   position: fixed;
   inset: auto 0 0 0;
   z-index: 5;
-  display: flex;
-  justify-content: center;
-  gap: var(--sp-2);
-  padding: var(--sp-2) var(--sp-3) calc(var(--sp-2) + env(safe-area-inset-bottom));
-  background: var(--bg);
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  padding: 0 0 env(safe-area-inset-bottom);
+  background: var(--surface);
   border-top: 1px solid var(--line);
 }
 .pestana {
-  flex: 1;
-  max-width: 200px;
-  min-height: var(--tap-min);
+  min-height: 56px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 2px;
   border: 0;
-  border-radius: var(--radius-pill);
+  border-top: 3px solid transparent;
+  border-radius: 0;
   background: transparent;
   color: var(--text-2);
   font: inherit;
   font-size: var(--text-caption);
+  font-weight: 700;
   cursor: pointer;
+  transition: color 150ms var(--ease);
+}
+.pestana:hover {
+  color: var(--text);
 }
 .pestana-activa {
-  background: var(--surface);
-  color: var(--talavera);
-  font-weight: 600;
+  color: var(--brand-text);
+  border-top-color: var(--brand);
 }
 
 /* ---- Tarjetas ---- */
 .tarjeta {
   background: var(--surface);
+  border: 1px solid var(--line);
   border-radius: var(--radius-card);
   padding: var(--sp-5);
   margin-bottom: var(--sp-4);
@@ -196,17 +260,14 @@ a {
 .tarjeta-mini svg {
   flex: none;
   margin-top: 2px;
-  color: var(--manantial);
+  color: var(--text);
 }
 .mini-titulo {
   margin: 0 0 var(--sp-1);
-  font-weight: 500;
+  font-weight: 600;
 }
 .tarjeta-bitacora {
-  border-left: 4px solid var(--barro);
-}
-.tarjeta-bitacora h2 {
-  color: var(--barro);
+  border-color: var(--line-strong);
 }
 
 /* ---- Estado del agua ---- */
@@ -219,7 +280,7 @@ a {
   border-radius: var(--radius-pill);
   color: var(--on-state);
   font-size: var(--text-body-sm);
-  font-weight: 600;
+  font-weight: 700;
   white-space: nowrap;
 }
 .insignia-grande {
@@ -356,15 +417,20 @@ a {
   padding: 0 var(--sp-4);
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-pill);
-  background: transparent;
+  background: var(--bg);
   color: var(--text);
   font: inherit;
   font-size: var(--text-body-sm);
+  font-weight: 600;
   cursor: pointer;
 }
-.ficha-activa {
-  background: var(--talavera);
-  border-color: var(--talavera);
+.ficha:hover {
+  background: var(--surface-2);
+}
+.ficha-activa,
+.ficha-activa:hover {
+  background: var(--brand-fill);
+  border-color: var(--brand-fill);
   color: var(--on-brand);
 }
 .lista {
@@ -388,27 +454,46 @@ a {
   grid-template-columns: 1fr auto;
   align-items: center;
 }
+.lista .quitar {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+.confirmar {
+  flex: 1 1 100%;
+  display: grid;
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-4);
+  margin: var(--sp-2) 0;
+  background: var(--surface-2);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-input);
+}
+.confirmar p {
+  margin: 0;
+}
 .fila-nodo > div {
   display: grid;
   gap: 2px;
 }
 .lista-notas li {
-  border-left: 3px solid var(--barro);
+  border-left: 3px solid var(--brand);
   padding-left: var(--sp-3);
   border-bottom: 0;
 }
 
 .formulario {
   display: grid;
-  gap: var(--sp-3);
+  gap: var(--sp-4);
   margin: var(--sp-3) 0;
 }
 .formulario label,
 .campos-fecha label {
   display: grid;
-  gap: var(--sp-1);
-  font-size: var(--text-body-sm);
-  font-weight: 500;
+  gap: 0.4rem;
+  font-size: 0.9rem;
+  font-weight: 700;
 }
 .campos-fecha {
   display: grid;
@@ -420,14 +505,34 @@ input,
 select,
 textarea {
   width: 100%;
-  min-height: var(--tap-min);
-  padding: var(--sp-2) var(--sp-3);
+  min-height: 52px;
+  padding: var(--sp-2) 1rem;
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-input);
   background: var(--bg);
   color: var(--text);
   font: inherit;
-  font-weight: 400;
+  font-size: 1.05rem;
+  font-weight: 500;
+  caret-color: var(--brand);
+  accent-color: var(--brand);
+}
+input:hover,
+select:hover,
+textarea:hover {
+  border-color: var(--text-2);
+}
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--brand) 40%, transparent);
+  outline-offset: 0;
+  border-color: var(--brand);
+}
+input::placeholder,
+textarea::placeholder {
+  color: var(--text-2);
+  opacity: 0.8;
 }
 textarea {
   resize: vertical;
@@ -442,7 +547,8 @@ details summary {
   display: flex;
   align-items: center;
   cursor: pointer;
-  color: var(--talavera);
+  color: var(--brand-text);
+  font-weight: 600;
 }
 
 .cifras {
@@ -453,6 +559,7 @@ details summary {
 }
 .cifras div {
   background: var(--bg);
+  border: 1px solid var(--line);
   border-radius: var(--radius-input);
   padding: var(--sp-3);
 }
@@ -469,44 +576,65 @@ details summary {
   margin: var(--sp-3) 0;
 }
 
-/* ---- Botones ---- */
+/* ---- Botones (píldora) ---- */
 .boton {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: var(--sp-2);
-  min-height: var(--tap-min);
-  padding: 0 var(--sp-5);
+  gap: 0.6rem;
+  min-height: 48px;
+  padding: 0 1.3rem;
   border: 1px solid transparent;
   border-radius: var(--radius-pill);
   font: inherit;
-  font-weight: 500;
+  font-weight: 600;
+  line-height: 1;
   text-decoration: none;
   cursor: pointer;
-  transition: background 150ms var(--ease);
+  transition:
+    background 180ms var(--ease),
+    transform 180ms var(--ease),
+    border-color 180ms;
+}
+.boton:active:not(:disabled) {
+  transform: scale(0.98);
 }
 .boton:disabled {
-  opacity: 0.55;
+  opacity: 0.5;
   cursor: not-allowed;
 }
 .boton-primario {
-  background: var(--talavera);
+  background: var(--brand-fill);
   color: var(--on-brand);
 }
 .boton-primario:hover:not(:disabled) {
-  background: var(--talavera-osc);
+  background: var(--brand-press);
 }
 .boton-secundario {
-  background: transparent;
-  color: var(--talavera);
-  border-color: var(--talavera);
+  background: var(--bg);
+  color: var(--text);
+  border-color: var(--line-strong);
+}
+.boton-secundario:hover:not(:disabled) {
+  background: var(--surface-2);
 }
 .boton-barro {
   background: var(--barro);
   color: var(--on-brand);
 }
+.boton-barro:hover:not(:disabled) {
+  background: var(--brand-press);
+}
+.boton-peligro {
+  background: var(--bg);
+  color: var(--text);
+  border-color: var(--crit);
+}
+.boton-peligro:hover:not(:disabled) {
+  background: var(--crit-soft);
+}
 .boton-chico {
-  min-height: 36px;
+  min-height: var(--tap-min);
   padding: 0 var(--sp-4);
   font-size: var(--text-body-sm);
 }
@@ -518,7 +646,8 @@ details summary {
   margin: var(--sp-3) 0;
   padding: var(--sp-3) var(--sp-4);
   border-radius: var(--radius-input);
-  background: var(--agua);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
   color: var(--text);
 }
 .aviso p {
@@ -526,12 +655,27 @@ details summary {
 }
 .aviso-error {
   background: var(--crit-soft);
+  border: 1px solid color-mix(in srgb, var(--crit) 45%, var(--line));
   border-left: 4px solid var(--crit);
+  font-weight: 600;
+}
+/* Símbolo de error (Lucide «circle-alert», ISC) delante de todo error: el color no va solo. */
+.aviso-error p::before {
+  content: "";
+  display: inline-block;
+  width: 1.15em;
+  height: 1.15em;
+  margin-right: 0.45em;
+  vertical-align: -0.22em;
+  background: currentColor;
+  -webkit-mask: var(--ico-error) center / contain no-repeat;
+  mask: var(--ico-error) center / contain no-repeat;
 }
 .vacio {
   text-align: center;
   padding: var(--sp-7) var(--sp-4);
   background: var(--surface);
+  border: 1px solid var(--line);
   border-radius: var(--radius-card);
 }
 .cargando {
@@ -543,29 +687,58 @@ details summary {
 /* ---- Entrar ---- */
 .entrar {
   min-height: 100dvh;
-  max-width: 420px;
+  max-width: 28rem;
   margin: 0 auto;
-  padding: var(--sp-7) var(--sp-4);
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
+  padding: var(--sp-6) var(--sp-4);
+  display: grid;
+  align-content: center;
   gap: var(--sp-5);
+}
+.entrar-marca {
+  display: grid;
+  justify-items: center;
+  gap: var(--sp-2);
   text-align: center;
 }
 .entrar-marca h1 {
-  margin: var(--sp-3) 0 var(--sp-1);
-  font-size: var(--text-display);
-  font-weight: var(--peso-titulo);
-  letter-spacing: var(--tracking-title);
+  margin: 0;
+}
+.entrar-producto {
+  margin: 0;
+  padding: 2px var(--sp-4);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-pill);
+  background: var(--bg);
+  font-size: var(--text-body-sm);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.entrar-marca .lead {
+  margin: 0;
+  font-size: var(--text-body);
+}
+.entrar-tarjeta {
+  display: grid;
+  gap: var(--sp-3);
+  margin: 0;
 }
 .entrar-acciones {
   display: grid;
   gap: var(--sp-3);
 }
+.entrar > .nota {
+  text-align: center;
+  margin: 0;
+  font-size: 0.8rem;
+}
 
 /* ---- Ajustes que dependen de las reglas de arriba (especificidad ascendente) ---- */
 .selector select {
   max-width: 150px;
+  min-height: var(--tap-min);
+  font-size: var(--text-body-sm);
+  font-weight: 600;
+  padding: 0 var(--sp-3);
 }
 
 .lista .boton {
@@ -577,37 +750,101 @@ details summary {
   margin-top: var(--sp-3);
 }
 
-/* ---- Pantallas anchas ---- */
+/* ---- Pantallas medianas ---- */
 @media (min-width: 720px) {
-  .pestanas {
-    position: static;
-    border-top: 0;
-    border-bottom: 1px solid var(--line);
-    padding: var(--sp-2) var(--sp-4);
-  }
-  .pestana {
-    flex-direction: row;
-    gap: var(--sp-2);
-    font-size: var(--text-body-sm);
-  }
-  .marco {
-    flex-direction: column;
-  }
-  .marco > .pestanas {
-    order: 1;
-  }
-  .contenido {
-    order: 2;
-    padding-bottom: var(--sp-7);
-  }
   .cifras {
     grid-template-columns: repeat(4, 1fr);
   }
 }
 
+/* ---- Pantallas anchas: barra lateral ---- */
+@media (min-width: 1024px) {
+  .marco {
+    display: grid;
+    grid-template-columns: var(--ancho-lateral) minmax(0, 1fr);
+    align-items: start;
+  }
+  .lateral {
+    position: sticky;
+    top: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-5);
+    height: 100dvh;
+    padding: var(--sp-6) var(--sp-4) var(--sp-5);
+    background: var(--surface);
+    border-right: 1px solid var(--line);
+    overflow-y: auto;
+  }
+  /* La barra «desaparece» como caja: sus hijos se ordenan dentro de la lateral. */
+  .barra {
+    display: contents;
+  }
+  .barra-marca {
+    order: 0;
+  }
+  .barra-selectores {
+    order: 1;
+    flex: none;
+    flex-direction: column;
+    justify-content: flex-start;
+  }
+  .selector select {
+    max-width: none;
+  }
+  .pestanas {
+    order: 2;
+    position: static;
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-1);
+    padding: 0;
+    background: transparent;
+    border: 0;
+  }
+  .pestana {
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: var(--sp-3);
+    min-height: 48px;
+    padding: 0 var(--sp-3);
+    border: 0;
+    border-radius: var(--radius-input);
+    font-size: var(--text-body);
+  }
+  .pestana:hover {
+    background: var(--surface-2);
+  }
+  .pestana-activa,
+  .pestana-activa:hover {
+    background: var(--brand-soft);
+  }
+  .boton-salir {
+    order: 3;
+    margin-top: auto;
+    justify-content: flex-start;
+    padding: 0 var(--sp-3);
+    border-top: 1px solid var(--line);
+    border-radius: 0;
+    padding-top: var(--sp-3);
+    min-height: calc(var(--tap-min) + var(--sp-3));
+  }
+  .salir-texto {
+    display: inline;
+  }
+  .cuerpo {
+    min-height: 100dvh;
+    padding-bottom: 0;
+  }
+  .contenido {
+    max-width: 64rem;
+    padding: var(--sp-7) var(--sp-6) var(--sp-5);
+  }
+}
+
 /* ---- Dosificación (actuador) ---- */
 .tarjeta-dosis {
-  border-left: 4px solid var(--manantial);
+  border-color: var(--line-strong);
 }
 .tarjeta-dosis h2 {
   display: flex;
@@ -617,9 +854,9 @@ details summary {
 }
 .sello-simulado {
   padding: var(--sp-1) var(--sp-3);
-  border: 1.5px dashed var(--barro);
+  border: 1.5px dashed var(--line-strong);
   border-radius: var(--radius-pill);
-  color: var(--barro);
+  color: var(--text);
   font-size: var(--text-body-sm);
   font-weight: 600;
   text-transform: uppercase;

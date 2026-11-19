@@ -81,6 +81,17 @@ export const nodo = z.object({
 export type Nodo = z.infer<typeof nodo>;
 
 export const listaNodos = z.object({ nodos: z.array(nodo) });
+/** Nodos que se quitaron (archivados) y se pueden restaurar. */
+export const nodosQuitados = z.object({
+  nodos: z.array(
+    z.object({
+      id: z.string(),
+      nombre: z.string(),
+      ubicacion: z.object({ texto: z.string() }).passthrough().nullable(),
+      quitado: fecha,
+    }),
+  ),
+});
 export const altaNodo = nodo.extend({ conectado: z.boolean() });
 export type AltaNodo = z.infer<typeof altaNodo>;
 
@@ -135,12 +146,14 @@ export const calibracion = z.object({
   id: z.string(),
   ts: fecha,
   parametro: z.string(),
-  temp_c: z.number(),
+  temp_c: z.number().nullable(),
   puntos: z.array(z.object({ valor: z.number(), mv: z.number() })),
   pendiente_mv_por_ph: z.number(),
   pendiente_pct_nernst: z.number(),
-  offset_mv: z.number(),
+  offset_mv: z.number().nullable(),
   diagnostico: z.enum(["buena", "desgastada", "revisar"]),
+  /** `nodo`: la placa reportó su pendiente por Blynk; `usuario`: alguien la registró con buffers. */
+  origen: z.enum(["usuario", "nodo"]).default("usuario"),
 });
 export type Calibracion = z.infer<typeof calibracion>;
 export const listaCalibraciones = z.object({ calibraciones: z.array(calibracion) });
@@ -170,6 +183,9 @@ export type Reporte = z.infer<typeof reporte>;
 export const listaReportes = z.object({ reportes: z.array(reporte) });
 
 export const nota = z.object({ ts: fecha, texto: z.string() });
+/** Respuestas sin cuerpo (204). */
+export const sinContenido = z.undefined();
+
 export const enlaceTelegram = z.object({ enlace: z.string().url(), expira: fecha });
 export type EnlaceTelegram = z.infer<typeof enlaceTelegram>;
 
